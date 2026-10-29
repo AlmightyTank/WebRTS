@@ -6,6 +6,7 @@ import { BUILDING_TYPES } from './simulation/content.js';
 import { getMobileHudLayout } from './mobileHudLayout.js';
 import { PlacementState, UiPointerGate } from './placementState.js';
 import { describePlacement, defaultPreviewAnchor } from './placementPreview.js';
+import { getPlacementHudGeometry, getPinchUpdate, isPlacementTap } from './mobilePlacement.js';
 import { isTouchGesturePointer, getDragPanDelta } from './mobileGestures.js';
 
 const WORLD = { width: 2400, height: 1500 };
@@ -37,6 +38,7 @@ class Battlefield extends Phaser.Scene {
     this.mobilePanelOpen = false;
     this.mobileCardPage = 0;
     this.uiPointerGate = new UiPointerGate();
+    this.pinchCenter = null;
   }
 
   create() {
@@ -104,6 +106,12 @@ class Battlefield extends Phaser.Scene {
     this.mobileMenuText = this.add.text(0, 0, 'BUILD', { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#f2d27b' })
       .setOrigin(0.5).setScrollFactor(0).setDepth(24).setVisible(false);
     this.mobileMenuButton.on('pointerdown', () => this.toggleMobilePanel());
+    this.mobilePlacementStatus = this.add.text(0, 0, '', {
+      fontFamily: 'monospace', fontSize: '11px', fontStyle: 'bold', color: '#a7f5c7'
+    }).setScrollFactor(0).setDepth(23).setVisible(false);
+    this.mobilePlacementHint = this.add.text(0, 0, 'TAP TO PLACE  •  DRAG TO PAN  •  PINCH TO ZOOM', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#d9e0c4'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(23).setVisible(false);
     this.mobilePagerButtons = ['prev', 'next'].map((action) => {
       const background = this.add.rectangle(0, 0, 72, 32, 0x26343b, 1).setStrokeStyle(1, 0x8ca58b)
         .setScrollFactor(0).setDepth(23).setInteractive({ useHandCursor: true }).setVisible(false);
@@ -214,6 +222,7 @@ class Battlefield extends Phaser.Scene {
       ...Object.values(this.hudText),
       this.buildTitle,
       this.mobileMenuButton, this.mobileMenuText, this.mobilePageText,
+      this.mobilePlacementStatus, this.mobilePlacementHint,
       ...this.mobilePagerButtons.flatMap((button) => [button.background, button.text]),
       ...this.categoryTabs.flatMap((tab) => [tab.background, tab.text]),
       ...Object.values(this.sidebarSections).flatMap((section) => [section.title, section.row]),
@@ -279,6 +288,7 @@ class Battlefield extends Phaser.Scene {
     this.previewScreenAnchor = this.defaultPlacementScreenAnchor();
     this.message = `Placing ${BUILDING_TYPES[type].name}. Tap a valid location to construct.`;
     this.refreshPlacementPreview();
+    if (this.uiCamera) this.layoutUi();
     return true;
   }
 
@@ -289,6 +299,7 @@ class Battlefield extends Phaser.Scene {
     this.previewScreenAnchor = null;
     this.buildPreview?.clear();
     this.buildPreviewLabel?.setVisible(false);
+    if (this.uiCamera) this.layoutUi();
     return true;
   }
 
@@ -299,6 +310,7 @@ class Battlefield extends Phaser.Scene {
     this.previewScreenAnchor = null;
     this.buildPreview?.clear();
     this.buildPreviewLabel?.setVisible(false);
+    if (this.uiCamera) this.layoutUi();
     return true;
   }
 
@@ -539,6 +551,7 @@ class Battlefield extends Phaser.Scene {
     this.game.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
     this.input.addPointer(1);
     this.pinchDistance = null;
+    this.pinchCenter = null;
     this.touchGestureOccurred = false;
     this.cameraKeys = this.input.keyboard?.createCursorKeys();
     this.cameraKeys.w = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.W);
@@ -564,7 +577,9 @@ class Battlefield extends Phaser.Scene {
         this.pointerMode = 'touch';
         this.touchGestureOccurred = true;
         this.dragStart = null;
-        this.pinchDistance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+        const gesture = getPinchUpdate(null, touches[0], touches[1], this.cameras.main.zoom, this.minZoom);
+        this.pinchDistance = gesture.distance;
+        this.pinchCenter = gesture.center;
         return;
       }
       if (this.isUiPointer(pointer)) {
@@ -573,7 +588,11 @@ class Battlefield extends Phaser.Scene {
         return;
       }
       const world = this.toWorld(pointer);
-      if (this.placement.active) this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
+      // Touch pan keeps the ghost at its screen anchor; only a deliberate tap
+      // relocates it. Desktop mouse placement still follows the cursor.
+      if (this.placement.active && !this.isTouchPointer(pointer)) {
+        this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
+      }
       this.dragStart = { screenX: pointer.x, screenY: pointer.y, lastX: pointer.x, lastY: pointer.y,
       pointerId: pointer.id, panStarted: false, worldX: world.x, worldY: world.y };
       if (pointer.button === 1) {
@@ -586,19 +605,20 @@ class Battlefield extends Phaser.Scene {
 
     this.input.on('pointermove', (pointer) => {
       if (this.pointerMode === 'ui' || this.uiPointerGate.active) return;
-      if (this.placement.active && !this.isUiPointer(pointer)
-        && (!this.isTouchPointer(pointer) || pointer.isDown)) {
+      if (this.placement.active && !this.isUiPointer(pointer) && !this.isTouchPointer(pointer)) {
         this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
       }
       const touches = this.getTouchPointers();
       if (this.pointerMode === 'touch' && touches.length >= 2) {
-        const distance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
-        if (this.pinchDistance) {
-          const centerX = (touches[0].x + touches[1].x) / 2;
-          const centerY = (touches[0].y + touches[1].y) / 2;
-          this.zoomAt(centerX, centerY, Phaser.Math.Clamp(this.cameras.main.zoom * distance / this.pinchDistance, this.minZoom, 1.5));
-        }
-        this.pinchDistance = distance;
+        const previous = this.pinchCenter ? { center: this.pinchCenter, distance: this.pinchDistance } : null;
+        const gesture = getPinchUpdate(previous, touches[0], touches[1],
+          this.cameras.main.zoom, this.minZoom);
+        // Both fingers moving together pans; their separation controls zoom.
+        this.cameras.main.scrollX -= gesture.panX / this.cameras.main.zoom;
+        this.cameras.main.scrollY -= gesture.panY / this.cameras.main.zoom;
+        this.zoomAt(gesture.center.x, gesture.center.y, gesture.zoom);
+        this.pinchDistance = gesture.distance;
+        this.pinchCenter = gesture.center;
         this.touchGestureOccurred = true;
         return;
       }
@@ -635,8 +655,10 @@ class Battlefield extends Phaser.Scene {
         // Never convert a pan or a two-finger pinch into an accidental move/order.
         this.dragStart = null;
         this.selectionLayer.clear();
+        // Keep pinch suppression until the last finger has lifted.
+        this.pinchDistance = null;
+        this.pinchCenter = null;
         if (this.getTouchPointers().filter((active) => active.id !== pointer.id).length === 0) {
-          this.pinchDistance = null;
           this.pointerMode = null;
           this.touchGestureOccurred = false;
         }
@@ -646,6 +668,7 @@ class Battlefield extends Phaser.Scene {
         this.dragStart = null;
         this.pointerMode = null;
         this.pinchDistance = null;
+        this.pinchCenter = null;
         this.selectionLayer.clear();
         return;
       }
@@ -655,8 +678,17 @@ class Battlefield extends Phaser.Scene {
       const distance = Phaser.Math.Distance.Between(start.screenX, start.screenY, pointer.x, pointer.y);
       this.dragStart = null;
       this.pinchDistance = null;
+      this.pinchCenter = null;
       this.selectionLayer.clear();
       if (this.pointerMode === 'pan') return;
+      if (this.placement.active && this.isTouchPointer(pointer)) {
+        if (isPlacementTap(
+          { x: start.screenX, y: start.screenY },
+          { x: pointer.x, y: pointer.y },
+          { panned: start.panStarted, pinched: this.touchGestureOccurred }
+        )) this.handleTap(world, pointer);
+        return;
+      }
       if (distance > 8 && this.pointerMode === 'mouse') this.selectBox(start.worldX, start.worldY, world.x, world.y);
       else if (distance <= 8) this.handleTap(world, pointer);
     });
@@ -1134,6 +1166,13 @@ class Battlefield extends Phaser.Scene {
       });
      const selectedBuilding = this.simulation.buildings.find((building) => this.selectedBuildings.has(building.id));
      this.hudText.selection.setText(selectedBuilding ? `${selectedBuilding.name.toUpperCase()}   HP ${Math.round(selectedBuilding.hp / selectedBuilding.maxHp * 100)}%   QUEUE ${selectedBuilding.queue.length}` : selectedUnits.length ? `${selectedUnits.length} × ${selectedUnits[0].name ?? 'RIFLE SQUAD'}   HP ${Math.round(selectedUnits.reduce((sum, unit) => sum + unit.hp, 0) / selectedUnits.length)}%` : 'NO UNIT SELECTED');
+     if (this.placement.active && (width < 700 || this.isTouchDevice())) {
+       const type = this.placement.selected;
+       this.hudText.selection.setText(`PLACE ${BUILDING_TYPES[type].name.toUpperCase()}   •   ${BUILDING_TYPES[type].cost} METAL`);
+       const location = describePlacement(this.simulation, type, this.buildPreviewPosition);
+       this.mobilePlacementStatus.setText(location?.message ?? 'TAP A LOCATION TO BUILD')
+         .setColor(location && !location.valid ? '#ffc0c5' : '#a7f5c7');
+     }
      this.hudText.hint.setText(this.placement.active ? `CONSTRUCTION: ${this.buildType.toUpperCase()} // 1 REFINERY  2 BARRACKS` : this.commandMode ? `${this.commandMode.toUpperCase()} MODE ACTIVE` : this.message);
      const ended = this.simulation.gameState !== 'playing';
      this.gameOverPanel.setVisible(ended);
@@ -1161,14 +1200,19 @@ class Battlefield extends Phaser.Scene {
     }
     this.mobileMenuButton.setVisible(false);
     this.mobileMenuText.setVisible(false);
+    this.mobilePlacementStatus.setVisible(false);
+    this.mobilePlacementHint.setVisible(false);
     this.mobilePageText.setVisible(false);
     this.mobilePagerButtons.forEach((button) => {
       button.background.setVisible(false);
       button.text.setVisible(false);
     });
-    this.commandButtons.forEach((button) => button.text.setText(
-      button.action === 'defend' ? 'DEFEND AREA' : button.action === 'select_all' ? 'SELECT ALL' : button.action.toUpperCase()
-    ));
+    this.commandButtons.forEach((button) => {
+      button.background.setVisible(true);
+      button.text.setVisible(true).setText(
+        button.action === 'defend' ? 'DEFEND AREA' : button.action === 'select_all' ? 'SELECT ALL' : button.action.toUpperCase()
+      );
+    });
     const bottomHeight = mobile ? 145 : 165;
     const bottomTop = height - bottomHeight;
     const sidebar = this.sidebarLayout();
@@ -1294,10 +1338,20 @@ class Battlefield extends Phaser.Scene {
     this.hudText.selection.setPosition(12, bottomTop + 9).setFontSize(11)
       .setWordWrapWidth(width - 24).setVisible(true);
 
-    this.mobileMenuButton.setVisible(true).setPosition(width - 60, 27).setSize(100, 40)
-      .setFillStyle(opened ? 0x5b4435 : 0x263f3b);
-    if (this.mobileMenuButton.input?.hitArea?.setSize) this.mobileMenuButton.input.hitArea.setSize(100, 40);
-    this.mobileMenuText.setVisible(true).setPosition(width - 60, 27).setText(opened ? 'CLOSE ×' : 'BUILD ▣');
+    const placing = this.placement.active;
+    const placementHud = getPlacementHudGeometry(width, height);
+    const cancel = placementHud.cancel;
+    this.mobileMenuButton.setVisible(true).setPosition(cancel.x, cancel.y).setSize(cancel.width, cancel.height)
+      .setFillStyle(placing ? 0x67363a : opened ? 0x5b4435 : 0x263f3b);
+    if (this.mobileMenuButton.input?.hitArea?.setSize) {
+      this.mobileMenuButton.input.hitArea.setSize(cancel.width, cancel.height);
+    }
+    this.mobileMenuText.setVisible(true).setPosition(cancel.x, cancel.y)
+      .setText(placing ? 'CANCEL ×' : opened ? 'CLOSE ×' : 'BUILD ▣');
+    this.mobilePlacementStatus.setPosition(placementHud.status.x, placementHud.status.y)
+      .setFontSize(width < 355 ? 10 : 11).setVisible(placing);
+    this.mobilePlacementHint.setPosition(placementHud.hint.x, placementHud.hint.y)
+      .setFontSize(width < 355 ? 9 : 10).setVisible(placing);
 
     const gap = 5;
     const buttonWidth = Math.floor((width - 20 - 4 * gap) / 5);
@@ -1306,8 +1360,9 @@ class Battlefield extends Phaser.Scene {
       const x = 10 + buttonWidth * (index + 0.5) + index * gap;
       const y = bottomTop + 66;
       button.text.setText(labels[button.action]).setPosition(x, y).setFontSize(width < 340 ? 9 : 10);
-      button.background.setSize(buttonWidth, 44).setPosition(x, y);
+      button.background.setSize(buttonWidth, 44).setPosition(x, y).setVisible(!placing);
       if (button.background.input?.hitArea?.setSize) button.background.input.hitArea.setSize(buttonWidth, 44);
+      button.text.setVisible(!placing);
     });
 
     this.gameOverPanel.clear().fillStyle(0x07101a, 0.9).fillRect(0, 0, width, height);
