@@ -910,7 +910,10 @@ class Battlefield extends Phaser.Scene {
     return isTouchGesturePointer(pointer, this.isTouchDevice());
   }
   getTouchPointers() {
-    return (this.input.pointers ?? []).filter((pointer) => pointer.isDown && this.isTouchPointer(pointer));
+    // Phaser's active touch pointers are stored on the Input Manager, not
+    // InputPlugin.pointers (which is undefined in Phaser 4).
+    return (this.input.manager?.pointers ?? [this.input.pointer1, this.input.pointer2])
+      .filter((pointer) => pointer?.isDown && this.isTouchPointer(pointer));
   }
   zoomAt(screenX, screenY, zoom) {
     const camera = this.cameras.main;
