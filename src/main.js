@@ -4,6 +4,7 @@ import { Simulation } from './simulation/Simulation.js';
 import { attackCommand, buildCommand, defendCommand, moveCommand, produceCommand, repairCommand, sellCommand, stopCommand } from './simulation/commands.js';
 import { BUILDING_TYPES } from './simulation/content.js';
 import { getMobileHudLayout } from './mobileHudLayout.js';
+import { isTouchGesturePointer, getDragPanDelta } from './mobileGestures.js';
 
 const WORLD = { width: 2400, height: 1500 };
 const TEAM = { PLAYER: 0x54b7ff, ENEMY: 0xff6575 };
@@ -477,7 +478,8 @@ class Battlefield extends Phaser.Scene {
         return;
       }
       const world = this.toWorld(pointer);
-      this.dragStart = { screenX: pointer.x, screenY: pointer.y, worldX: world.x, worldY: world.y };
+      this.dragStart = { screenX: pointer.x, screenY: pointer.y, lastX: pointer.x, lastY: pointer.y,
+      pointerId: pointer.id, panStarted: false, worldX: world.x, worldY: world.y };
       if (pointer.button === 1) {
         this.pointerMode = 'pan';
         return;
@@ -501,21 +503,26 @@ class Battlefield extends Phaser.Scene {
         this.touchGestureOccurred = true;
         return;
       }
-      if (!pointer.isDown || !this.dragStart) return;
-      if (this.pointerMode === 'pan') {
-        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
-        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
+      if (!pointer.isDown || !this.dragStart || pointer.id !== this.dragStart.pointerId) return;
+      const point = { x: pointer.x, y: pointer.y };
+      const start = { x: this.dragStart.screenX, y: this.dragStart.screenY };
+      if (this.pointerMode === 'pan' || this.pointerMode === 'touch') {
+        // Phaser may update prevPosition before scene callbacks on mobile.
+        // Keep our own last position and retain the full initial drag delta.
+        const delta = getDragPanDelta(start,
+          { x: this.dragStart.lastX, y: this.dragStart.lastY },
+          point, this.dragStart.panStarted || this.pointerMode === 'pan');
+        if (delta) {
+          this.cameras.main.scrollX -= delta.x / this.cameras.main.zoom;
+          this.cameras.main.scrollY -= delta.y / this.cameras.main.zoom;
+          this.dragStart.panStarted = true;
+          this.dragStart.lastX = point.x;
+          this.dragStart.lastY = point.y;
+          if (this.pointerMode === 'touch') this.touchGestureOccurred = true;
+        }
         return;
       }
-      const distance = Phaser.Math.Distance.Between(this.dragStart.screenX, this.dragStart.screenY, pointer.x, pointer.y);
-      if (this.pointerMode === 'touch' && distance > 8) {
-        // Pan consistently even if the finger passes over another unit.
-        this.touchGestureOccurred = true;
-        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
-        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
-        return;
-      }
-      if (this.pointerMode === 'mouse' && distance > 8) this.drawSelectionBox(pointer);
+      if (this.pointerMode === 'mouse' && Phaser.Math.Distance.Between(start.x, start.y, point.x, point.y) > 8) this.drawSelectionBox(pointer);
     });
 
     this.input.on('pointerup', (pointer) => {
@@ -530,7 +537,7 @@ class Battlefield extends Phaser.Scene {
         // Never convert a pan or a two-finger pinch into an accidental move/order.
         this.dragStart = null;
         this.selectionLayer.clear();
-        if (this.getTouchPointers().length === 0) {
+        if (this.getTouchPointers().filter((active) => active.id !== pointer.id).length === 0) {
           this.pinchDistance = null;
           this.pointerMode = null;
           this.touchGestureOccurred = false;
@@ -728,7 +735,7 @@ class Battlefield extends Phaser.Scene {
 
   toWorld(pointer) { return this.cameras.main.getWorldPoint(pointer.x, pointer.y); }
   isTouchPointer(pointer) {
-    return pointer.pointerType === 'touch' || pointer.event?.pointerType === 'touch';
+    return isTouchGesturePointer(pointer, this.isTouchDevice());
   }
   getTouchPointers() {
     return (this.input.pointers ?? []).filter((pointer) => pointer.isDown && this.isTouchPointer(pointer));
