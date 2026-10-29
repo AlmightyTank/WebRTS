@@ -5,6 +5,7 @@ import { attackCommand, buildCommand, defendCommand, moveCommand, produceCommand
 import { BUILDING_TYPES } from './simulation/content.js';
 import { getMobileHudLayout } from './mobileHudLayout.js';
 import { PlacementState, UiPointerGate } from './placementState.js';
+import { describePlacement, defaultPreviewAnchor } from './placementPreview.js';
 import { isTouchGesturePointer, getDragPanDelta } from './mobileGestures.js';
 
 const WORLD = { width: 2400, height: 1500 };
@@ -32,6 +33,7 @@ class Battlefield extends Phaser.Scene {
     this.isPaused = false;
     this.placement = new PlacementState(BUILDING_TYPES);
     this.buildPreviewPosition = null;
+    this.previewScreenAnchor = null;
     this.mobilePanelOpen = false;
     this.mobileCardPage = 0;
     this.uiPointerGate = new UiPointerGate();
@@ -48,7 +50,12 @@ class Battlefield extends Phaser.Scene {
     this.selectionLayer = this.add.graphics();
     this.unitLayer = this.add.graphics();
     this.projectileLayer = this.add.graphics();
-    this.buildPreview = this.add.graphics();
+    this.buildPreview = this.add.graphics().setDepth(9);
+    this.buildPreviewLabel = this.add.text(0, 0, '', {
+      fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold',
+      color: '#a7f5c7', backgroundColor: '#07101ade',
+      padding: { x: 7, y: 4 }
+    }).setOrigin(0.5, 1).setDepth(10).setVisible(false);
     this.ui = this.add.graphics().setScrollFactor(0);
     this.helpText = this.add.text(18, 16, '', {
       color: '#e8f2ff', fontFamily: 'system-ui, sans-serif', fontSize: '15px',
@@ -73,6 +80,7 @@ class Battlefield extends Phaser.Scene {
       this.updateZoomLimits();
       const { width, height } = this.uiSize();
       this.uiCamera?.setViewport(0, 0, width, height).setSize(width, height);
+      if (this.placement.active) this.previewScreenAnchor = this.defaultPlacementScreenAnchor();
       this.layoutUi();
     });
     this.layoutUi();
@@ -223,7 +231,7 @@ class Battlefield extends Phaser.Scene {
       this.statusText
     ];
     this.cameras.main.ignore(hudObjects);
-    this.uiCamera.ignore([this.worldLayer, this.resourceLayer, this.selectionLayer, this.unitLayer, this.projectileLayer, this.buildPreview, this.ui]);
+    this.uiCamera.ignore([this.worldLayer, this.resourceLayer, this.selectionLayer, this.unitLayer, this.projectileLayer, this.buildPreview, this.buildPreviewLabel, this.ui]);
   }
 
   uiSize() {
@@ -266,8 +274,11 @@ class Battlefield extends Phaser.Scene {
     this.utilityMode = null;
     this.buildPreviewPosition = null;
     this.buildPreview?.clear();
+    this.buildPreviewLabel?.setVisible(false);
     this.closeMobilePanelForTargeting();
+    this.previewScreenAnchor = this.defaultPlacementScreenAnchor();
     this.message = `Placing ${BUILDING_TYPES[type].name}. Tap a valid location to construct.`;
+    this.refreshPlacementPreview();
     return true;
   }
 
@@ -275,7 +286,9 @@ class Battlefield extends Phaser.Scene {
     if (!this.placement.cancel()) return false;
     if (this.commandMode === 'build') this.commandMode = null;
     this.buildPreviewPosition = null;
+    this.previewScreenAnchor = null;
     this.buildPreview?.clear();
+    this.buildPreviewLabel?.setVisible(false);
     return true;
   }
 
@@ -283,7 +296,9 @@ class Battlefield extends Phaser.Scene {
     if (!this.placement.finish()) return false;
     if (this.commandMode === 'build') this.commandMode = null;
     this.buildPreviewPosition = null;
+    this.previewScreenAnchor = null;
     this.buildPreview?.clear();
+    this.buildPreviewLabel?.setVisible(false);
     return true;
   }
 
@@ -292,6 +307,10 @@ class Battlefield extends Phaser.Scene {
     this.buildPreviewPosition = null;
     this.buildPreview?.clear();
     this.message = `${BUILDING_TYPES[type].name} selected.`;
+    if (this.placement.active) {
+      this.previewScreenAnchor = this.previewScreenAnchor ?? this.defaultPlacementScreenAnchor();
+      this.refreshPlacementPreview();
+    }
     return true;
   }
 
@@ -554,6 +573,7 @@ class Battlefield extends Phaser.Scene {
         return;
       }
       const world = this.toWorld(pointer);
+      if (this.placement.active) this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
       this.dragStart = { screenX: pointer.x, screenY: pointer.y, lastX: pointer.x, lastY: pointer.y,
       pointerId: pointer.id, panStarted: false, worldX: world.x, worldY: world.y };
       if (pointer.button === 1) {
@@ -566,7 +586,10 @@ class Battlefield extends Phaser.Scene {
 
     this.input.on('pointermove', (pointer) => {
       if (this.pointerMode === 'ui' || this.uiPointerGate.active) return;
-      if (this.placement.active && !this.isUiPointer(pointer)) this.updateBuildPreview(this.toWorld(pointer));
+      if (this.placement.active && !this.isUiPointer(pointer)
+        && (!this.isTouchPointer(pointer) || pointer.isDown)) {
+        this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
+      }
       const touches = this.getTouchPointers();
       if (this.pointerMode === 'touch' && touches.length >= 2) {
         const distance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
@@ -683,6 +706,8 @@ class Battlefield extends Phaser.Scene {
     }
     if (this.placement.active) {
       const type = this.placement.selected;
+      this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
+      this.updateBuildPreview(world);
       const result = this.simulation.issue(buildCommand(0, type, world));
       this.message = result.ok ? `${BUILDING_TYPES[type].name} construction started.` : `Build rejected: ${result.reason}.`;
       if (result.ok) this.finishPlacement();
@@ -772,13 +797,53 @@ class Battlefield extends Phaser.Scene {
     });
   }
 
+  defaultPlacementScreenAnchor() {
+    const { width, height } = this.uiSize();
+    const mobile = width < 700 || this.isTouchDevice();
+    return defaultPreviewAnchor(width, height, mobile, mobile ? width : this.sidebarLayout().left);
+  }
+
+  refreshPlacementPreview() {
+    if (!this.placement.active || this.isPaused || this.simulation.gameState !== 'playing') {
+      this.buildPreview.clear();
+      this.buildPreviewLabel.setVisible(false);
+      return;
+    }
+    const anchor = this.previewScreenAnchor ?? this.defaultPlacementScreenAnchor();
+    this.updateBuildPreview(this.cameras.main.getWorldPoint(anchor.x, anchor.y));
+  }
+
   updateBuildPreview(world) {
     this.buildPreviewPosition = world;
-    const definition = BUILDING_TYPES[this.buildType];
-    const valid = this.simulation.resources[0] >= definition.cost && this.simulation.canPlace(this.buildType, world);
+    const preview = describePlacement(this.simulation, this.placement.selected, world);
     this.buildPreview.clear();
-    this.buildPreview.fillStyle(valid ? 0x66d69a : 0xe05e68, 0.28).fillRect(world.x - definition.width / 2, world.y - definition.height / 2, definition.width, definition.height);
-    this.buildPreview.lineStyle(3, valid ? 0x66d69a : 0xe05e68, 0.95).strokeRect(world.x - definition.width / 2, world.y - definition.height / 2, definition.width, definition.height);
+    if (!preview) {
+      this.buildPreviewLabel.setVisible(false);
+      return;
+    }
+    const { x, y, width, height, color, valid } = preview;
+    const graphics = this.buildPreview;
+    // The same footprint and silhouette as the finished building.
+    graphics.fillStyle(0x07101a, 0.35)
+      .fillRect(x - width / 2, y - height / 2, width, height);
+    graphics.fillStyle(color, 0.26)
+      .fillRect(x - width / 2 + 5, y - height / 2 + 5, width - 10, height - 10);
+    this.drawBuildingSymbol({ type: preview.type, x, y }, color, 0.52, graphics);
+    graphics.fillStyle(color, 0.12).fillRect(x - width / 2, y - height / 2, width, height);
+    graphics.lineStyle(3, color, 0.98)
+      .strokeRect(x - width / 2, y - height / 2, width, height);
+    const corner = 12;
+    graphics.lineStyle(2, color, 1);
+    for (const dx of [-1, 1]) for (const dy of [-1, 1]) {
+      const px = x + dx * width / 2;
+      const py = y + dy * height / 2;
+      graphics.lineBetween(px, py, px - dx * corner, py);
+      graphics.lineBetween(px, py, px, py - dy * corner);
+    }
+    this.buildPreviewLabel.setText(`${preview.type.replaceAll('_', ' ').toUpperCase()} // ${preview.message}`)
+      .setColor(valid ? '#a7f5c7' : '#ffc0c5')
+      .setPosition(x, y - height / 2 - 13)
+      .setVisible(true);
   }
   produceSelected(type = 'rifle_squad') {
     const selectedProducer = this.simulation.buildings.find((candidate) => {
@@ -839,7 +904,7 @@ class Battlefield extends Phaser.Scene {
     this.selected.forEach((id) => { if (!this.getUnit(id)) this.selected.delete(id); });
     this.drawUnits();
     this.drawProjectiles();
-    if (!this.placement.active) this.buildPreview.clear();
+    this.refreshPlacementPreview();
     this.drawResourceNodes();
     this.updateUi();
   }
@@ -910,8 +975,7 @@ class Battlefield extends Phaser.Scene {
     });
   }
 
-  drawBuildingSymbol(building, teamColor, opacity) {
-    const graphics = this.unitLayer;
+  drawBuildingSymbol(building, teamColor, opacity, graphics = this.unitLayer) {
     const x = building.x;
     const y = building.y;
     const shadow = 0x07101a;
