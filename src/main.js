@@ -389,10 +389,28 @@ class Battlefield extends Phaser.Scene {
     return window.matchMedia?.('(pointer: coarse)').matches ?? false;
   }
 
+  mobileAvailableCards() {
+    if (this.activeCategory === 'buildings' || this.activeCategory === 'defensive') {
+      return this.buildCards.filter((card) => card.category === this.activeCategory);
+    }
+    if (this.activeCategory === 'infantry') {
+      return this.unitCards.filter((card) => ['rifle_squad', 'rocket_team', 'assault_trooper'].includes(card.type));
+    }
+    if (this.activeCategory === 'vehicles') {
+      return this.unitCards.filter((card) => ['scout_bike', 'light_tank', 'siege_tank', 'harvester'].includes(card.type));
+    }
+    return [];
+  }
+
+  mobileHudLayout() {
+    const { width, height } = this.uiSize();
+    return getMobileHudLayout(width, height, this.mobileAvailableCards().length);
+  }
+
   isUiPointer(pointer) {
     const { width, height } = this.uiSize();
     if (width < 700 || this.isTouchDevice()) {
-      const layout = getMobileHudLayout(width, height);
+      const layout = this.mobileHudLayout();
       const inPanel = this.mobilePanelOpen
         && pointer.x >= layout.drawerLeft && pointer.x <= layout.drawerLeft + layout.drawerWidth
         && pointer.y >= layout.drawerTop && pointer.y <= layout.drawerBottom;
@@ -1136,10 +1154,11 @@ class Battlefield extends Phaser.Scene {
 
   layoutMobileUi() {
     const { width, height } = this.uiSize();
-    const layout = getMobileHudLayout(width, height);
+    const layout = this.mobileHudLayout();
     const opened = this.mobilePanelOpen;
     const { drawerLeft, drawerWidth, drawerTop, drawerBottom, bottomTop,
-      mapX, mapY, mapWidth, mapHeight, utilityY, tabsY, titleY, cardsTop,
+      mapX, mapY, mapWidth, mapHeight, utilityY, utilityButtonHeight, 
+      tabsY, tabHeight, titleY, cardsTop,
       cardWidth, cardHeight, cardRowHeight, rowsPerPage } = layout;
 
     this.hudText.title.setVisible(false);
@@ -1197,26 +1216,21 @@ class Battlefield extends Phaser.Scene {
     this.categoryTabs.forEach((tab, index) => {
       const slotWidth = (drawerWidth - 24) / 6;
       const x = drawerLeft + 12 + slotWidth * (index + 0.5);
-      tab.background.setSize(slotWidth - 3, 34).setPosition(x, tabsY).setVisible(opened);
-      if (tab.background.input?.hitArea?.setSize) tab.background.input.hitArea.setSize(slotWidth - 3, 34);
+      tab.background.setSize(slotWidth - 5, tabHeight).setPosition(x, tabsY).setVisible(opened);
+      if (tab.background.input?.hitArea?.setSize) tab.background.input.hitArea.setSize(slotWidth - 5, tabHeight);
       tab.text.setPosition(x, tabsY).setFontSize(15).setVisible(opened);
       tab.background.setStrokeStyle(2, tab.key === this.activeCategory ? 0xf2d27b : 0x71806d);
     });
     this.utilityButtons.forEach((button, index) => {
       const availableWidth = drawerWidth - (mapX - drawerLeft) - mapWidth - 24;
       const x = mapX + mapWidth + 12 + availableWidth / 2;
-      const y = utilityY + (index === 0 ? -22 : 22);
-      button.background.setSize(availableWidth, 40).setPosition(x, y).setVisible(opened);
-      if (button.background.input?.hitArea?.setSize) button.background.input.hitArea.setSize(availableWidth, 40);
-      button.text.setPosition(x, y).setFontSize(12).setVisible(opened);
+      const y = utilityY + (index === 0 ? -(utilityButtonHeight + 4) / 2 : (utilityButtonHeight + 4) / 2);
+      button.background.setSize(availableWidth, utilityButtonHeight).setPosition(x, y).setVisible(opened);
+      if (button.background.input?.hitArea?.setSize) button.background.input.hitArea.setSize(availableWidth, utilityButtonHeight);
+      button.text.setPosition(x, y).setFontSize(mapHeight < 50 ? 10 : 12).setVisible(opened);
     });
 
-    const allVisible = this.activeCategory === 'buildings' || this.activeCategory === 'defensive'
-      ? this.buildCards.filter((card) => card.category === this.activeCategory)
-      : this.unitCards.filter((card) =>
-        this.activeCategory === 'infantry'
-          ? ['rifle_squad', 'rocket_team', 'assault_trooper'].includes(card.type)
-          : this.activeCategory === 'vehicles' && ['scout_bike', 'light_tank', 'siege_tank', 'harvester'].includes(card.type));
+    const allVisible = this.mobileAvailableCards();
     const pageSize = rowsPerPage * 2;
     const pages = Math.max(1, Math.ceil(allVisible.length / pageSize));
     this.mobileCardPage = Math.min(this.mobileCardPage, pages - 1);
@@ -1240,12 +1254,12 @@ class Battlefield extends Phaser.Scene {
     const showPager = opened && pages > 1;
     this.mobilePagerButtons.forEach((button, index) => {
       const x = width / 2 + (index === 0 ? -95 : 95);
-      const y = drawerBottom - 23;
+      const y = drawerBottom - (layout.pagerHeight / 2) - 5;
       button.background.setPosition(x, y).setVisible(showPager).setAlpha(
         index === 0 ? (this.mobileCardPage === 0 ? 0.45 : 1) : (this.mobileCardPage === pages - 1 ? 0.45 : 1));
       button.text.setPosition(x, y).setVisible(showPager);
     });
-    this.mobilePageText.setPosition(width / 2, drawerBottom - 23)
+    this.mobilePageText.setPosition(width / 2, drawerBottom - (layout.pagerHeight / 2) - 5)
       .setText(`${this.mobileCardPage + 1} / ${pages}`).setVisible(showPager);
     this.drawHud();
   }
@@ -1290,7 +1304,7 @@ class Battlefield extends Phaser.Scene {
 
   drawMobileHud() {
     const { width, height } = this.uiSize();
-    const layout = getMobileHudLayout(width, height);
+    const layout = this.mobileHudLayout();
     this.hud.clear();
     this.hud.fillStyle(0x11191b, 0.97).fillRect(0, 0, width, layout.topBarHeight);
     this.hud.lineStyle(2, 0x6f7b5d, 1).lineBetween(0, layout.topBarHeight, width, layout.topBarHeight);
