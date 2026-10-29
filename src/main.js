@@ -4,6 +4,7 @@ import { Simulation } from './simulation/Simulation.js';
 import { attackCommand, buildCommand, defendCommand, moveCommand, produceCommand, repairCommand, sellCommand, stopCommand } from './simulation/commands.js';
 import { BUILDING_TYPES } from './simulation/content.js';
 import { getMobileHudLayout } from './mobileHudLayout.js';
+import { PlacementState, UiPointerGate } from './placementState.js';
 import { isTouchGesturePointer, getDragPanDelta } from './mobileGestures.js';
 
 const WORLD = { width: 2400, height: 1500 };
@@ -13,6 +14,8 @@ class Battlefield extends Phaser.Scene {
   constructor() {
     super('battlefield');
   }
+
+  get buildType() { return this.placement.type; }
 
   init() {
     this.simulation = new Simulation({ seed: 1337 });
@@ -27,11 +30,11 @@ class Battlefield extends Phaser.Scene {
     this.commandMode = null;
     this.utilityMode = null;
     this.isPaused = false;
-    this.buildType = 'refinery';
+    this.placement = new PlacementState(BUILDING_TYPES);
     this.buildPreviewPosition = null;
     this.mobilePanelOpen = false;
     this.mobileCardPage = 0;
-    this.suppressPointerUntilUp = false;
+    this.uiPointerGate = new UiPointerGate();
   }
 
   create() {
@@ -110,7 +113,7 @@ class Battlefield extends Phaser.Scene {
     [['buildings', '▣', 'BUILDINGS'], ['defensive', '⌂', 'DEFENSIVE'], ['infantry', '✚', 'INFANTRY'], ['vehicles', '▰', 'VEHICLES'], ['aircraft', '▲', 'AIRCRAFT'], ['navy', '≋', 'NAVY']].forEach(([key, symbol, title]) => {
       const background = this.add.rectangle(0, 0, 40, 23, 0x26343b, 1).setStrokeStyle(1, 0x71806d).setScrollFactor(0).setDepth(21).setInteractive({ useHandCursor: true });
       const text = this.add.text(0, 0, symbol, { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#d9e0c4' }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
-      background.on('pointerdown', () => this.setCategory(key));
+      background.on('pointerdown', () => { this.uiPointerGate.block(); this.setCategory(key); });
       this.categoryTabs.push({ background, text, key, title });
     });
     [['defensive', '⌂ DEFENSIVE', 'NO STRUCTURES'], ['infantry', '✚ INFANTRY', 'RIFLE SQUAD'], ['vehicles', '▰ VEHICLES', 'NO VEHICLES'], ['aircraft', '▲ AIRCRAFT', 'NO AIRCRAFT'], ['navy', '≋ NAVY', 'NO NAVAL UNITS']].forEach(([key, title, row]) => {
@@ -127,7 +130,7 @@ class Battlefield extends Phaser.Scene {
     [['MAIN BUILDINGS', 'main'], ['SUPPORT BUILDINGS', 'support']].forEach(([label, tab]) => {
       const background = this.add.rectangle(0, 0, 90, 25, 0x26343b, 1).setStrokeStyle(1, 0x71806d).setScrollFactor(0).setDepth(21).setInteractive({ useHandCursor: true });
       const text = this.add.text(0, 0, label, { fontFamily: 'monospace', fontSize: '8px', fontStyle: 'bold', color: '#d9e0c4' }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
-      background.on('pointerdown', () => this.setBuildTab(tab));
+      background.on('pointerdown', () => { this.uiPointerGate.block(); this.setBuildTab(tab); });
       this.buildTabs.push({ background, text, tab });
     });
     this.supportNotice = this.add.text(0, 0, 'SUPPORT SYSTEMS\nNO STRUCTURES\nAVAILABLE', { fontFamily: 'monospace', fontSize: '10px', align: 'center', color: '#8ca58b' }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
@@ -139,7 +142,7 @@ class Battlefield extends Phaser.Scene {
       const text = this.add.text(0, 0, label, { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#d9e0c4' }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
       background.on('pointerover', () => background.setFillStyle(0x3e5748));
       background.on('pointerout', () => background.setFillStyle(0x26343b));
-      background.on('pointerdown', () => this.useCommandButton(action));
+      background.on('pointerdown', () => { this.uiPointerGate.block(); this.useCommandButton(action); });
       this.commandButtons.push({ background, text, action });
     });
     this.buildCards = [];
@@ -150,7 +153,7 @@ class Battlefield extends Phaser.Scene {
        const costText = this.add.text(0, 0, `METAL ${cost}${powerLabel}`, { fontFamily: 'monospace', fontSize: '10px', color: '#aebc9a' }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(22);
       background.on('pointerover', () => background.setFillStyle(0x3e5748));
       background.on('pointerout', () => background.setFillStyle(0x26343b));
-      background.on('pointerdown', () => this.selectBuildType(type));
+      background.on('pointerdown', () => { this.uiPointerGate.block(); this.selectBuildType(type); });
       this.buildCards.push({ background, text, costText, type, category });
     });
     this.unitCards = [];
@@ -172,7 +175,7 @@ class Battlefield extends Phaser.Scene {
       const text = this.add.text(0, 0, label, { fontFamily: 'monospace', fontSize: '10px', fontStyle: 'bold', color: '#d9e0c4' }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
       background.on('pointerover', () => background.setFillStyle(0x3e5748));
       background.on('pointerout', () => background.setFillStyle(0x26343b));
-       background.on('pointerdown', () => this.useBuildingAction(action));
+       background.on('pointerdown', () => { this.uiPointerGate.block(); this.useBuildingAction(action); });
       this.utilityButtons.push({ background, text, action });
     });
     this.gameOverPanel = this.add.graphics().setScrollFactor(0).setDepth(30).setVisible(false);
@@ -231,27 +234,84 @@ class Battlefield extends Phaser.Scene {
   }
 
   toggleMobilePanel() {
+    this.uiPointerGate.block();
+    if (!this.mobilePanelOpen && this.cancelPlacement()) {
+      this.message = 'Building placement cancelled.';
+      return;
+    }
     this.mobilePanelOpen = !this.mobilePanelOpen;
     this.mobileCardPage = 0;
-    this.suppressPointerUntilUp = true;
+    this.uiPointerGate.block();
     this.layoutUi();
   }
 
   changeMobilePage(delta) {
+    this.uiPointerGate.block();
     this.mobileCardPage = Math.max(0, this.mobileCardPage + delta);
-    this.suppressPointerUntilUp = true;
+    this.uiPointerGate.block();
     this.layoutUi();
   }
 
   closeMobilePanelForTargeting() {
     if (this.mobilePanelOpen && (this.uiSize().width < 700 || this.isTouchDevice())) {
       this.mobilePanelOpen = false;
-      this.suppressPointerUntilUp = true;
+      this.uiPointerGate.block();
       this.layoutUi();
     }
   }
 
+  beginPlacement(type = this.buildType) {
+    if (!this.placement.begin(type)) return false;
+    this.commandMode = 'build';
+    this.utilityMode = null;
+    this.buildPreviewPosition = null;
+    this.buildPreview?.clear();
+    this.closeMobilePanelForTargeting();
+    this.message = `Placing ${BUILDING_TYPES[type].name}. Tap a valid location to construct.`;
+    return true;
+  }
+
+  cancelPlacement() {
+    if (!this.placement.cancel()) return false;
+    if (this.commandMode === 'build') this.commandMode = null;
+    this.buildPreviewPosition = null;
+    this.buildPreview?.clear();
+    return true;
+  }
+
+  finishPlacement() {
+    if (!this.placement.finish()) return false;
+    if (this.commandMode === 'build') this.commandMode = null;
+    this.buildPreviewPosition = null;
+    this.buildPreview?.clear();
+    return true;
+  }
+
+  choosePreferredBuilding(type) {
+    if (!this.placement.prefer(type)) return false;
+    this.buildPreviewPosition = null;
+    this.buildPreview?.clear();
+    this.message = `${BUILDING_TYPES[type].name} selected.`;
+    return true;
+  }
+
   useCommandButton(action) {
+    if (action === 'build') {
+      if (this.cancelPlacement()) {
+        this.message = 'Building placement cancelled.';
+        return;
+      }
+      const core = this.simulation.buildings.find((building) =>
+        this.selectedBuildings.has(building.id) && building.type === 'command_core' && building.complete);
+      if (!core) {
+        this.message = 'Select a completed Command Core to open construction.';
+        return;
+      }
+      this.beginPlacement();
+      return;
+    }
+    this.cancelPlacement();
+    this.utilityMode = null;
     if (action === 'select_all') {
       this.selected.clear();
       this.selectedBuildings.clear();
@@ -264,26 +324,13 @@ class Battlefield extends Phaser.Scene {
     } else if (action === 'defend') {
       this.commandMode = 'defend';
       this.message = 'DEFEND AREA: choose a guard position.';
-    } else if (action === 'build') {
-      const selectedBuilding = this.simulation.buildings.find((building) => this.selectedBuildings.has(building.id));
-      if (!selectedBuilding || selectedBuilding.type !== 'command_core' || !selectedBuilding.complete) {
-        this.message = 'Select a completed Command Core to open construction.';
-        return;
-      }
-      this.commandMode = 'build';
-      this.message = `BUILD mode: ${this.buildType.toUpperCase()} selected. 1: refinery, 2: barracks.`;
     } else {
       this.commandMode = action;
       this.message = `${action.toUpperCase()} mode: choose a target.`;
     }
   }
 
-  selectBuildType(type) {
-    this.buildType = type;
-    this.commandMode = 'build';
-    this.closeMobilePanelForTargeting();
-    this.message = `BUILD mode: ${type.replaceAll('_', ' ').toUpperCase()} selected. Choose a placement location.`;
-  }
+  selectBuildType(type) { return this.beginPlacement(type); }
 
   setBuildTab(tab) {
     this.activeBuildTab = tab;
@@ -348,6 +395,7 @@ class Battlefield extends Phaser.Scene {
   }
 
   useBuildingAction(action) {
+    this.cancelPlacement();
     this.utilityMode = action;
     this.commandMode = null;
     this.closeMobilePanelForTargeting();
@@ -355,6 +403,8 @@ class Battlefield extends Phaser.Scene {
   }
 
   handleProductionCard(type, pointer) {
+    this.uiPointerGate.block();
+    this.cancelPlacement();
     const canProduce = (building) => {
       const products = BUILDING_TYPES[building.type]?.produces;
       return building.playerId === 0 && building.complete && (Array.isArray(products) ? products.includes(type) : products === type);
@@ -477,9 +527,17 @@ class Battlefield extends Phaser.Scene {
     this.cameraKeys.s = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.cameraKeys.d = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.input.on('pointerdown', (pointer) => {
-      if (this.suppressPointerUntilUp) {
+      if (this.uiPointerGate.active) {
         this.dragStart = null;
         this.pointerMode = 'ui';
+        return;
+      }
+      if (pointer.button === 2 && this.placement.active) {
+        this.cancelPlacement();
+        this.uiPointerGate.block();
+        this.message = 'Building placement cancelled.';
+        this.pointerMode = 'ui';
+        this.dragStart = null;
         return;
       }
       const touches = this.getTouchPointers();
@@ -507,8 +565,8 @@ class Battlefield extends Phaser.Scene {
     });
 
     this.input.on('pointermove', (pointer) => {
-      if (this.commandMode === 'build') this.updateBuildPreview(this.toWorld(pointer));
-      if (this.pointerMode === 'ui') return;
+      if (this.pointerMode === 'ui' || this.uiPointerGate.active) return;
+      if (this.placement.active && !this.isUiPointer(pointer)) this.updateBuildPreview(this.toWorld(pointer));
       const touches = this.getTouchPointers();
       if (this.pointerMode === 'touch' && touches.length >= 2) {
         const distance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
@@ -544,8 +602,7 @@ class Battlefield extends Phaser.Scene {
     });
 
     this.input.on('pointerup', (pointer) => {
-      if (this.suppressPointerUntilUp) {
-        this.suppressPointerUntilUp = false;
+      if (this.uiPointerGate.release()) {
         this.dragStart = null;
         this.pointerMode = null;
         this.selectionLayer.clear();
@@ -587,7 +644,10 @@ class Battlefield extends Phaser.Scene {
       this.zoomAt(pointer.x, pointer.y, next);
     });
 
-    this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.cancelPlacement()) this.message = 'Building placement cancelled.';
+      else this.togglePause();
+    });
     this.input.keyboard?.on('keydown-SPACE', () => this.centerOnSelection());
     this.input.keyboard?.on('keydown-B', () => this.useCommandButton('build'));
     this.input.keyboard?.on('keydown-P', () => this.produceSelected());
@@ -599,8 +659,8 @@ class Battlefield extends Phaser.Scene {
     this.input.keyboard?.on('keydown-U', () => this.setCategory('navy'));
     this.input.keyboard?.on('keydown-K', () => this.useBuildingAction('repair'));
     this.input.keyboard?.on('keydown-L', () => this.useBuildingAction('sell'));
-    this.input.keyboard?.on('keydown-ONE', () => { this.buildType = 'refinery'; this.message = 'Refinery selected for construction.'; });
-    this.input.keyboard?.on('keydown-TWO', () => { this.buildType = 'barracks'; this.message = 'Barracks selected for construction.'; });
+    this.input.keyboard?.on('keydown-ONE', () => this.choosePreferredBuilding('refinery'));
+    this.input.keyboard?.on('keydown-TWO', () => this.choosePreferredBuilding('barracks'));
   }
 
   handleTap(world, pointer) {
@@ -621,14 +681,11 @@ class Battlefield extends Phaser.Scene {
       }
       return;
     }
-    if (this.commandMode === 'build') {
-      const result = this.simulation.issue(buildCommand(0, this.buildType, world));
-      const definition = BUILDING_TYPES[this.buildType];
-      this.message = result.ok ? `${definition.name} construction started.` : `Build rejected: ${result.reason}.`;
-      if (result.ok) {
-        this.commandMode = null;
-        this.buildPreview.clear();
-      }
+    if (this.placement.active) {
+      const type = this.placement.selected;
+      const result = this.simulation.issue(buildCommand(0, type, world));
+      this.message = result.ok ? `${BUILDING_TYPES[type].name} construction started.` : `Build rejected: ${result.reason}.`;
+      if (result.ok) this.finishPlacement();
       return;
     }
     if (this.commandMode === 'attack' && this.selected.size > 0 && building?.team === 1) {
@@ -782,7 +839,7 @@ class Battlefield extends Phaser.Scene {
     this.selected.forEach((id) => { if (!this.getUnit(id)) this.selected.delete(id); });
     this.drawUnits();
     this.drawProjectiles();
-    if (this.commandMode !== 'build') this.buildPreview.clear();
+    if (!this.placement.active) this.buildPreview.clear();
     this.drawResourceNodes();
     this.updateUi();
   }
@@ -1013,7 +1070,7 @@ class Battlefield extends Phaser.Scene {
       });
      const selectedBuilding = this.simulation.buildings.find((building) => this.selectedBuildings.has(building.id));
      this.hudText.selection.setText(selectedBuilding ? `${selectedBuilding.name.toUpperCase()}   HP ${Math.round(selectedBuilding.hp / selectedBuilding.maxHp * 100)}%   QUEUE ${selectedBuilding.queue.length}` : selectedUnits.length ? `${selectedUnits.length} × ${selectedUnits[0].name ?? 'RIFLE SQUAD'}   HP ${Math.round(selectedUnits.reduce((sum, unit) => sum + unit.hp, 0) / selectedUnits.length)}%` : 'NO UNIT SELECTED');
-     this.hudText.hint.setText(this.commandMode === 'build' ? `CONSTRUCTION: ${this.buildType.toUpperCase()} // 1 REFINERY  2 BARRACKS` : this.commandMode ? `${this.commandMode.toUpperCase()} MODE ACTIVE` : this.message);
+     this.hudText.hint.setText(this.placement.active ? `CONSTRUCTION: ${this.buildType.toUpperCase()} // 1 REFINERY  2 BARRACKS` : this.commandMode ? `${this.commandMode.toUpperCase()} MODE ACTIVE` : this.message);
      const ended = this.simulation.gameState !== 'playing';
      this.gameOverPanel.setVisible(ended);
      this.gameOverTitle.setVisible(ended).setText(this.simulation.gameState === 'victory' ? 'MISSION COMPLETE' : 'MISSION FAILED');
