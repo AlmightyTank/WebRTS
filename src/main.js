@@ -1540,7 +1540,7 @@ class Battlefield extends Phaser.Scene {
   }
 }
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game-container',
   backgroundColor: '#101a2a',
@@ -1548,3 +1548,9 @@ new Phaser.Game({
   render: { antialias: true, roundPixels: true },
   scene: [Battlefield]
 });
+
+// Browser acceptance tests can inspect the real scene without altering the
+// production game. Vite compiles this branch out unless mode=e2e.
+if (import.meta.env.MODE === 'e2e') {
+  window.__WEBRTS_E2E__ = () => game.scene.getScene('battlefield');
+}
