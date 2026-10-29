@@ -76,6 +76,33 @@ export class Simulation {
     };
   }
 
+  getRequestedUnitType(command) {
+    const building = this.buildings.find((candidate) => candidate.id === command.buildingId);
+    const products = BUILDING_TYPES[building?.type]?.produces;
+    return command.unitType ?? (Array.isArray(products) ? products[0] : products);
+  }
+
+  getPendingResourceCost(playerId) {
+    return this.commandQueue.reduce((total, command) => {
+      if (command.playerId !== playerId) return total;
+      if (command.type === COMMANDS.BUILD) return total + (BUILDING_TYPES[command.buildingType]?.cost ?? 0);
+      if (command.type === COMMANDS.PRODUCE) return total + (UNIT_TYPES[this.getRequestedUnitType(command)]?.cost ?? 0);
+      if (command.type === COMMANDS.REPAIR) return total + 100;
+      return total;
+    }, 0);
+  }
+
+  getPendingSupply(playerId) {
+    return this.commandQueue.reduce((total, command) => {
+      if (command.playerId !== playerId || command.type !== COMMANDS.PRODUCE) return total;
+      return total + (UNIT_TYPES[this.getRequestedUnitType(command)]?.supply ?? 0);
+    }, 0);
+  }
+
+  getAvailableResources(playerId) {
+    return (this.resources[playerId] ?? 0) - this.getPendingResourceCost(playerId);
+  }
+
   issue(command) {
     const valid = this.validateCommand(command);
     if (!valid.ok) return valid;
@@ -86,16 +113,35 @@ export class Simulation {
   controlProduction(playerId, buildingId, action) {
     const building = this.buildings.find((candidate) => candidate.id === buildingId && candidate.playerId === playerId && candidate.complete);
     if (!building) return { ok: false, reason: 'invalid_producer' };
+    let refunded = 0;
+    let canceledPending = 0;
     if (action === 'clear') {
+      refunded = building.queue.reduce((sum, item) => sum + (UNIT_TYPES[item.type]?.cost ?? 0), 0);
       building.queue.length = 0;
+      const before = this.commandQueue.length;
+      this.commandQueue = this.commandQueue.filter((command) =>
+        !(command.type === COMMANDS.PRODUCE && command.playerId === playerId && command.buildingId === buildingId));
+      canceledPending = before - this.commandQueue.length;
       building.queuePaused = false;
     } else if (action === 'cancel') {
-      building.queue.shift();
+      const canceled = building.queue.shift();
+      if (canceled) {
+        refunded = UNIT_TYPES[canceled.type]?.cost ?? 0;
+      } else {
+        const index = this.commandQueue.findIndex((command) =>
+          command.type === COMMANDS.PRODUCE && command.playerId === playerId && command.buildingId === buildingId);
+        if (index === -1) return { ok: false, reason: 'empty_queue' };
+        this.commandQueue.splice(index, 1);
+        canceledPending = 1;
+      }
       building.queuePaused = false;
     } else if (action === 'pause') {
       building.queuePaused = !building.queuePaused;
+    } else {
+      return { ok: false, reason: 'invalid_action' };
     }
-    return { ok: true, paused: building.queuePaused, queueLength: building.queue.length };
+    this.resources[playerId] += refunded;
+    return { ok: true, paused: building.queuePaused, queueLength: building.queue.length, refunded, canceledPending };
   }
 
   validateCommand(command) {
@@ -118,21 +164,22 @@ export class Simulation {
       const definition = BUILDING_TYPES[command.buildingType];
       if (!definition) return { ok: false, reason: 'unknown_building' };
       if (!this.buildings.some((building) => building.playerId === command.playerId && building.type === 'command_core' && building.complete)) return { ok: false, reason: 'no_command_core' };
-      if (!command.position || this.resources[command.playerId] < definition.cost) return { ok: false, reason: 'insufficient_resources' };
+      if (!command.position || this.getAvailableResources(command.playerId) < definition.cost) return { ok: false, reason: 'insufficient_resources' };
       if (!this.canPlace(command.buildingType, command.position)) return { ok: false, reason: 'invalid_placement' };
     }
     if (command.type === COMMANDS.PRODUCE) {
       const building = this.buildings.find((candidate) => candidate.id === command.buildingId);
       const definition = building && BUILDING_TYPES[building.type];
-      if (!building || building.playerId !== command.playerId || !building.complete || !definition?.produces) return { ok: false, reason: 'invalid_producer' };
+      if (!building || building.playerId !== command.playerId || !building.complete || !definition?.produces
+        || this.commandQueue.some((pending) => pending.type === COMMANDS.SELL && pending.buildingId === building.id)) return { ok: false, reason: 'invalid_producer' };
       const products = Array.isArray(definition.produces) ? definition.produces : [definition.produces];
       const productType = command.unitType ?? products[0];
       if (!products.includes(productType) || !UNIT_TYPES[productType]) return { ok: false, reason: 'invalid_product' };
       const unitDefinition = UNIT_TYPES[productType];
-      const queuedCost = building.queue.reduce((total, item) => total + (UNIT_TYPES[item.type]?.cost ?? 0), 0);
-      if (this.resources[command.playerId] < queuedCost + (unitDefinition.cost ?? 0)) return { ok: false, reason: 'insufficient_resources' };
+      // Queued items have already been paid for. Reserve only pending commands.
+      if (this.getAvailableResources(command.playerId) < (unitDefinition.cost ?? 0)) return { ok: false, reason: 'insufficient_resources' };
       const state = this.getPlayerState(command.playerId);
-      if (state.capacity > 0 && state.usedSupply + (unitDefinition.supply ?? 0) > state.capacity) return { ok: false, reason: 'supply_limit' };
+      if (state.capacity > 0 && state.usedSupply + this.getPendingSupply(command.playerId) + (unitDefinition.supply ?? 0) > state.capacity) return { ok: false, reason: 'supply_limit' };
       if (this.commandCoreStarted[command.playerId] && state.generated > 0 && state.power < 100) return { ok: false, reason: 'insufficient_power' };
     }
     if (command.type === COMMANDS.REPAIR || command.type === COMMANDS.SELL) {
@@ -146,7 +193,7 @@ export class Simulation {
       if (command.type === COMMANDS.SELL && target.type === 'command_core') return { ok: false, reason: 'cannot_sell_command_core' };
       if (command.type === COMMANDS.REPAIR && target.hp >= target.maxHp) return { ok: false, reason: 'already_repaired' };
       if (command.type === COMMANDS.REPAIR && target.repairing) return { ok: false, reason: 'repair_in_progress' };
-      if (command.type === COMMANDS.REPAIR && this.resources[command.playerId] < 100) return { ok: false, reason: 'insufficient_resources' };
+      if (command.type === COMMANDS.REPAIR && this.getAvailableResources(command.playerId) < 100) return { ok: false, reason: 'insufficient_resources' };
     }
     return { ok: true };
   }
@@ -257,7 +304,7 @@ export class Simulation {
   }
 
   closestResourceNodeToHome(unit) {
-    const home = this.buildings.find((building) => building.id === unit.homeBuildingId)
+    const home = this.buildings.find((building) => building.id === unit.homeBuildingId && building.complete && building.hp > 0)
       ?? this.closestRefinery(unit.x, unit.y, unit.playerId)
       ?? this.buildings.find((building) => building.playerId === unit.playerId && building.type === 'command_core');
     if (!home) return this.closestResourceNode(unit.x, unit.y);
@@ -266,7 +313,7 @@ export class Simulation {
   }
 
   closestRefinery(x, y, playerId) {
-    return this.buildings.filter((building) => building.playerId === playerId && building.type === 'refinery')
+    return this.buildings.filter((building) => building.playerId === playerId && building.type === 'refinery' && building.complete && building.hp > 0)
       .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
   }
 
@@ -420,6 +467,30 @@ export class Simulation {
 
   updateHarvester(unit, dt) {
     const definition = UNIT_TYPES[unit.type];
+    const refinery = this.buildings.find((building) => building.id === unit.homeBuildingId
+      && building.playerId === unit.playerId && building.type === 'refinery' && building.complete && building.hp > 0)
+      ?? this.closestRefinery(unit.x, unit.y, unit.playerId);
+    if (!refinery) {
+      // Preserve collected cargo until a completed replacement refinery exists.
+      unit.homeBuildingId = null;
+      unit.harvesterState = 'awaiting_refinery';
+      unit.harvesterPath = null;
+      unit.harvesterRouteKey = null;
+      return;
+    }
+    if (unit.homeBuildingId !== refinery.id) {
+      unit.homeBuildingId = refinery.id;
+      unit.harvesterPath = null;
+      unit.harvesterRouteKey = null;
+    }
+    if (unit.harvesterState === 'awaiting_refinery' || unit.harvesterState === 'idle') {
+      const node = this.closestResourceNodeToHome(unit);
+      if (unit.cargo > 0) unit.harvesterState = 'to_refinery';
+      else if (node) {
+        unit.resourceNodeId = node.id;
+        unit.harvesterState = 'to_resource';
+      } else return;
+    }
     if (unit.harvesterState === 'to_resource' || unit.harvesterState === 'harvesting') {
       let node = this.resourceNodes.find((candidate) => candidate.id === unit.resourceNodeId);
       if (!node || node.amount <= 0) {
@@ -448,15 +519,6 @@ export class Simulation {
       return;
     }
 
-    let refinery = this.buildings.find((building) => building.id === unit.homeBuildingId && building.playerId === unit.playerId && building.type === 'refinery' && building.complete);
-    if (!refinery) {
-      refinery = this.closestRefinery(unit.x, unit.y, unit.playerId);
-      unit.homeBuildingId = refinery?.id ?? null;
-    }
-    if (!refinery) {
-      unit.harvesterState = 'idle';
-      return;
-    }
     const dock = this.refineryDockPoint(unit, refinery);
     const dockKey = `refinery:${refinery.id}:${Math.round(dock.x)}:${Math.round(dock.y)}`;
     if (Math.hypot(unit.x - dock.x, unit.y - dock.y) <= 8) {
@@ -744,7 +806,9 @@ export class Simulation {
     if (command.type === COMMANDS.SELL) {
       const index = this.buildings.findIndex((candidate) => candidate.id === command.buildingId);
       const building = this.buildings[index];
-      this.resources[command.playerId] += Math.floor((BUILDING_TYPES[building.type].cost ?? 0) * 0.5);
+      const queueRefund = building.queue.reduce((sum, item) => sum + (UNIT_TYPES[item.type]?.cost ?? 0), 0);
+      this.resources[command.playerId] += Math.floor((BUILDING_TYPES[building.type].cost ?? 0) * 0.5) + queueRefund;
+      this.commandQueue = this.commandQueue.filter((pending) => !(pending.type === COMMANDS.PRODUCE && pending.buildingId === building.id));
       this.buildings.splice(index, 1);
       this.units.filter((unit) => unit.homeBuildingId === command.buildingId).forEach((unit) => { unit.homeBuildingId = null; });
       this.events.push({ type: 'building_sold', buildingId: command.buildingId });

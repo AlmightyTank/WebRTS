@@ -243,3 +243,92 @@ test('destroying the enemy command core ends the match', () => {
   assert.equal(simulation.gameState, 'victory');
   assert.equal(simulation.gameOverReason, 'ENEMY COMMAND CORE DESTROYED');
 });
+
+
+test('pending production and construction reserve metal before the next tick', () => {
+  const simulation = new Simulation();
+  simulation.resources[0] = 350;
+  simulation.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const barracks = simulation.addBuilding({ playerId: 0, type: 'barracks', x: 600, y: 300 });
+  assert.deepEqual(simulation.issue(buildCommand(0, 'refinery', { x: 950, y: 500 })), { ok: true });
+  assert.equal(simulation.issue(produceCommand(0, barracks.id)).reason, 'insufficient_resources');
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 50);
+});
+
+test('queued units are paid once and rapid purchase clicks cannot overspend', () => {
+  const simulation = new Simulation();
+  simulation.resources[0] = 250;
+  const barracks = simulation.addBuilding({ playerId: 0, type: 'barracks', x: 300, y: 300 });
+  assert.deepEqual(simulation.issue(produceCommand(0, barracks.id)), { ok: true });
+  assert.deepEqual(simulation.issue(produceCommand(0, barracks.id)), { ok: true });
+  assert.equal(simulation.issue(produceCommand(0, barracks.id)).reason, 'insufficient_resources');
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 50);
+  simulation.resources[0] = 110;
+  assert.deepEqual(simulation.issue(produceCommand(0, barracks.id)), { ok: true });
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 10);
+});
+
+test('pending production counts toward supply limits', () => {
+  const simulation = new Simulation();
+  simulation.resources[0] = 1000;
+  const barracks = simulation.addBuilding({ playerId: 0, type: 'barracks', x: 300, y: 300 });
+  for (let i = 0; i < 4; i += 1) simulation.addUnit({ playerId: 0, x: 600 + i * 50, y: 500 });
+  assert.deepEqual(simulation.issue(produceCommand(0, barracks.id)), { ok: true });
+  assert.equal(simulation.issue(produceCommand(0, barracks.id)).reason, 'supply_limit');
+  simulation.advance(1 / 30);
+  assert.equal(simulation.getPlayerState(0).usedSupply, 5);
+});
+
+test('cancel and clear refund queued production and discard pending orders', () => {
+  const simulation = new Simulation();
+  simulation.resources[0] = 500;
+  const barracks = simulation.addBuilding({ playerId: 0, type: 'barracks', x: 300, y: 300 });
+  simulation.issue(produceCommand(0, barracks.id, 'rocket_team'));
+  assert.equal(simulation.controlProduction(0, barracks.id, 'cancel').canceledPending, 1);
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 500);
+  simulation.issue(produceCommand(0, barracks.id, 'rocket_team'));
+  simulation.issue(produceCommand(0, barracks.id, 'rifle_squad'));
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 225);
+  assert.equal(simulation.controlProduction(0, barracks.id, 'cancel').refunded, 175);
+  assert.equal(simulation.resources[0], 400);
+  assert.equal(simulation.controlProduction(0, barracks.id, 'clear').refunded, 100);
+  assert.equal(simulation.resources[0], 500);
+  assert.equal(barracks.queue.length, 0);
+});
+
+test('selling a building refunds its outstanding production queue', () => {
+  const simulation = new Simulation();
+  simulation.resources[0] = 500;
+  const barracks = simulation.addBuilding({ playerId: 0, type: 'barracks', x: 300, y: 300 });
+  simulation.issue(produceCommand(0, barracks.id));
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 400);
+  assert.deepEqual(simulation.issue(sellCommand(0, barracks.id)), { ok: true });
+  simulation.advance(1 / 30);
+  assert.equal(simulation.resources[0], 625);
+});
+
+test('harvesters wait for a completed refinery and retain existing cargo', () => {
+  const simulation = new Simulation();
+  const refinery = simulation.addBuilding({ playerId: 0, type: 'refinery', x: 300, y: 300 });
+  const harvester = simulation.addUnit({ playerId: 0, type: 'harvester', x: 500, y: 300 });
+  harvester.cargo = 80;
+  harvester.harvesterState = 'to_refinery';
+  refinery.hp = 0;
+  simulation.advance(1 / 30);
+  assert.equal(harvester.harvesterState, 'awaiting_refinery');
+  assert.equal(harvester.cargo, 80);
+  const replacement = simulation.addBuilding({ playerId: 0, type: 'refinery', x: 650, y: 500, complete: false });
+  for (let i = 0; i < 30; i += 1) simulation.advance(1 / 30);
+  assert.equal(harvester.harvesterState, 'awaiting_refinery');
+  replacement.complete = true;
+  for (let i = 0; i < 250; i += 1) simulation.advance(1 / 30);
+  assert.equal(harvester.homeBuildingId, replacement.id);
+  assert.ok(simulation.resources[0] >= 1330, 'saved cargo should reach the new refinery');
+  assert.ok(harvester.cargo >= 0 && harvester.cargo <= harvester.capacity);
+});

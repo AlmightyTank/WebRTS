@@ -319,7 +319,9 @@ class Battlefield extends Phaser.Scene {
     if (rightClick) {
       const action = shift ? 'clear' : producer.queuePaused ? 'cancel' : 'pause';
       const result = this.simulation.controlProduction(0, producer.id, action);
-      this.message = result.ok ? `${producer.name} queue ${action === 'clear' ? 'cleared' : action === 'cancel' ? 'item cancelled' : result.paused ? 'paused' : 'resumed'}.` : `QUEUE rejected: ${result.reason}.`;
+      this.message = result.ok
+        ? `${producer.name} queue ${action === 'clear' ? 'cleared' : action === 'cancel' ? 'item cancelled' : result.paused ? 'paused' : 'resumed'}.${result.refunded ? ` ${result.refunded} metal refunded.` : ''}`
+        : `QUEUE rejected: ${result.reason}.`;
       return;
     }
     const count = shift ? 5 : 1;
@@ -394,12 +396,21 @@ class Battlefield extends Phaser.Scene {
     this.game.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
     this.input.addPointer(1);
     this.pinchDistance = null;
+    this.touchGestureOccurred = false;
     this.cameraKeys = this.input.keyboard?.createCursorKeys();
     this.cameraKeys.w = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     this.cameraKeys.a = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.cameraKeys.s = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.cameraKeys.d = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.input.on('pointerdown', (pointer) => {
+      const touches = this.getTouchPointers();
+      if (this.isTouchPointer(pointer) && touches.length >= 2) {
+        this.pointerMode = 'touch';
+        this.touchGestureOccurred = true;
+        this.dragStart = null;
+        this.pinchDistance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+        return;
+      }
       if (this.isUiPointer(pointer)) {
         this.dragStart = null;
         this.pointerMode = 'ui';
@@ -412,19 +423,12 @@ class Battlefield extends Phaser.Scene {
         return;
       }
       this.pointerMode = this.isTouchPointer(pointer) ? 'touch' : 'mouse';
-      const touches = this.getTouchPointers();
-      if (touches.length >= 2) this.pinchDistance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+      this.touchGestureOccurred = false;
     });
 
     this.input.on('pointermove', (pointer) => {
       if (this.commandMode === 'build') this.updateBuildPreview(this.toWorld(pointer));
       if (this.pointerMode === 'ui') return;
-      if (!pointer.isDown || !this.dragStart) return;
-      if (this.pointerMode === 'pan') {
-        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
-        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
-        return;
-      }
       const touches = this.getTouchPointers();
       if (this.pointerMode === 'touch' && touches.length >= 2) {
         const distance = Phaser.Math.Distance.Between(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
@@ -434,11 +438,19 @@ class Battlefield extends Phaser.Scene {
           this.zoomAt(centerX, centerY, Phaser.Math.Clamp(this.cameras.main.zoom * distance / this.pinchDistance, this.minZoom, 1.5));
         }
         this.pinchDistance = distance;
+        this.touchGestureOccurred = true;
+        return;
+      }
+      if (!pointer.isDown || !this.dragStart) return;
+      if (this.pointerMode === 'pan') {
+        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
+        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
         return;
       }
       const distance = Phaser.Math.Distance.Between(this.dragStart.screenX, this.dragStart.screenY, pointer.x, pointer.y);
-      if (this.pointerMode === 'touch' && distance > 8 && !this.hitUnit(this.toWorld(pointer))) {
-        // Pointer movement is measured in screen pixels; camera scroll is in world units.
+      if (this.pointerMode === 'touch' && distance > 8) {
+        // Pan consistently even if the finger passes over another unit.
+        this.touchGestureOccurred = true;
         this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
         this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
         return;
@@ -447,6 +459,17 @@ class Battlefield extends Phaser.Scene {
     });
 
     this.input.on('pointerup', (pointer) => {
+      if (this.isTouchPointer(pointer) && this.touchGestureOccurred) {
+        // Never convert a pan or a two-finger pinch into an accidental move/order.
+        this.dragStart = null;
+        this.selectionLayer.clear();
+        if (this.getTouchPointers().length === 0) {
+          this.pinchDistance = null;
+          this.pointerMode = null;
+          this.touchGestureOccurred = false;
+        }
+        return;
+      }
       if (this.pointerMode === 'ui' || this.isUiPointer(pointer)) {
         this.dragStart = null;
         this.pointerMode = null;
@@ -477,11 +500,11 @@ class Battlefield extends Phaser.Scene {
     this.input.keyboard?.on('keydown-B', () => this.useCommandButton('build'));
     this.input.keyboard?.on('keydown-P', () => this.produceSelected());
     this.input.keyboard?.on('keydown-Q', () => this.setCategory('buildings'));
-    this.input.keyboard?.on('keydown-W', () => this.setCategory('defensive'));
+    this.input.keyboard?.on('keydown-T', () => this.setCategory('defensive'));
     this.input.keyboard?.on('keydown-E', () => this.setCategory('infantry'));
     this.input.keyboard?.on('keydown-R', () => this.setCategory('vehicles'));
-    this.input.keyboard?.on('keydown-A', () => this.setCategory('aircraft'));
-    this.input.keyboard?.on('keydown-F', () => this.setCategory('navy'));
+    this.input.keyboard?.on('keydown-Y', () => this.setCategory('aircraft'));
+    this.input.keyboard?.on('keydown-U', () => this.setCategory('navy'));
     this.input.keyboard?.on('keydown-K', () => this.useBuildingAction('repair'));
     this.input.keyboard?.on('keydown-L', () => this.useBuildingAction('sell'));
     this.input.keyboard?.on('keydown-ONE', () => { this.buildType = 'refinery'; this.message = 'Refinery selected for construction.'; });
