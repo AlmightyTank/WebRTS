@@ -121,7 +121,8 @@ class Battlefield extends Phaser.Scene {
     [['REFINERY', 'refinery', 300, 'buildings'], ['BARRACKS', 'barracks', 250, 'buildings'], ['WAR FACTORY', 'machine_shop', 800, 'buildings'], ['SERVICE DEPOT', 'service_depot', 500, 'buildings'], ['SENTRY TURRET', 'defense_grid', 450, 'defensive'], ['POWER PLANT', 'power_plant', 400, 'buildings']].forEach(([label, type, cost, category]) => {
       const background = this.add.rectangle(0, 0, 178, 62, 0x26343b, 1).setStrokeStyle(1, 0x71806d).setScrollFactor(0).setDepth(21).setInteractive({ useHandCursor: true });
       const text = this.add.text(0, 0, label, { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#d9e0c4' }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(22);
-      const costText = this.add.text(0, 0, `METAL ${cost}`, { fontFamily: 'monospace', fontSize: '10px', color: '#aebc9a' }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(22);
+       const powerLabel = type === 'power_plant' ? '  +35 PWR' : '';
+       const costText = this.add.text(0, 0, `METAL ${cost}${powerLabel}`, { fontFamily: 'monospace', fontSize: '10px', color: '#aebc9a' }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(22);
       background.on('pointerover', () => background.setFillStyle(0x3e5748));
       background.on('pointerout', () => background.setFillStyle(0x26343b));
       background.on('pointerdown', () => this.selectBuildType(type));
@@ -479,6 +480,8 @@ class Battlefield extends Phaser.Scene {
     this.input.keyboard?.on('keydown-W', () => this.setCategory('defensive'));
     this.input.keyboard?.on('keydown-E', () => this.setCategory('infantry'));
     this.input.keyboard?.on('keydown-R', () => this.setCategory('vehicles'));
+    this.input.keyboard?.on('keydown-A', () => this.setCategory('aircraft'));
+    this.input.keyboard?.on('keydown-F', () => this.setCategory('navy'));
     this.input.keyboard?.on('keydown-K', () => this.useBuildingAction('repair'));
     this.input.keyboard?.on('keydown-L', () => this.useBuildingAction('sell'));
     this.input.keyboard?.on('keydown-ONE', () => { this.buildType = 'refinery'; this.message = 'Refinery selected for construction.'; });
@@ -702,10 +705,19 @@ class Battlefield extends Phaser.Scene {
         this.unitLayer.fillStyle(0x07101a, 1).fillRect(barX, barY, barWidth, 6);
         this.unitLayer.fillStyle(barColor, 1).fillRect(barX, barY, barWidth * healthRatio, 6);
       }
-      if (!building.complete) {
+       if (!building.complete) {
         const progress = 1 - building.constructionRemaining / definition.constructionTime;
         this.unitLayer.fillStyle(0xffe66d, 1).fillRect(building.x - width / 2, building.y + height / 2 + 10, width * progress, 6);
-      } else if (building.queue.length) this.unitLayer.fillStyle(0xffe66d, 1).fillRect(building.x - 30, building.y + height / 2 + 10, 60 * (1 - building.queue[0].remaining / definition.productionTime), 5);
+       } else if (building.queue.length) this.unitLayer.fillStyle(0xffe66d, 1).fillRect(building.x - 30, building.y + height / 2 + 10, 60 * (1 - building.queue[0].remaining / definition.productionTime), 5);
+     });
+    const shownPerimeters = new Set();
+    this.units.filter((unit) => this.selected.has(unit.id) && unit.stance === 'defend_area' && unit.guardPosition).forEach((unit) => {
+      const key = `${Math.round(unit.guardPosition.x)}:${Math.round(unit.guardPosition.y)}:${unit.guardRadius}`;
+      if (shownPerimeters.has(key)) return;
+      shownPerimeters.add(key);
+      this.unitLayer.fillStyle(0x66d69a, 0.08).fillCircle(unit.guardPosition.x, unit.guardPosition.y, unit.guardRadius);
+      this.unitLayer.lineStyle(2, 0x66d69a, 0.75).strokeCircle(unit.guardPosition.x, unit.guardPosition.y, unit.guardRadius);
+      this.unitLayer.lineStyle(1, 0xa7f5c7, 0.45).strokeCircle(unit.guardPosition.x, unit.guardPosition.y, 6);
     });
     this.units.forEach((unit) => {
       const color = unit.team === 0 ? TEAM.PLAYER : TEAM.ENEMY;
@@ -872,7 +884,8 @@ class Battlefield extends Phaser.Scene {
      const metal = Math.floor(this.simulation.resources[0]);
      const playerState = this.simulation.getPlayerState(0);
      this.hudText.sidebarCredit.setText(`${metal.toLocaleString()} CREDITS`);
-     this.hudText.sidebarPower.setText(`POWER  ${playerState.power}%  ${playerState.usedSupply}/${playerState.capacity}`);
+      const powerStatus = playerState.lowPower ? 'LOW' : 'ONLINE';
+      this.hudText.sidebarPower.setText(`POWER ${playerState.generated}/${playerState.consumed}  ${powerStatus}`);
      this.hudText.resources.setText('');
       this.sidebarSections.infantry.row.setText(`RIFLE SQUAD // ${this.units.filter((unit) => unit.team === 0 && unit.type === 'rifle_squad').length}`);
       const unitLabels = { rifle_squad: 'RIFLE SQUAD', scout_bike: 'SCOUT BIKE', harvester: 'HARVESTER' };
@@ -1036,9 +1049,10 @@ class Battlefield extends Phaser.Scene {
       this.buildPanel.fillStyle(color, 1).fillRect(sidebar.mapX + (building.x / 2400) * sidebar.mapWidth - 3, sidebar.mapY + (building.y / 1500) * sidebar.mapHeight - 3, 6, 6);
     });
     this.buildPanel.lineStyle(1, 0x3d5148, 1).lineBetween(sidebar.left + 12, sidebar.powerY - 8, sidebar.left + sidebar.width - 12, sidebar.powerY - 8);
-    const powerRatio = this.simulation.getPlayerState(0).power / 100;
-    this.buildPanel.fillStyle(0x26343b, 1).fillRect(sidebar.left + 12, sidebar.powerY + 14, sidebar.width - 24, 7);
-    this.buildPanel.fillStyle(powerRatio < 1 ? 0xf2c75c : 0x54b7ff, 1).fillRect(sidebar.left + 12, sidebar.powerY + 14, (sidebar.width - 24) * powerRatio, 7);
+     const playerState = this.simulation.getPlayerState(0);
+     const powerRatio = Phaser.Math.Clamp(playerState.powerRatio, 0, 1);
+     this.buildPanel.fillStyle(0x26343b, 1).fillRect(sidebar.left + 12, sidebar.powerY + 14, sidebar.width - 24, 7);
+     this.buildPanel.fillStyle(playerState.lowPower ? 0xff6575 : powerRatio < 1 ? 0xf2c75c : 0x54b7ff, 1).fillRect(sidebar.left + 12, sidebar.powerY + 14, (sidebar.width - 24) * powerRatio, 7);
     this.buildCards.forEach((card) => card.background.setStrokeStyle(2, card.type === this.buildType ? 0xf2d27b : 0x71806d));
     this.buildTabs.forEach((tab) => tab.background.setStrokeStyle(2, tab.tab === this.activeBuildTab ? 0xf2d27b : 0x71806d));
   }

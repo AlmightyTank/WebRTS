@@ -33,7 +33,7 @@ export class Simulation {
     const unit = {
       id: this.nextUnitId++, playerId, team, type, name: definition.name, x, y,
       hp: definition.maxHp, maxHp: definition.maxHp,
-      target: null, cooldown: 0, facing: 0, stance: 'aggressive', guardPosition: null, guardRadius: 180
+      target: null, cooldown: 0, facing: 0, stance: 'aggressive', guardPosition: null, guardRadius: 180, alertTargetId: null, alertUntil: 0
     };
     if (type === 'harvester') {
       unit.cargo = 0;
@@ -64,7 +64,16 @@ export class Simulation {
     const queued = ownedBuildings.reduce((sum, building) => sum + building.queue.reduce((total, item) => total + (UNIT_TYPES[item.type]?.supply ?? 0), 0), 0);
     const usedSupply = units.reduce((sum, unit) => sum + (UNIT_TYPES[unit.type].supply ?? 0), 0) + queued;
     const capacity = ownedBuildings.reduce((sum, building) => sum + (BUILDING_TYPES[building.type].supply ?? 0), 0);
-    return { generated, consumed, power: consumed === 0 ? 100 : Math.min(100, Math.floor((generated / consumed) * 100)), usedSupply, capacity };
+    const ratio = consumed === 0 ? 1 : generated / consumed;
+    return {
+      generated,
+      consumed,
+      power: Math.min(100, Math.floor(ratio * 100)),
+      powerRatio: ratio,
+      lowPower: generated < consumed,
+      usedSupply,
+      capacity
+    };
   }
 
   issue(command) {
@@ -269,8 +278,52 @@ export class Simulation {
     const step = Math.min(distance, speed * dt);
     const nextX = unit.x + (dx / distance) * step;
     const nextY = unit.y + (dy / distance) * step;
-    this.tryMoveUnit(unit, nextX, nextY, dx, dy);
-    return distance <= speed * dt + 1;
+    const moved = this.tryMoveUnit(unit, nextX, nextY, dx, dy);
+    return moved && Math.hypot(x - unit.x, y - unit.y) <= 1;
+  }
+
+  moveHarvesterAlongRoute(unit, x, y, speed, dt, routeKey) {
+    const target = { x, y };
+    if (unit.harvesterRouteKey !== routeKey || !unit.harvesterPath) {
+      unit.harvesterRouteKey = routeKey;
+      unit.harvesterPath = this.findPath(unit, target);
+      unit.harvesterWaypoint = 0;
+    }
+    while (unit.harvesterWaypoint < unit.harvesterPath.length
+      && Math.hypot(unit.x - unit.harvesterPath[unit.harvesterWaypoint].x, unit.y - unit.harvesterPath[unit.harvesterWaypoint].y) < 12) {
+      unit.harvesterWaypoint += 1;
+    }
+    const waypoint = unit.harvesterPath[unit.harvesterWaypoint] ?? target;
+    const dx = waypoint.x - unit.x;
+    const dy = waypoint.y - unit.y;
+    const distance = Math.hypot(dx, dy);
+    if (Math.hypot(x - unit.x, y - unit.y) <= speed * dt && this.canUnitOccupy(unit, x, y)) {
+      unit.x = x;
+      unit.y = y;
+      unit.harvesterPath = [];
+      return true;
+    }
+    if (distance <= 1) return Math.hypot(x - unit.x, y - unit.y) <= 1;
+    const step = Math.min(distance, speed * dt);
+    const moved = this.tryMoveUnit(unit, unit.x + dx / distance * step, unit.y + dy / distance * step, dx, dy);
+    if (!moved) {
+      unit.harvesterPath = this.findPath(unit, target);
+      unit.harvesterWaypoint = 0;
+    }
+    return Math.hypot(x - unit.x, y - unit.y) <= 1;
+  }
+
+  refineryDockPoint(unit, refinery) {
+    const definition = BUILDING_TYPES[refinery.type];
+    const distance = Math.max(definition.width, definition.height) / 2 + 30;
+    return [
+      { x: refinery.x + definition.width / 2 + 30, y: refinery.y },
+      { x: refinery.x - definition.width / 2 - 30, y: refinery.y },
+      { x: refinery.x, y: refinery.y + definition.height / 2 + 30 },
+      { x: refinery.x, y: refinery.y - definition.height / 2 - 30 }
+    ].filter((point) => this.canUnitOccupy(unit, point.x, point.y))
+      .sort((a, b) => Math.hypot(a.x - unit.x, a.y - unit.y) - Math.hypot(b.x - unit.x, b.y - unit.y))[0]
+      ?? { x: refinery.x + distance, y: refinery.y };
   }
 
   tryMoveUnit(unit, nextX, nextY, dx, dy) {
@@ -287,7 +340,9 @@ export class Simulation {
       : [[unit.x, nextY], [nextX, unit.y]];
     const clear = candidates.find(([x, y]) => this.canUnitOccupy(unit, x, y));
     if (!clear) {
-      const detourDistance = 45;
+      // Keep collision recovery smaller than a frame's travel distance. The old
+      // 45px fallback looked like teleporting and made units overshoot corners.
+      const detourDistance = Math.min(14, Math.max(4, Math.hypot(dx, dy)));
       const detours = [
         [unit.x + detourDistance, unit.y], [unit.x - detourDistance, unit.y],
         [unit.x, unit.y + detourDistance], [unit.x, unit.y - detourDistance],
@@ -345,6 +400,14 @@ export class Simulation {
       const distance = Math.hypot(dx, dy);
       if (distance <= projectile.speed * dt + (projectile.targetType === 'building' ? 18 : 8)) {
         target.hp -= projectile.damage;
+        if (projectile.targetType === 'unit' && target.stance === 'defend_area') {
+          const attacker = this.units.find((unit) => unit.id === projectile.sourceId && unit.team !== target.team);
+          if (attacker) {
+            target.alertTargetId = attacker.id;
+            target.alertUntil = this.time + 3;
+            target.target = attacker.id;
+          }
+        }
         this.events.push({ type: 'damage', sourceId: projectile.sourceId, targetId: projectile.targetId, amount: projectile.damage });
         return;
       }
@@ -358,7 +421,7 @@ export class Simulation {
   updateHarvester(unit, dt) {
     const definition = UNIT_TYPES[unit.type];
     if (unit.harvesterState === 'to_resource' || unit.harvesterState === 'harvesting') {
-      const node = this.resourceNodes.find((candidate) => candidate.id === unit.resourceNodeId) ?? this.closestResourceNode(unit.x, unit.y);
+      let node = this.resourceNodes.find((candidate) => candidate.id === unit.resourceNodeId);
       if (!node || node.amount <= 0) {
         const nextNode = this.closestResourceNodeToHome(unit);
         if (!nextNode) {
@@ -367,29 +430,45 @@ export class Simulation {
         }
         unit.resourceNodeId = nextNode.id;
         unit.harvesterState = 'to_resource';
+        node = nextNode;
       }
-      const activeNode = this.resourceNodes.find((candidate) => candidate.id === unit.resourceNodeId);
-      if (this.moveUnitToward(unit, activeNode.x, activeNode.y, definition.speed, dt) && Math.hypot(unit.x - activeNode.x, unit.y - activeNode.y) <= definition.range) {
-        unit.harvesterState = 'harvesting';
-        const harvested = Math.min(unit.capacity - unit.cargo, definition.harvestRate * dt, activeNode.amount);
-        unit.cargo += harvested;
-        activeNode.amount -= harvested;
-        if (unit.cargo >= unit.capacity || activeNode.amount <= 0) unit.harvesterState = 'to_refinery';
+      const distance = Math.hypot(unit.x - node.x, unit.y - node.y);
+      if (distance > definition.range) {
+        this.moveHarvesterAlongRoute(unit, node.x, node.y, definition.speed, dt, `resource:${node.id}`);
+        return;
+      }
+      unit.harvesterState = 'harvesting';
+      const harvested = Math.min(unit.capacity - unit.cargo, definition.harvestRate * dt, node.amount);
+      unit.cargo += harvested;
+      node.amount -= harvested;
+      if (unit.cargo >= unit.capacity || node.amount <= 0) {
+        unit.harvesterState = 'to_refinery';
+        unit.harvesterPath = null;
       }
       return;
     }
 
-    const refinery = this.closestRefinery(unit.x, unit.y, unit.playerId);
-    if (!refinery) return;
-    const refineryType = BUILDING_TYPES[refinery.type];
-    const dropX = refinery.x + refineryType.width / 2 + 30;
-    if (this.moveUnitToward(unit, dropX, refinery.y, definition.speed, dt) && Math.abs(unit.x - dropX) <= 8 && Math.abs(unit.y - refinery.y) <= 8) {
+    let refinery = this.buildings.find((building) => building.id === unit.homeBuildingId && building.playerId === unit.playerId && building.type === 'refinery' && building.complete);
+    if (!refinery) {
+      refinery = this.closestRefinery(unit.x, unit.y, unit.playerId);
+      unit.homeBuildingId = refinery?.id ?? null;
+    }
+    if (!refinery) {
+      unit.harvesterState = 'idle';
+      return;
+    }
+    const dock = this.refineryDockPoint(unit, refinery);
+    const dockKey = `refinery:${refinery.id}:${Math.round(dock.x)}:${Math.round(dock.y)}`;
+    if (Math.hypot(unit.x - dock.x, unit.y - dock.y) <= 8) {
       this.resources[unit.playerId] += unit.cargo;
       this.events.push({ type: 'harvester_deposit', unitId: unit.id, amount: unit.cargo });
       unit.cargo = 0;
       const nextNode = this.closestResourceNodeToHome(unit);
       unit.harvesterState = nextNode ? 'to_resource' : 'idle';
       if (nextNode) unit.resourceNodeId = nextNode.id;
+      unit.harvesterPath = null;
+    } else {
+      this.moveHarvesterAlongRoute(unit, dock.x, dock.y, definition.speed, dt, dockKey);
     }
   }
 
@@ -409,7 +488,7 @@ export class Simulation {
     while (this.commandQueue.length) this.apply(this.commandQueue.shift());
     this.aiTimer -= dt;
     if (this.aiTimer <= 0) {
-      this.aiTimer = 1.5;
+      this.aiTimer = 4;
       this.updateEnemyAI();
     }
 
@@ -469,11 +548,20 @@ export class Simulation {
         this.updateHarvester(unit, dt);
         continue;
       }
-      if (unit.stance === 'defend_area' && !unit.target) {
+      if (unit.stance === 'defend_area' && unit.guardPosition) {
+        const alertActive = unit.alertTargetId !== null && this.time <= unit.alertUntil;
         const enemy = this.units
-          .filter((candidate) => candidate.team !== unit.team && unit.guardPosition && Math.hypot(candidate.x - unit.guardPosition.x, candidate.y - unit.guardPosition.y) <= unit.guardRadius)
+          .filter((candidate) => candidate.team !== unit.team && (Math.hypot(candidate.x - unit.guardPosition.x, candidate.y - unit.guardPosition.y) <= unit.guardRadius || (alertActive && candidate.id === unit.alertTargetId)))
           .sort((a, b) => Math.hypot(a.x - unit.x, a.y - unit.y) - Math.hypot(b.x - unit.x, b.y - unit.y))[0];
-        if (enemy) unit.target = enemy.id;
+        const currentEnemy = typeof unit.target === 'number' ? this.units.find((candidate) => candidate.id === unit.target) : null;
+        if (currentEnemy && Math.hypot(currentEnemy.x - unit.guardPosition.x, currentEnemy.y - unit.guardPosition.y) > unit.guardRadius && !(alertActive && currentEnemy.id === unit.alertTargetId)) {
+          unit.target = null;
+        }
+        if (enemy && (!currentEnemy || currentEnemy.id !== enemy.id)) unit.target = enemy.id;
+        if (!alertActive) unit.alertTargetId = null;
+        if (!unit.target && Math.hypot(unit.x - unit.guardPosition.x, unit.y - unit.guardPosition.y) > 8) {
+          unit.target = { ...unit.guardPosition, path: this.findPath(unit, unit.guardPosition), waypointIndex: 0 };
+        }
       }
       if (!unit.target) continue;
       const buildingTarget = unit.target.kind === 'building';
@@ -492,20 +580,36 @@ export class Simulation {
         continue;
       }
       const targetRadius = buildingTarget ? Math.max(BUILDING_TYPES[target.type].width, BUILDING_TYPES[target.type].height) / 2 : 0;
-      if (distance - targetRadius > definition.range) {
+      const positionalTarget = typeof unit.target !== 'number' && !buildingTarget;
+      const needsMove = positionalTarget ? distance > 4 : distance - targetRadius > definition.range;
+      if (needsMove) {
         let destination = target;
         const path = unit.target.path;
         if (path?.length) {
-          while (unit.target.waypointIndex < path.length - 1 && Math.hypot(unit.x - path[unit.target.waypointIndex].x, unit.y - path[unit.target.waypointIndex].y) < 12) unit.target.waypointIndex += 1;
-          destination = path[unit.target.waypointIndex];
+          while (unit.target.waypointIndex < path.length && Math.hypot(unit.x - path[unit.target.waypointIndex].x, unit.y - path[unit.target.waypointIndex].y) < 12) unit.target.waypointIndex += 1;
+          destination = unit.target.waypointIndex < path.length ? path[unit.target.waypointIndex] : target;
         }
         const pathDx = destination.x - unit.x;
         const pathDy = destination.y - unit.y;
         const pathDistance = Math.hypot(pathDx, pathDy) || 1;
         const nextX = unit.x + (pathDx / pathDistance) * definition.speed * dt;
         const nextY = unit.y + (pathDy / pathDistance) * definition.speed * dt;
-        if (!this.tryMoveUnit(unit, nextX, nextY, pathDx, pathDy)) {
+        const finalStep = positionalTarget && distance <= definition.speed * dt + 4;
+        if (finalStep && this.canUnitOccupy(unit, target.x, target.y)) {
+          unit.facing = Math.atan2(target.y - unit.y, target.x - unit.x);
+          unit.x = target.x;
+          unit.y = target.y;
           unit.target = null;
+        } else if (!this.tryMoveUnit(unit, nextX, nextY, pathDx, pathDy)) {
+          // A moving obstacle or a tight corner can invalidate the cached path.
+          // Repath from the current position instead of silently dropping the order.
+          if (positionalTarget) {
+            unit.target.path = this.findPath(unit, target);
+            unit.target.waypointIndex = 0;
+          } else if (buildingTarget) {
+            unit.target.path = this.findPath(unit, target);
+            unit.target.waypointIndex = 0;
+          }
         }
       } else if ((typeof unit.target === 'number' || buildingTarget) && unit.cooldown === 0) {
         this.projectiles.push({
@@ -565,9 +669,10 @@ export class Simulation {
     const enemyUnits = this.units.filter((unit) => unit.playerId === 1 && unit.type !== 'harvester');
     const playerTargets = [...this.units.filter((unit) => unit.playerId === 0), ...this.buildings.filter((building) => building.playerId === 0)];
     const target = playerTargets.sort((a, b) => Math.hypot(a.x - 1900, a.y - 750) - Math.hypot(b.x - 1900, b.y - 750))[0];
-    if (target) enemyUnits.filter((unit) => !unit.target).forEach((unit) => {
-      this.issue({ type: COMMANDS.ATTACK, playerId: 1, unitIds: [unit.id], targetId: target.id, targetType: target.queue ? 'building' : 'unit' });
-    });
+    if (target) {
+      const attacker = enemyUnits.find((unit) => !unit.target);
+      if (attacker) this.issue({ type: COMMANDS.ATTACK, playerId: 1, unitIds: [attacker.id], targetId: target.id, targetType: target.queue ? 'building' : 'unit' });
+    }
     const barracks = this.buildings.find((building) => building.playerId === 1 && building.type === 'barracks' && building.complete && !building.queue.length);
     if (barracks && this.resources[1] >= (UNIT_TYPES.rifle_squad.cost ?? 0)) this.issue({ type: COMMANDS.PRODUCE, playerId: 1, buildingId: barracks.id });
   }
@@ -608,7 +713,9 @@ export class Simulation {
         unit.stance = 'aggressive';
         unit.guardPosition = null;
         const angle = (index / Math.max(1, selected.length)) * Math.PI * 2;
-        const destination = { x: command.destination.x + Math.cos(angle) * 42, y: command.destination.y + Math.sin(angle) * 42 };
+        const destination = selected.length === 1
+          ? { x: command.destination.x, y: command.destination.y }
+          : { x: command.destination.x + Math.cos(angle) * 42, y: command.destination.y + Math.sin(angle) * 42 };
         unit.target = { ...destination, path: this.findPath(unit, destination), waypointIndex: 0 };
       });
     }

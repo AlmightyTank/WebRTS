@@ -221,6 +221,19 @@ test('power and supply gate production', () => {
   assert.equal(simulation.issue(produceCommand(0, barracks.id)).reason, 'insufficient_power');
 });
 
+test('power plants increase the base power budget', () => {
+  const simulation = new Simulation();
+  simulation.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  simulation.addBuilding({ playerId: 0, type: 'barracks', x: 600, y: 300 });
+  const before = simulation.getPlayerState(0);
+  simulation.addBuilding({ playerId: 0, type: 'power_plant', x: 900, y: 300 });
+  const after = simulation.getPlayerState(0);
+  assert.equal(before.generated, 40);
+  assert.equal(after.generated, 75);
+  assert.equal(after.lowPower, false);
+  assert.ok(after.powerRatio > before.powerRatio);
+});
+
 test('destroying the enemy command core ends the match', () => {
   const simulation = new Simulation();
   simulation.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
