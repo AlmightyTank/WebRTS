@@ -1,3 +1,5 @@
+> **Full desktop + mobile 1.0 plan:** [WebRTS Master Roadmap](docs/ROADMAP-1.0-DESKTOP-MOBILE.md). The linked roadmap supersedes this early prototype plan wherever the scope differs.
+
 # WebRTS Roadmap
 
 WebRTS is a browser RTS for PC and mobile, inspired by the readability and tactical clarity of classic RTS games. It will use original factions, fiction, art, maps, and missions.
