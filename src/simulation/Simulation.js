@@ -106,7 +106,12 @@ export class Simulation {
   issue(command) {
     const valid = this.validateCommand(command);
     if (!valid.ok) return valid;
-    this.commandQueue.push(command);
+    // Commands execute on the next fixed tick. Snapshot build requests now:
+    // callers must not be able to change the type, owner or coordinates after
+    // validation and before resources are charged.
+    this.commandQueue.push(command.type === COMMANDS.BUILD
+      ? { ...command, position: { x: command.position.x, y: command.position.y } }
+      : command);
     return { ok: true };
   }
 
@@ -161,11 +166,7 @@ export class Simulation {
       if (!targetExists) return { ok: false, reason: 'invalid_target' };
     }
     if (command.type === COMMANDS.BUILD) {
-      const definition = BUILDING_TYPES[command.buildingType];
-      if (!definition) return { ok: false, reason: 'unknown_building' };
-      if (!this.buildings.some((building) => building.playerId === command.playerId && building.type === 'command_core' && building.complete)) return { ok: false, reason: 'no_command_core' };
-      if (!command.position || this.getAvailableResources(command.playerId) < definition.cost) return { ok: false, reason: 'insufficient_resources' };
-      if (!this.canPlace(command.buildingType, command.position)) return { ok: false, reason: 'invalid_placement' };
+      return this.validateConstruction(command);
     }
     if (command.type === COMMANDS.PRODUCE) {
       const building = this.buildings.find((candidate) => candidate.id === command.buildingId);
@@ -198,8 +199,27 @@ export class Simulation {
     return { ok: true };
   }
 
+  validateConstruction(command, { reservePending = true } = {}) {
+    const definition = BUILDING_TYPES[command.buildingType];
+    if (!definition) return { ok: false, reason: 'unknown_building' };
+    // Command Cores are initial scenario structures, not free build-menu items.
+    if (command.buildingType === 'command_core') return { ok: false, reason: 'unbuildable_structure' };
+    if (!command.position || !Number.isFinite(command.position.x) || !Number.isFinite(command.position.y)) {
+      return { ok: false, reason: 'invalid_placement' };
+    }
+    if (!this.buildings.some((building) =>
+      building.playerId === command.playerId && building.type === 'command_core' && building.complete)) {
+      return { ok: false, reason: 'no_command_core' };
+    }
+    const available = reservePending ? this.getAvailableResources(command.playerId) : (this.resources[command.playerId] ?? 0);
+    if (available < definition.cost) return { ok: false, reason: 'insufficient_resources' };
+    if (!this.canPlace(command.buildingType, command.position)) return { ok: false, reason: 'invalid_placement' };
+    return { ok: true };
+  }
+
   canPlace(type, position) {
     const definition = BUILDING_TYPES[type];
+    if (!definition || !position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return false;
     return position.x > definition.width / 2 && position.x < this.map.width - definition.width / 2
       && position.y > definition.height / 2 && position.y < this.map.height - definition.height / 2
       && !this.buildings.some((building) => {
@@ -782,10 +802,17 @@ export class Simulation {
       });
     }
     if (command.type === COMMANDS.BUILD) {
+      // Units/structures/resources may have changed since issue(). Recheck
+      // without subtracting still-pending reservations a second time.
+      const valid = this.validateConstruction(command, { reservePending: false });
+      if (!valid.ok) {
+        this.events.push({ type: 'building_rejected', buildingType: command.buildingType, reason: valid.reason });
+        return;
+      }
       const definition = BUILDING_TYPES[command.buildingType];
       this.resources[command.playerId] -= definition.cost;
-      this.addBuilding({ playerId: command.playerId, team: command.playerId, type: command.buildingType, x: command.position.x, y: command.position.y, complete: false });
-      this.events.push({ type: 'building_created', buildingType: command.buildingType });
+      const building = this.addBuilding({ playerId: command.playerId, team: command.playerId, type: command.buildingType, x: command.position.x, y: command.position.y, complete: false });
+      this.events.push({ type: 'building_created', buildingType: command.buildingType, buildingId: building.id });
     }
     if (command.type === COMMANDS.PRODUCE) {
       const building = this.buildings.find((candidate) => candidate.id === command.buildingId);

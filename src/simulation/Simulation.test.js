@@ -332,3 +332,108 @@ test('harvesters wait for a completed refinery and retain existing cargo', () =>
   assert.ok(simulation.resources[0] >= 1330, 'saved cargo should reach the new refinery');
   assert.ok(harvester.cargo >= 0 && harvester.cargo <= harvester.capacity);
 });
+
+test('building requests reject malformed positions without charging metal or throwing', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const original = sim.resources[0];
+  const badPositions = [null, undefined, {}, { x: NaN, y: 500 }, { x: Infinity, y: 500 }, { x: -Infinity, y: 500 }, { x: 500, y: '500' }];
+  for (const position of badPositions) {
+    assert.deepEqual(sim.issue({ type: 'build', playerId: 0, buildingType: 'refinery', position }), { ok: false, reason: 'invalid_placement' });
+    assert.equal(sim.canPlace('refinery', position), false);
+  }
+  assert.equal(sim.resources[0], original);
+  assert.equal(sim.commandQueue.length, 0);
+});
+
+test('map edges, existing structures, units and queued footprints reject construction', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const before = sim.resources[0];
+  for (const position of [{ x: 60, y: 500 }, { x: 2340, y: 500 }, { x: 500, y: 50 }, { x: 500, y: 1450 }, { x: 300, y: 300 }]) {
+    assert.equal(sim.issue(buildCommand(0, 'refinery', position)).reason, 'invalid_placement');
+  }
+  sim.addUnit({ playerId: 0, x: 900, y: 650 });
+  assert.equal(sim.issue(buildCommand(0, 'refinery', { x: 900, y: 650 })).reason, 'invalid_placement');
+  assert.deepEqual(sim.issue(buildCommand(0, 'refinery', { x: 1100, y: 700 })), { ok: true });
+  assert.equal(sim.issue(buildCommand(0, 'refinery', { x: 1100, y: 700 })).reason, 'invalid_placement');
+  assert.equal(sim.issue(buildCommand(0, 'refinery', { x: 1180, y: 700 })).reason, 'invalid_placement');
+  assert.equal(sim.resources[0], before);
+  sim.step(1 / 30);
+  assert.equal(sim.resources[0], before - 300);
+  assert.equal(sim.buildings.filter(b => b.type === 'refinery').length, 1);
+});
+
+test('pending construction and production spend the same shared resource budget once', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const barracks = sim.addBuilding({ playerId: 0, type: 'barracks', x: 600, y: 300 });
+  sim.resources[0] = 420;
+  assert.deepEqual(sim.issue(buildCommand(0, 'refinery', { x: 1100, y: 700 })), { ok: true });
+  assert.equal(sim.issue(produceCommand(0, barracks.id, 'rifle_squad')).reason, undefined);
+  assert.equal(sim.getAvailableResources(0), 20);
+  assert.equal(sim.issue(buildCommand(0, 'barracks', { x: 1350, y: 700 })).reason, 'insufficient_resources');
+  sim.step(1 / 30);
+  assert.equal(sim.resources[0], 20);
+  assert.equal(sim.buildings.filter(b => b.type === 'refinery').length, 1);
+});
+
+test('queued construction is immune to callers mutating the accepted command', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const command = buildCommand(0, 'refinery', { x: 1100, y: 700 });
+  assert.deepEqual(sim.issue(command), { ok: true });
+  command.position.x = 300;
+  command.position.y = 300;
+  command.buildingType = 'command_core';
+  command.playerId = 1;
+  assert.equal(sim.commandQueue[0].buildingType, 'refinery');
+  assert.deepEqual(sim.commandQueue[0].position, { x: 1100, y: 700 });
+  sim.step(1 / 30);
+  const constructed = sim.buildings.find(b => b.type === 'refinery');
+  assert.equal(constructed.x, 1100);
+  assert.equal(constructed.y, 700);
+  assert.equal(sim.resources[0], 950);
+});
+
+test('if a unit moves onto a queued site, no charge or structure occurs at execution', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const before = sim.resources[0];
+  assert.deepEqual(sim.issue(buildCommand(0, 'refinery', { x: 1100, y: 700 })), { ok: true });
+  sim.addUnit({ playerId: 0, x: 1100, y: 700 });
+  sim.step(1 / 30);
+  assert.equal(sim.resources[0], before);
+  assert.equal(sim.buildings.filter(b => b.type === 'refinery').length, 0);
+  assert.ok(sim.events.some(e => e.type === 'building_rejected' && e.reason === 'invalid_placement'));
+});
+
+test('a Command Core lost after issue prevents starting construction and charging metal', () => {
+  const sim = new Simulation();
+  const core = sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  const before = sim.resources[0];
+  assert.deepEqual(sim.issue(buildCommand(0, 'refinery', { x: 1100, y: 700 })), { ok: true });
+  sim.buildings.splice(sim.buildings.indexOf(core), 1);
+  sim.step(1 / 30);
+  assert.equal(sim.resources[0], before);
+  assert.equal(sim.buildings.filter(b => b.type === 'refinery').length, 0);
+  assert.ok(sim.events.some(e => e.type === 'building_rejected' && e.reason === 'no_command_core'));
+});
+
+test('a queued build cannot spend metal that becomes unavailable before execution', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  assert.deepEqual(sim.issue(buildCommand(0, 'refinery', { x: 1100, y: 700 })), { ok: true });
+  sim.resources[0] = 100;
+  sim.step(1 / 30);
+  assert.equal(sim.resources[0], 100);
+  assert.equal(sim.buildings.filter(b => b.type === 'refinery').length, 0);
+  assert.ok(sim.events.some(e => e.type === 'building_rejected' && e.reason === 'insufficient_resources'));
+});
+
+test('scenario-only command cores cannot be built for free via a build command', () => {
+  const sim = new Simulation();
+  sim.addBuilding({ playerId: 0, type: 'command_core', x: 300, y: 300 });
+  assert.equal(sim.issue(buildCommand(0, 'command_core', { x: 1100, y: 700 })).reason, 'unbuildable_structure');
+  assert.equal(sim.commandQueue.length, 0);
+});

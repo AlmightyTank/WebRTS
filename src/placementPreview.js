@@ -10,7 +10,8 @@ const REASONS = Object.freeze({
   no_command_core: 'COMMAND CORE REQUIRED',
   insufficient_resources: 'INSUFFICIENT METAL',
   invalid_placement: 'LOCATION BLOCKED',
-  unknown_building: 'UNKNOWN BUILDING'
+  unknown_building: 'UNKNOWN BUILDING',
+  unbuildable_structure: 'UNBUILDABLE STRUCTURE'
 });
 
 // Always use the simulation's authoritative command validation: it includes

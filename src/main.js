@@ -741,7 +741,7 @@ class Battlefield extends Phaser.Scene {
       this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
       this.updateBuildPreview(world);
       const result = this.simulation.issue(buildCommand(0, type, world));
-      this.message = result.ok ? `${BUILDING_TYPES[type].name} construction started.` : `Build rejected: ${result.reason}.`;
+      this.message = result.ok ? `${BUILDING_TYPES[type].name} construction queued.` : `Build rejected: ${result.reason}.`;
       if (result.ok) this.finishPlacement();
       return;
     }
@@ -932,6 +932,14 @@ class Battlefield extends Phaser.Scene {
     if (!this.isPaused) {
       this.updateKeyboardPan(dt);
       this.simulation.advance(dt);
+      const constructionEvent = this.simulation.events.find((event) =>
+        event.type === 'building_rejected' || event.type === 'building_created');
+      if (constructionEvent) {
+        const name = BUILDING_TYPES[constructionEvent.buildingType]?.name ?? 'Building';
+        this.message = constructionEvent.type === 'building_created'
+          ? `${name} construction started.`
+          : `${name} construction cancelled: ${constructionEvent.reason}.`;
+      }
     }
     this.selected.forEach((id) => { if (!this.getUnit(id)) this.selected.delete(id); });
     this.drawUnits();
