@@ -3,6 +3,7 @@ import './style.css';
 import { Simulation } from './simulation/Simulation.js';
 import { attackCommand, buildCommand, defendCommand, moveCommand, produceCommand, repairCommand, sellCommand, stopCommand } from './simulation/commands.js';
 import { BUILDING_TYPES } from './simulation/content.js';
+import { getMobileHudLayout } from './mobileHudLayout.js';
 
 const WORLD = { width: 2400, height: 1500 };
 const TEAM = { PLAYER: 0x54b7ff, ENEMY: 0xff6575 };
@@ -27,6 +28,9 @@ class Battlefield extends Phaser.Scene {
     this.isPaused = false;
     this.buildType = 'refinery';
     this.buildPreviewPosition = null;
+    this.mobilePanelOpen = false;
+    this.mobileCardPage = 0;
+    this.suppressPointerUntilUp = false;
   }
 
   create() {
@@ -55,6 +59,10 @@ class Battlefield extends Phaser.Scene {
     this.setupUiCamera();
 
     this.createUnits();
+    if (this.uiSize().width < 700 || this.isTouchDevice()) {
+      // Begin on the player's base, not the empty corner of the map.
+      this.cameras.main.centerOn(520, 720);
+    }
     this.drawWorld();
     this.installInput();
     this.scale.on('resize', () => {
@@ -78,6 +86,22 @@ class Battlefield extends Phaser.Scene {
       sidebarCredit: this.add.text(0, 0, '', { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#f2d27b' }).setScrollFactor(0).setDepth(22),
       sidebarPower: this.add.text(0, 0, 'POWER  100%', { fontFamily: 'monospace', fontSize: '10px', color: '#d9e0c4' }).setScrollFactor(0).setDepth(22)
     };
+    this.mobileMenuButton = this.add.rectangle(0, 0, 100, 38, 0x354744, 1)
+      .setStrokeStyle(2, 0xf2d27b).setScrollFactor(0).setDepth(23)
+      .setInteractive({ useHandCursor: true }).setVisible(false);
+    this.mobileMenuText = this.add.text(0, 0, 'BUILD', { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#f2d27b' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(24).setVisible(false);
+    this.mobileMenuButton.on('pointerdown', () => this.toggleMobilePanel());
+    this.mobilePagerButtons = ['prev', 'next'].map((action) => {
+      const background = this.add.rectangle(0, 0, 72, 32, 0x26343b, 1).setStrokeStyle(1, 0x8ca58b)
+        .setScrollFactor(0).setDepth(23).setInteractive({ useHandCursor: true }).setVisible(false);
+      const text = this.add.text(0, 0, action === 'prev' ? 'PREV' : 'NEXT', { fontFamily: 'monospace', fontSize: '11px', color: '#e9f0dd' })
+        .setOrigin(0.5).setScrollFactor(0).setDepth(24).setVisible(false);
+      background.on('pointerdown', () => this.changeMobilePage(action === 'prev' ? -1 : 1));
+      return { background, text, action };
+    });
+    this.mobilePageText = this.add.text(0, 0, '', { fontFamily: 'monospace', fontSize: '11px', color: '#f2d27b' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(24).setVisible(false);
     this.buildTitle = this.add.text(0, 0, '▣ BUILDINGS', { fontFamily: 'monospace', fontSize: '13px', fontStyle: 'bold', color: '#f2d27b' }).setScrollFactor(0).setDepth(22);
     this.sidebarSections = {};
     this.categoryTabs = [];
@@ -177,6 +201,8 @@ class Battlefield extends Phaser.Scene {
       this.hud,
       ...Object.values(this.hudText),
       this.buildTitle,
+      this.mobileMenuButton, this.mobileMenuText, this.mobilePageText,
+      ...this.mobilePagerButtons.flatMap((button) => [button.background, button.text]),
       ...this.categoryTabs.flatMap((tab) => [tab.background, tab.text]),
       ...Object.values(this.sidebarSections).flatMap((section) => [section.title, section.row]),
       ...this.unitEntries,
@@ -201,6 +227,27 @@ class Battlefield extends Phaser.Scene {
       width: this.scale.gameSize?.width ?? this.scale.width,
       height: this.scale.gameSize?.height ?? this.scale.height
     };
+  }
+
+  toggleMobilePanel() {
+    this.mobilePanelOpen = !this.mobilePanelOpen;
+    this.mobileCardPage = 0;
+    this.suppressPointerUntilUp = true;
+    this.layoutUi();
+  }
+
+  changeMobilePage(delta) {
+    this.mobileCardPage = Math.max(0, this.mobileCardPage + delta);
+    this.suppressPointerUntilUp = true;
+    this.layoutUi();
+  }
+
+  closeMobilePanelForTargeting() {
+    if (this.mobilePanelOpen && (this.uiSize().width < 700 || this.isTouchDevice())) {
+      this.mobilePanelOpen = false;
+      this.suppressPointerUntilUp = true;
+      this.layoutUi();
+    }
   }
 
   useCommandButton(action) {
@@ -233,6 +280,7 @@ class Battlefield extends Phaser.Scene {
   selectBuildType(type) {
     this.buildType = type;
     this.commandMode = 'build';
+    this.closeMobilePanelForTargeting();
     this.message = `BUILD mode: ${type.replaceAll('_', ' ').toUpperCase()} selected. Choose a placement location.`;
   }
 
@@ -260,6 +308,7 @@ class Battlefield extends Phaser.Scene {
   }
 
   setCategory(category) {
+    if (this.activeCategory !== category) this.mobileCardPage = 0;
     this.activeCategory = category;
     const tab = this.categoryTabs.find((candidate) => candidate.key === category);
     this.buildTitle.setText(`${tab?.text.text ?? '▣'} ${tab?.title ?? 'BUILDINGS'}`);
@@ -300,6 +349,7 @@ class Battlefield extends Phaser.Scene {
   useBuildingAction(action) {
     this.utilityMode = action;
     this.commandMode = null;
+    this.closeMobilePanelForTargeting();
     this.message = `${action.toUpperCase()} MODE: click a friendly ${action === 'sell' ? 'structure' : 'structure or vehicle'}.`;
   }
 
@@ -340,9 +390,14 @@ class Battlefield extends Phaser.Scene {
 
   isUiPointer(pointer) {
     const { width, height } = this.uiSize();
-    const mobile = width < 700 || this.isTouchDevice();
-    const bottomHeight = mobile ? 145 : 165;
-    return this.isPaused || pointer.x >= this.sidebarLayout().left || pointer.y >= height - bottomHeight;
+    if (width < 700 || this.isTouchDevice()) {
+      const layout = getMobileHudLayout(width, height);
+      const inPanel = this.mobilePanelOpen
+        && pointer.x >= layout.drawerLeft && pointer.x <= layout.drawerLeft + layout.drawerWidth
+        && pointer.y >= layout.drawerTop && pointer.y <= layout.drawerBottom;
+      return this.isPaused || pointer.y <= layout.topBarHeight || pointer.y >= layout.bottomTop || inPanel;
+    }
+    return this.isPaused || pointer.x >= this.sidebarLayout().left || pointer.y >= height - 165;
   }
 
   updateZoomLimits() {
@@ -403,6 +458,11 @@ class Battlefield extends Phaser.Scene {
     this.cameraKeys.s = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.cameraKeys.d = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.input.on('pointerdown', (pointer) => {
+      if (this.suppressPointerUntilUp) {
+        this.dragStart = null;
+        this.pointerMode = 'ui';
+        return;
+      }
       const touches = this.getTouchPointers();
       if (this.isTouchPointer(pointer) && touches.length >= 2) {
         this.pointerMode = 'touch';
@@ -459,6 +519,13 @@ class Battlefield extends Phaser.Scene {
     });
 
     this.input.on('pointerup', (pointer) => {
+      if (this.suppressPointerUntilUp) {
+        this.suppressPointerUntilUp = false;
+        this.dragStart = null;
+        this.pointerMode = null;
+        this.selectionLayer.clear();
+        return;
+      }
       if (this.isTouchPointer(pointer) && this.touchGestureOccurred) {
         // Never convert a pan or a two-finger pinch into an accidental move/order.
         this.dragStart = null;
@@ -942,6 +1009,20 @@ class Battlefield extends Phaser.Scene {
   layoutUi() {
     const { width, height } = this.uiSize();
     const mobile = width < 700 || this.isTouchDevice();
+    if (mobile) {
+      this.layoutMobileUi();
+      return;
+    }
+    this.mobileMenuButton.setVisible(false);
+    this.mobileMenuText.setVisible(false);
+    this.mobilePageText.setVisible(false);
+    this.mobilePagerButtons.forEach((button) => {
+      button.background.setVisible(false);
+      button.text.setVisible(false);
+    });
+    this.commandButtons.forEach((button) => button.text.setText(
+      button.action === 'defend' ? 'DEFEND AREA' : button.action === 'select_all' ? 'SELECT ALL' : button.action.toUpperCase()
+    ));
     const bottomHeight = mobile ? 145 : 165;
     const bottomTop = height - bottomHeight;
     const sidebar = this.sidebarLayout();
@@ -1046,11 +1127,131 @@ class Battlefield extends Phaser.Scene {
     this.drawHud();
   }
 
+  layoutMobileUi() {
+    const { width, height } = this.uiSize();
+    const layout = getMobileHudLayout(width, height);
+    const opened = this.mobilePanelOpen;
+    const { drawerLeft, drawerWidth, drawerTop, drawerBottom, bottomTop,
+      mapX, mapY, mapWidth, mapHeight, utilityY, tabsY, titleY, cardsTop,
+      cardWidth, cardHeight, cardRowHeight, rowsPerPage } = layout;
+
+    this.hudText.title.setVisible(false);
+    this.hudText.resources.setVisible(false);
+    this.hudText.intel.setVisible(false);
+    this.hudText.hint.setVisible(false);
+    this.helpText.setVisible(false);
+    this.statusText.setVisible(false);
+
+    this.hudText.sidebarCredit.setPosition(12, 8).setFontSize(13).setVisible(true);
+    this.hudText.sidebarPower.setPosition(12, 31).setFontSize(9).setVisible(true);
+    this.hudText.selection.setPosition(12, bottomTop + 9).setFontSize(11)
+      .setWordWrapWidth(width - 24).setVisible(true);
+
+    this.mobileMenuButton.setVisible(true).setPosition(width - 60, 27).setSize(100, 40)
+      .setFillStyle(opened ? 0x5b4435 : 0x263f3b);
+    if (this.mobileMenuButton.input?.hitArea?.setSize) this.mobileMenuButton.input.hitArea.setSize(100, 40);
+    this.mobileMenuText.setVisible(true).setPosition(width - 60, 27).setText(opened ? 'CLOSE ×' : 'BUILD ▣');
+
+    const gap = 5;
+    const buttonWidth = Math.floor((width - 20 - 4 * gap) / 5);
+    this.commandButtons.forEach((button, index) => {
+      const labels = { move: 'MOVE', attack: 'ATTACK', stop: 'STOP', defend: 'GUARD', select_all: 'ALL' };
+      const x = 10 + buttonWidth * (index + 0.5) + index * gap;
+      const y = bottomTop + 66;
+      button.text.setText(labels[button.action]).setPosition(x, y).setFontSize(width < 340 ? 9 : 10);
+      button.background.setSize(buttonWidth, 44).setPosition(x, y);
+      if (button.background.input?.hitArea?.setSize) button.background.input.hitArea.setSize(buttonWidth, 44);
+    });
+
+    this.gameOverPanel.clear().fillStyle(0x07101a, 0.9).fillRect(0, 0, width, height);
+    this.gameOverTitle.setPosition(width / 2, height / 2 - 52).setFontSize(21);
+    this.gameOverDetail.setPosition(width / 2, height / 2 - 14).setFontSize(10);
+    this.restartButton.setPosition(width / 2, height / 2 + 38);
+    this.restartButtonText.setPosition(width / 2, height / 2 + 38);
+    this.pausePanel.clear().fillStyle(0x07101a, 0.9).fillRect(0, 0, width, height);
+    this.pauseTitle.setPosition(width / 2, height / 2 - 72).setFontSize(21);
+    this.pauseDetail.setPosition(width / 2, height / 2 - 35).setFontSize(10);
+    this.pauseResume.setPosition(width / 2, height / 2 + 8);
+    this.pauseResumeText.setPosition(width / 2, height / 2 + 8);
+    this.pauseRestart.setPosition(width / 2, height / 2 + 62);
+    this.pauseRestartText.setPosition(width / 2, height / 2 + 62);
+
+    this.buildTabs.forEach((tab) => {
+      tab.background.setVisible(false);
+      tab.text.setVisible(false);
+    });
+    this.supportNotice.setVisible(false);
+    this.unitEntries.forEach((entry) => entry.setVisible(false));
+    Object.values(this.sidebarSections).forEach((section) => {
+      section.title.setVisible(false);
+      section.row.setVisible(false);
+    });
+    this.buildTitle.setVisible(opened).setPosition(drawerLeft + 12, titleY).setFontSize(14);
+    this.categoryTabs.forEach((tab, index) => {
+      const slotWidth = (drawerWidth - 24) / 6;
+      const x = drawerLeft + 12 + slotWidth * (index + 0.5);
+      tab.background.setSize(slotWidth - 3, 34).setPosition(x, tabsY).setVisible(opened);
+      if (tab.background.input?.hitArea?.setSize) tab.background.input.hitArea.setSize(slotWidth - 3, 34);
+      tab.text.setPosition(x, tabsY).setFontSize(15).setVisible(opened);
+      tab.background.setStrokeStyle(2, tab.key === this.activeCategory ? 0xf2d27b : 0x71806d);
+    });
+    this.utilityButtons.forEach((button, index) => {
+      const availableWidth = drawerWidth - (mapX - drawerLeft) - mapWidth - 24;
+      const x = mapX + mapWidth + 12 + availableWidth / 2;
+      const y = utilityY + (index === 0 ? -22 : 22);
+      button.background.setSize(availableWidth, 40).setPosition(x, y).setVisible(opened);
+      if (button.background.input?.hitArea?.setSize) button.background.input.hitArea.setSize(availableWidth, 40);
+      button.text.setPosition(x, y).setFontSize(12).setVisible(opened);
+    });
+
+    const allVisible = this.activeCategory === 'buildings' || this.activeCategory === 'defensive'
+      ? this.buildCards.filter((card) => card.category === this.activeCategory)
+      : this.unitCards.filter((card) =>
+        this.activeCategory === 'infantry'
+          ? ['rifle_squad', 'rocket_team', 'assault_trooper'].includes(card.type)
+          : this.activeCategory === 'vehicles' && ['scout_bike', 'light_tank', 'siege_tank', 'harvester'].includes(card.type));
+    const pageSize = rowsPerPage * 2;
+    const pages = Math.max(1, Math.ceil(allVisible.length / pageSize));
+    this.mobileCardPage = Math.min(this.mobileCardPage, pages - 1);
+    const current = allVisible.slice(this.mobileCardPage * pageSize, (this.mobileCardPage + 1) * pageSize);
+    const positionCard = (card, list) => {
+      const index = list.indexOf(card);
+      const visible = opened && index >= 0;
+      const x = drawerLeft + 12 + (index % 2) * (cardWidth + 10) + cardWidth / 2;
+      const y = cardsTop + Math.floor(index / 2) * cardRowHeight;
+      card.background.setVisible(visible);
+      card.text.setVisible(visible);
+      card.costText.setVisible(visible);
+      if (!visible) return;
+      card.background.setSize(cardWidth, cardHeight).setPosition(x, y);
+      if (card.background.input?.hitArea?.setSize) card.background.input.hitArea.setSize(cardWidth, cardHeight);
+      card.text.setPosition(x - cardWidth / 2 + 9, y - 9).setFontSize(width < 340 ? 9 : 10);
+      card.costText.setPosition(x - cardWidth / 2 + 9, y + 10).setFontSize(9);
+    };
+    this.buildCards.forEach((card) => positionCard(card, current));
+    this.unitCards.forEach((card) => positionCard(card, current));
+    const showPager = opened && pages > 1;
+    this.mobilePagerButtons.forEach((button, index) => {
+      const x = width / 2 + (index === 0 ? -95 : 95);
+      const y = drawerBottom - 23;
+      button.background.setPosition(x, y).setVisible(showPager).setAlpha(
+        index === 0 ? (this.mobileCardPage === 0 ? 0.45 : 1) : (this.mobileCardPage === pages - 1 ? 0.45 : 1));
+      button.text.setPosition(x, y).setVisible(showPager);
+    });
+    this.mobilePageText.setPosition(width / 2, drawerBottom - 23)
+      .setText(`${this.mobileCardPage + 1} / ${pages}`).setVisible(showPager);
+    this.drawHud();
+  }
+
   drawHud() {
     if (!this.hud) return;
     const { width, height } = this.uiSize();
     const mobile = width < 700 || this.isTouchDevice();
-    const bottomHeight = mobile ? 145 : 165;
+    if (mobile) {
+      this.drawMobileHud();
+      return;
+    }
+    const bottomHeight = 165;
     const bottomTop = height - bottomHeight;
     const sidebar = this.sidebarLayout();
     this.hud.clear();
@@ -1078,6 +1279,35 @@ class Battlefield extends Phaser.Scene {
      this.buildPanel.fillStyle(playerState.lowPower ? 0xff6575 : powerRatio < 1 ? 0xf2c75c : 0x54b7ff, 1).fillRect(sidebar.left + 12, sidebar.powerY + 14, (sidebar.width - 24) * powerRatio, 7);
     this.buildCards.forEach((card) => card.background.setStrokeStyle(2, card.type === this.buildType ? 0xf2d27b : 0x71806d));
     this.buildTabs.forEach((tab) => tab.background.setStrokeStyle(2, tab.tab === this.activeBuildTab ? 0xf2d27b : 0x71806d));
+  }
+
+  drawMobileHud() {
+    const { width, height } = this.uiSize();
+    const layout = getMobileHudLayout(width, height);
+    this.hud.clear();
+    this.hud.fillStyle(0x11191b, 0.97).fillRect(0, 0, width, layout.topBarHeight);
+    this.hud.lineStyle(2, 0x6f7b5d, 1).lineBetween(0, layout.topBarHeight, width, layout.topBarHeight);
+    this.hud.fillStyle(0x11191b, 0.97).fillRect(0, layout.bottomTop, width, height - layout.bottomTop);
+    this.hud.lineStyle(2, 0x6f7b5d, 1).lineBetween(0, layout.bottomTop, width, layout.bottomTop);
+    this.buildPanel.clear();
+    if (this.mobilePanelOpen) {
+      this.buildPanel.fillStyle(0x11191b, 0.99).fillRect(layout.drawerLeft, layout.drawerTop, layout.drawerWidth, layout.drawerBottom - layout.drawerTop);
+      this.buildPanel.lineStyle(2, 0x8a8559, 1).strokeRect(layout.drawerLeft, layout.drawerTop, layout.drawerWidth, layout.drawerBottom - layout.drawerTop);
+      this.buildPanel.fillStyle(0x1e3030, 1).fillRect(layout.mapX, layout.mapY, layout.mapWidth, layout.mapHeight);
+      this.buildPanel.lineStyle(2, 0xa89a58, 1).strokeRect(layout.mapX, layout.mapY, layout.mapWidth, layout.mapHeight);
+      this.units.forEach((unit) => {
+        const dot = unit.type === 'harvester' ? 5 : 4;
+        this.buildPanel.fillStyle(unit.type === 'harvester' ? 0xf2c75c : unit.team === 0 ? TEAM.PLAYER : TEAM.ENEMY, 1)
+          .fillRect(layout.mapX + unit.x / WORLD.width * layout.mapWidth - dot / 2,
+            layout.mapY + unit.y / WORLD.height * layout.mapHeight - dot / 2, dot, dot);
+      });
+      this.simulation.buildings.forEach((building) => {
+        this.buildPanel.fillStyle(building.team === 0 ? TEAM.PLAYER : TEAM.ENEMY, 1)
+          .fillRect(layout.mapX + building.x / WORLD.width * layout.mapWidth - 3,
+            layout.mapY + building.y / WORLD.height * layout.mapHeight - 3, 6, 6);
+      });
+      this.buildCards.forEach((card) => card.background.setStrokeStyle(2, card.type === this.buildType ? 0xf2d27b : 0x71806d));
+    }
   }
 
   sidebarLayout() {
