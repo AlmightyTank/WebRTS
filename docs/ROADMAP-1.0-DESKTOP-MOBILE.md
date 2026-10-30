@@ -1,6 +1,7 @@
 # WebRTS — Desktop & Mobile RTS 1.0 Master Roadmap
 
-**Status:** planned after building-placement 2.0 slices A–E; baseline commit `6fdeec67830bae136b64c02e9130fdeac4980afe`.
+**Status (2026-10-29):** v0.2 Slices A–H implemented and merged into `main`; `test-and-build` and `browser-playtest` CI passed on the current main branch. **Next: v0.3 Slice A (shared unit intents and commands).** All v0.3–1.0 slices remain planned until individually implemented and accepted.
+**Original planning baseline:** building-placement 2.0 slices A–E at `6fdeec67830bae136b64c02e9130fdeac4980afe`.
 **Reference feel:** the strategic depth and immediacy of classic Red Alert 2, rebuilt as an original intellectual property with original names, graphics, voices, maps, music, technology and story.
 **Release platforms:** modern desktop browsers, Android/iOS mobile browsers and tablets; installable PWA is planned.
 
@@ -17,9 +18,36 @@
 
 ## What exists already
 
-Phaser 4 + Vite frontend; JavaScript fixed-step simulation; seeded map; initial 7 unit classes, 7 building classes, 2 starter faction records; commands for move/attack/defend/build/produce/repair/sell; resource harvesting, queues, power/supply, baseline enemy AI, building-placement 2.0 and cross-device Chromium acceptance tests. These are prototypes, not completed production-quality systems. No dedicated online server, mission framework or complete air/naval game exists yet.
+Phaser 4 + Vite frontend; JavaScript fixed-step simulation; seeded map; initial 7 unit classes, 7 building classes, 2 starter faction records; commands for move/attack/defend/build/produce/repair/sell; resource harvesting, queues, power/supply, baseline enemy AI and building-placement 2.0. The v0.2 foundation adds modular engine/data boundaries, versioned commands and content definitions, deterministic hashes, validated local skirmish save/load, performance diagnostics and desktop/phone/tablet Chromium playtests. High-DPI canvas rendering and pointer scaling are also implemented and documented in [HIDPI-RENDERING.md](HIDPI-RENDERING.md). These systems remain an evolving prototype, not a complete production-quality RTS. No dedicated online server, mission framework or complete air/naval game exists yet.
 
-**Immediate technical finding:** the Git tree includes tracked `node_modules` paths. Clean tracked dependencies as the first slice before a major refactor.
+**Repository hygiene:** the formerly tracked dependencies/build outputs were cleaned in v0.2 Slice A. Continue enforcing clean installs with `npm ci`; do not reintroduce tracked `node_modules`.
+
+**Current execution tracker:** [Root ROADMAP.md](../ROADMAP.md) summarizes every milestone, the next work slices, release gates and current status. This document is the authoritative specification for all **147 slices**.
+
+## Delivery and status checklist (living record)
+
+This is a plan, not evidence that future game features are complete. Check off slices only when their implementation, regression tests, CI and playable acceptance scenario are verified on `main`.
+
+- [x] **v0.2 A–H:** Engine/repository foundation, desktop/mobile/tablet Chromium browser acceptance, green main CI.
+- [ ] **v0.3 A–H:** Desktop/mobile RTS commands, camera, HUD and gesture correctness.
+- [ ] **v0.4 A–H:** Terrain, navigation, line of sight and fog of war.
+- [ ] **v0.5 A–H:** Harvesting, production, tech and base-building economy.
+- [ ] **v0.6 A–H:** Infantry/vehicle combat, garrisons, capture and veterancy.
+- [ ] **v0.7 A–H:** Fully asymmetric Iron Collective and Vanguard League.
+- [ ] **v0.8 A–H:** Aircraft, naval combat and amphibious movement.
+- [ ] **v0.9 A–H:** Tactical abilities, stealth and superweapons.
+- [ ] **v0.10 A–H:** Finished offline skirmish setup, AI and result flow.
+- [ ] **v0.11 A–H:** Original art, sound, VFX and polished UI.
+- [ ] **v0.12 A–H:** Mission scripting, editor and campaign progression.
+- [ ] **v0.13 A–J:** Ten Iron Collective story missions.
+- [ ] **v0.14 A–J:** Ten Vanguard League story missions.
+- [ ] **v0.15 A–H:** Server-authoritative online 1v1.
+- [ ] **v0.16 A–H:** 2v2, lobby, crossplay and replays.
+- [ ] **v0.17 A–H:** Accessibility, performance, saves and device compatibility.
+- [ ] **v0.18 A–H:** Twelve release-quality maps, final balance and release-candidate QA.
+- [ ] **v1.0 A–G:** Production launch, backups, support and release verification.
+
+**Verified starting point:** v0.2 release notes, `CHANGELOG.md`, and [main CI run 40986198488](https://github.com/AlmightyTank/WebRTS/actions/runs/40986198488). CI uses emulated browsers; physical-device quality, VPS deployment and playability still require their own checks.
 
 ## Desktop/mobile design contract
 
@@ -50,7 +78,7 @@ Target performance numbers are **acceptance goals**, not measured claims. Establ
 
 ### v0.2 — Engine, data and repository foundation
 
-**Progress:** Slices A–H implemented on the v0.2 release branch: repository hygiene, engine extraction, versioned contracts, deterministic hashes, local saves, content registries, diagnostics and desktop/mobile/tablet playtests. Mark release complete after both CI jobs pass on main.
+**Progress: COMPLETE on `main` (8/8 slices).** Repository hygiene, engine extraction, versioned contracts, deterministic hashes, local saves, content registries, diagnostics and desktop/mobile/tablet Chromium playtests are implemented. Both CI jobs (`test-and-build` and `browser-playtest`) passed on `main`; real Android/iOS hardware testing and hosted VPS deployment are separate validations, not claims made by CI. See the [v0.2 release notes](V0.2-ENGINE-FOUNDATION-RELEASE.md).
 
 [Read the v0.2 engine foundation notes](V0.2-ENGINE-FOUNDATION-RELEASE.md).
 
@@ -301,4 +329,6 @@ A: Every campaign mission is completable, restartable and save-compatible on des
 
 ## First next action
 
-**Start with v0.2 Slice A:** remove tracked dependencies, normalize `.gitignore`, and confirm clean `npm ci`, unit tests, production build and Chromium tests. This comes before large game expansions.
+**Start with v0.3 Slice A:** centralize player intents (selection, move, attack, attack-move, defend, patrol, stop, queue, build and abilities) so desktop mouse/keyboard and mobile touch dispatch the same gameplay commands. Preserve the existing building-placement preview, camera gestures, high-DPI pointer conversion and save/load contracts. Add unit tests and Chromium desktop/mobile/tablet acceptance tests, run `npm ci`, `npm test`, `npm run build` and browser playtests, then merge to `main` only when both CI jobs are green.
+
+**After Slice A:** proceed through v0.3 Slices B–H in order and validate the milestone exit gate before advancing to v0.4. Track completion per slice in [ROADMAP.md](../ROADMAP.md), not by version number alone.
