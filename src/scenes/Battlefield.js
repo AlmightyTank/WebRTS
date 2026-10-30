@@ -215,7 +215,34 @@ export class Battlefield extends Phaser.Scene {
     this.pauseResumeText = this.add.text(0, 0, 'RESUME', { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#f2d27b' }).setOrigin(0.5).setScrollFactor(0).setDepth(30).setVisible(false);
     this.pauseRestart = this.add.rectangle(0, 0, 190, 44, 0x26343b, 1).setStrokeStyle(1, 0x71806d).setScrollFactor(0).setDepth(29).setInteractive({ useHandCursor: true }).setVisible(false);
     this.pauseRestartText = this.add.text(0, 0, 'RESTART MISSION', { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: '#d9e0c4' }).setOrigin(0.5).setScrollFactor(0).setDepth(30).setVisible(false);
-    this.pauseResume.on('pointerdown', () => this.togglePause(false));
+    this.pauseSave = this.add.rectangle(0, 0, 116, 38, 0x26343b, 1).setStrokeStyle(1, 0xf2d27b)
+      .setScrollFactor(0).setDepth(29).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.pauseSaveText = this.add.text(0, 0, 'SAVE', {
+      fontFamily: 'monospace', fontSize: '12px', color: '#e9f0dd'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(30).setVisible(false);
+    this.pauseLoad = this.add.rectangle(0, 0, 116, 38, 0x26343b, 1).setStrokeStyle(1, 0xf2d27b)
+      .setScrollFactor(0).setDepth(29).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.pauseLoadText = this.add.text(0, 0, 'LOAD', {
+      fontFamily: 'monospace', fontSize: '12px', color: '#e9f0dd'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(30).setVisible(false);
+    this.pauseSave.on('pointerdown', () => { this.uiPointerGate.block(); this.saveSkirmish(); });
+    this.pauseLoad.on('pointerdown', () => { this.uiPointerGate.block(); this.loadSkirmish(); });
+    this.mobilePauseButton = this.add.rectangle(0, 0, 74, 36, 0x263f3b, 1)
+      .setStrokeStyle(1, 0x8ca58b).setScrollFactor(0).setDepth(23)
+      .setInteractive({ useHandCursor: true }).setVisible(false);
+    this.mobilePauseText = this.add.text(0, 0, 'PAUSE', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#e9f0dd'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(24).setVisible(false);
+    this.mobilePauseButton.on('pointerdown', () => {
+      this.uiPointerGate.block();
+      this.cancelPlacement();
+      this.togglePause();
+    });
+    this.debugText = this.add.text(8, 58, '', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#b7e7cb',
+      backgroundColor: '#06131bef', padding: { x: 8, y: 7 }
+    }).setScrollFactor(0).setDepth(33).setVisible(false);
+    this.pauseResume.on('pointerdown', () => { this.uiPointerGate.block(); this.togglePause(false); });
     this.pauseRestart.on('pointerdown', () => this.scene.restart());
     this.setBuildTab('main');
     this.setCategory('buildings');
