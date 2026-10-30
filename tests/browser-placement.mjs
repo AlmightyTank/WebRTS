@@ -377,3 +377,33 @@ test('high-DPI Android: crisp canvas and aligned touch construction', async () =
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
+
+test('high-DPI 3.5x phone: backing exactly matches native physical pixels', async () => {
+  const { page, context, errors } = await launch({
+    viewport: { width: 412, height: 915 }, deviceScaleFactor: 3.5,
+    isMobile: true, hasTouch: true
+  });
+  try {
+    const dimensions = await page.evaluate(() => {
+      const s = window.__WEBRTS_E2E__();
+      const c = s.game.canvas;
+      const rect = c.getBoundingClientRect();
+      return {
+        density: s.renderDensity,
+        canvasWidth: c.width, canvasHeight: c.height,
+        displayWidth: rect.width, displayHeight: rect.height,
+        cameraRatio: s.cameras.main.zoom / s.renderDensity
+      };
+    });
+    assert.equal(dimensions.density, 3.5);
+    assert.equal(dimensions.canvasWidth, Math.round(412 * 3.5));
+    assert.equal(dimensions.canvasHeight, Math.round(915 * 3.5));
+    assert.ok(Math.abs(dimensions.displayWidth - 412) < 2);
+    assert.ok(Math.abs(dimensions.displayHeight - 915) < 2);
+    assert.ok(Math.abs(dimensions.cameraRatio - 1) < 0.001);
+    const menu = await target(page, 'menu');
+    await page.touchscreen.tap(menu.x, menu.y);
+    assert.equal((await state(page)).drawer, true, 'touch HUD stays aligned at fractional DPR');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
