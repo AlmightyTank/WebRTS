@@ -2,17 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDensity, gamePixels, logicalPointer, textFontSize, installHighDpiText } from './hiDpi.js';
 
-test('render density is capped for high-DPI phones and large displays', () => {
-  assert.equal(renderDensity(390, 844, 3), 2.5);
+test('native DPR is preserved on mobile instead of softened by fractional upscaling', () => {
+  assert.equal(renderDensity(390, 844, 3), 3);
+  assert.equal(renderDensity(390, 844, 3.5), 3.5);
+  assert.equal(renderDensity(412, 915, 3.5), 3.5);
   assert.equal(renderDensity(390, 844, 2), 2);
-  assert.equal(renderDensity(360, 640, 3), 2.5);
-  assert.ok(renderDensity(430, 932, 3) <= 2.5);
-  const constrained = renderDensity(1000, 1000, 3);
-  assert.ok(1000 * 1000 * constrained ** 2 <= 2600000, 'density respects GPU pixel cap');
+  assert.equal(renderDensity(360, 640, 3), 3);
   assert.equal(renderDensity(390, 844, 1), 1);
-  assert.ok(renderDensity(1920, 1080, 3) < 1.2);
+  assert.equal(gamePixels(390, renderDensity(390, 844, 3)), 1170);
+  assert.equal(gamePixels(844, renderDensity(390, 844, 3)), 2532);
+});
+
+test('pixel budget caps larger screens and balanced quality preserves a lower fill rate', () => {
+  const density = renderDensity(1000, 1000, 3);
+  assert.ok(1000 * 1000 * density ** 2 <= 5500000, 'density respects default GPU pixel cap');
+  const balanced = renderDensity(390, 844, 3, 2600000);
+  assert.ok(balanced < 3, 'balanced quality reduces density when needed');
+  assert.ok(390 * 844 * balanced ** 2 <= 2600000, 'balanced quality respects budget');
+  assert.ok(renderDensity(1920, 1080, 3, 3000000) < 1.3, 'desktop stays within lower budget');
   assert.equal(renderDensity(0, 844, 3), 1);
-  assert.equal(gamePixels(390, 2), 780);
 });
 test('pointer coordinates normalize without changing touch identity', () => {
   const p = logicalPointer({ x: 230, y: 640, id: 4, isDown: true,
