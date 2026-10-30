@@ -1,5 +1,6 @@
 import { BUILDING_TYPES, MAPS, UNIT_TYPES } from './content.js';
 import { COMMANDS } from './commands.js';
+import { validateCommandShape } from './contracts.js';
 
 const FIXED_STEP = 1 / 30;
 
@@ -150,7 +151,8 @@ export class Simulation {
   }
 
   validateCommand(command) {
-    if (!command || !Object.values(COMMANDS).includes(command.type)) return { ok: false, reason: 'unknown_command' };
+    const shape = validateCommandShape(command);
+    if (!shape.ok) return shape;
     const unitCommands = [COMMANDS.MOVE, COMMANDS.ATTACK, COMMANDS.STOP, COMMANDS.DEFEND];
     if (unitCommands.includes(command.type)) {
       if (!Array.isArray(command.unitIds) || command.unitIds.length === 0) return { ok: false, reason: 'no_units' };
