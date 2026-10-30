@@ -1,12 +1,15 @@
 import { BUILDING_TYPES, MAPS, UNIT_TYPES } from './content.js';
 import { COMMANDS } from './commands.js';
 import { validateCommandShape } from './contracts.js';
+import { CONTENT_VERSION } from './content.js';
+import { SAVE_VERSION, validateSaveState, stateHash, nextSeededRandom } from './saveState.js';
 
 const FIXED_STEP = 1 / 30;
 
 export class Simulation {
   constructor({ seed = MAPS.FIRST_CONTACT.seed, map = MAPS.FIRST_CONTACT } = {}) {
     this.seed = seed >>> 0;
+    this.randomState = this.seed;
     this.map = map;
     this.units = [];
     this.buildings = [];
@@ -21,6 +24,7 @@ export class Simulation {
     this.projectiles = [];
     this.pathCellSize = 60;
     this.commandQueue = [];
+    this.commandJournal = [];
     this.events = [];
     this.gameState = 'playing';
     this.gameOverReason = null;
@@ -110,9 +114,9 @@ export class Simulation {
     // Commands execute on the next fixed tick. Snapshot build requests now:
     // callers must not be able to change the type, owner or coordinates after
     // validation and before resources are charged.
-    this.commandQueue.push(command.type === COMMANDS.BUILD
-      ? { ...command, position: { x: command.position.x, y: command.position.y } }
-      : command);
+    const accepted = structuredClone(command);
+    this.commandQueue.push(accepted);
+    this.commandJournal.push({ tick: this.tick + 1, command: structuredClone(accepted) });
     return { ok: true };
   }
 
@@ -843,6 +847,44 @@ export class Simulation {
       this.events.push({ type: 'building_sold', buildingId: command.buildingId });
     }
   }
+
+  random() {
+    const next = nextSeededRandom(this.randomState);
+    this.randomState = next.state;
+    return next.value;
+  }
+
+  exportSaveState() {
+    return JSON.parse(JSON.stringify({
+      version: SAVE_VERSION, contentVersion: CONTENT_VERSION, mapId: this.map.id,
+      seed: this.seed, randomState: this.randomState,
+      tick: this.tick, time: this.time, accumulator: this.accumulator,
+      nextUnitId: this.nextUnitId, nextBuildingId: this.nextBuildingId,
+      nextProjectileId: this.nextProjectileId, pathCellSize: this.pathCellSize,
+      commandQueue: this.commandQueue, commandJournal: this.commandJournal,
+      resources: this.resources, resourceNodes: this.resourceNodes,
+      buildings: this.buildings, units: this.units, projectiles: this.projectiles,
+      events: this.events, aiTimer: this.aiTimer,
+      commandCoreStarted: this.commandCoreStarted,
+      gameState: this.gameState, gameOverReason: this.gameOverReason
+    }));
+  }
+
+  static fromSaveState(input) {
+    const data = validateSaveState(input);
+    const map = Object.values(MAPS).find(candidate => candidate.id === data.mapId);
+    const sim = new Simulation({ seed: data.seed, map });
+    for (const key of [
+      'randomState', 'tick', 'time', 'accumulator', 'nextUnitId',
+      'nextBuildingId', 'nextProjectileId', 'pathCellSize',
+      'commandQueue', 'commandJournal', 'resources', 'resourceNodes',
+      'buildings', 'units', 'projectiles', 'events', 'aiTimer',
+      'commandCoreStarted', 'gameState', 'gameOverReason'
+    ]) sim[key] = data[key];
+    return sim;
+  }
+
+  getStateHash() { return stateHash(this.exportSaveState()); }
 
   snapshot() {
     return JSON.parse(JSON.stringify({ seed: this.seed, tick: this.tick, time: this.time, resources: this.resources, resourceNodes: this.resourceNodes, buildings: this.buildings, units: this.units, projectiles: this.projectiles, gameState: this.gameState, gameOverReason: this.gameOverReason, playerState: { 0: this.getPlayerState(0), 1: this.getPlayerState(1) } }));
