@@ -336,6 +336,21 @@ test('high-DPI Android: crisp canvas and aligned touch construction', async () =
     const before = await state(page);
     const menu = await target(page, 'menu');
     await page.touchscreen.tap(menu.x, menu.y);
+    const opened = await state(page);
+    const inputDebug = await page.evaluate(() => {
+      const scene = window.__WEBRTS_E2E__();
+      return {
+        menu: { x: scene.mobileMenuButton.x, y: scene.mobileMenuButton.y,
+          width: scene.mobileMenuButton.width, height: scene.mobileMenuButton.height },
+        pointers: scene.input.manager.pointers.map(p =>
+          ({ x: p.x, y: p.y, downX: p.downX, downY: p.downY, isDown: p.isDown })),
+        canvas: scene.game.canvas.getBoundingClientRect().toJSON(),
+        layout: scene.uiSize(),
+        cameraZoom: scene.uiCamera.zoom,
+        drawer: scene.mobilePanelOpen
+      };
+    });
+    assert.equal(opened.drawer, true, JSON.stringify(inputDebug));
     const card = await target(page, 'barracks');
     await page.touchscreen.tap(card.x, card.y);
     assert.equal((await state(page)).active, true);
