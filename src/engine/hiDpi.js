@@ -2,8 +2,10 @@
 // and coordinated camera / pointer transforms (scale.resolution is ignored).
 export function renderDensity(width, height, devicePixelRatio = 1, maxPixels = 2600000) {
   if (!(width > 0) || !(height > 0)) return 1;
-  const ratio = Number.isFinite(devicePixelRatio) ? Math.max(1, Math.min(2, devicePixelRatio)) : 1;
-  return Math.max(1, Math.round(Math.min(ratio, Math.sqrt(maxPixels / (width * height))) * 100) / 100);
+  // More than 2x noticeably helps small HUD glyphs and thin vector edges.
+  // Bound fill-rate on large displays and stay strictly inside the pixel budget.
+  const ratio = Number.isFinite(devicePixelRatio) ? Math.max(1, Math.min(2.5, devicePixelRatio)) : 1;
+  return Math.max(1, Math.floor(Math.min(ratio, Math.sqrt(maxPixels / (width * height))) * 100) / 100);
 }
 
 export function gamePixels(value, ratio) { return Math.round(value * ratio); }
