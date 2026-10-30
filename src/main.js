@@ -6,7 +6,13 @@ import { renderDensity, gamePixels } from './engine/hiDpi.js';
 const container = document.getElementById('game-container');
 const viewWidth = Math.max(1, container.clientWidth);
 const viewHeight = Math.max(1, container.clientHeight);
-const density = renderDensity(viewWidth, viewHeight, window.devicePixelRatio || 1);
+// Favor true device pixels for crisp mobile text and vectors. Large desktop
+// windows keep a smaller fill-rate budget, and ?quality=balanced is available
+// as a mobile fallback if a device struggles with native-density rendering.
+const isSmallScreen = Math.min(viewWidth, viewHeight) < 700;
+const graphicsQuality = new URLSearchParams(window.location.search).get('quality');
+const pixelBudget = graphicsQuality === 'balanced' ? 2600000 : isSmallScreen ? 5500000 : 3000000;
+const density = renderDensity(viewWidth, viewHeight, window.devicePixelRatio || 1, pixelBudget);
 
 // Use a physical-size backing canvas and inverse CSS zoom. The scene's
 // cameras maintain original logical coordinates for UI and world entities.
