@@ -173,6 +173,13 @@ export function installBattlefieldInput(scene) {
       scene.debugText.setVisible(scene.debugVisible);
     });
     scene.input.keyboard?.on('keydown-F4', (event) => { event?.preventDefault?.(); scene.runDebugScenario(); });
+    // F3 may be intercepted by the browser's Find Next; H/J are reliable
+    // alternatives for gameplay diagnostics and dev stress scenarios.
+    scene.input.keyboard?.on('keydown-H', () => {
+      scene.debugVisible = !scene.debugVisible;
+      scene.debugText.setVisible(scene.debugVisible);
+    });
+    scene.input.keyboard?.on('keydown-J', () => scene.runDebugScenario());
     scene.input.keyboard?.on('keydown-B', () => scene.useCommandButton('build'));
     scene.input.keyboard?.on('keydown-P', () => scene.produceSelected());
     scene.input.keyboard?.on('keydown-Q', () => scene.setCategory('buildings'));

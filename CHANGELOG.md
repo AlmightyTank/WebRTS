@@ -8,7 +8,7 @@
 - Deterministic seeded random stream, command journal, state hashes and save/load validation
 - Full skirmish save/load and autosaves; touch Pause with Save/Load, desktop F6/F7
 - Data registries for maps, factions, units, buildings, weapons, armor and abilities
-- Optional performance/FPS debugging overlay and dev-only stress scenarios
+- Optional performance/FPS debugging overlay (H) and dev-only stress scenarios (J)
 - Chromium regression matrix for desktop, phone portrait/landscape, and tablet
 
 ### Compatibility and deployment

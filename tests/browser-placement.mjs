@@ -240,7 +240,7 @@ test('desktop: complete match save/load, deterministic hash and F3 diagnostics',
     await page.evaluate(() => { window.__WEBRTS_E2E__().simulation.resources[0] = 23; });
     await page.keyboard.press('F7');
     assert.equal((await state(page)).metal, before.metal);
-    await page.keyboard.press('F3');
+    await page.keyboard.press('h');
     await page.waitForTimeout(700);
     const overlay = await page.evaluate(() => {
       const s = window.__WEBRTS_E2E__();
@@ -250,7 +250,7 @@ test('desktop: complete match save/load, deterministic hash and F3 diagnostics',
     assert.match(overlay.text, /FPS/);
     assert.match(overlay.text, /HASH/);
     const count = (await state(page)).buildings.length;
-    await page.keyboard.press('F4');
+    await page.keyboard.press('j');
     const units = await page.evaluate(() => window.__WEBRTS_E2E__().units.length);
     assert.ok(units >= 60);
     assert.equal((await state(page)).buildings.length, count);
