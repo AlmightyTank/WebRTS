@@ -173,31 +173,29 @@ export function installBattlefieldInput(scene) {
       scene.debugText.setVisible(scene.debugVisible);
     });
     scene.input.keyboard?.on('keydown-F4', (event) => { event?.preventDefault?.(); scene.runDebugScenario(); });
-    // F3 may be intercepted by the browser's Find Next; H/J are reliable
-    // alternatives for gameplay diagnostics and dev stress scenarios.
-    scene.input.keyboard?.on('keydown-H', () => {
-      scene.debugVisible = !scene.debugVisible;
-      scene.debugText.setVisible(scene.debugVisible);
+    // Browser-safe shortcuts are captured before the browser or Phaser can
+    // retarget input. Do not trigger them while typing into future text fields.
+    const shortcuts = event => {
+      if (event.repeat || event.target?.closest?.('input,textarea,[contenteditable]')) return;
+      const key = event.code;
+      const save = event.shiftKey && key === 'KeyS';
+      const load = event.shiftKey && key === 'KeyO';
+      const debug = !event.shiftKey && key === 'KeyH';
+      const stress = !event.shiftKey && key === 'KeyJ';
+      if (!save && !load && !debug && !stress) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (save) scene.saveSkirmish();
+      else if (load) scene.loadSkirmish();
+      else if (debug) {
+        scene.debugVisible = !scene.debugVisible;
+        scene.debugText.setVisible(scene.debugVisible);
+      } else scene.runDebugScenario();
+    };
+    window.addEventListener('keydown', shortcuts, { capture: true });
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('keydown', shortcuts, { capture: true });
     });
-    scene.input.keyboard?.on('keydown-J', () => scene.runDebugScenario());
-    // Browser-safe desktop save/open shortcuts; F6/F7 can be reserved by the
-    // address bar or caret-navigation settings on some browsers.
-    scene.input.keyboard?.on('keydown-S', event => {
-      if (event.shiftKey) scene.saveSkirmish();
-    });
-    scene.input.keyboard?.on('keydown-O', event => {
-      if (event.shiftKey) scene.loadSkirmish();
-    });
-    scene.input.keyboard?.on('keydown-B', () => scene.useCommandButton('build'));
-    scene.input.keyboard?.on('keydown-P', () => scene.produceSelected());
-    scene.input.keyboard?.on('keydown-Q', () => scene.setCategory('buildings'));
-    scene.input.keyboard?.on('keydown-T', () => scene.setCategory('defensive'));
-    scene.input.keyboard?.on('keydown-E', () => scene.setCategory('infantry'));
-    scene.input.keyboard?.on('keydown-R', () => scene.setCategory('vehicles'));
-    scene.input.keyboard?.on('keydown-Y', () => scene.setCategory('aircraft'));
-    scene.input.keyboard?.on('keydown-U', () => scene.setCategory('navy'));
-    scene.input.keyboard?.on('keydown-K', () => scene.useBuildingAction('repair'));
-    scene.input.keyboard?.on('keydown-L', () => scene.useBuildingAction('sell'));
     scene.input.keyboard?.on('keydown-ONE', () => scene.choosePreferredBuilding('refinery'));
     scene.input.keyboard?.on('keydown-TWO', () => scene.choosePreferredBuilding('barracks'));
 }
