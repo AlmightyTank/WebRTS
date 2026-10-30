@@ -8,7 +8,13 @@ export function installBattlefieldInput(scene) {
     scene.pinchDistance = null;
     scene.pinchCenter = null;
     scene.touchGestureOccurred = false;
-    scene.cameraKeys = scene.input.keyboard?.createCursorKeys();
+    scene.input.keyboard?.addCapture([
+    Phaser.Input.Keyboard.KeyCodes.F3,
+    Phaser.Input.Keyboard.KeyCodes.F4,
+    Phaser.Input.Keyboard.KeyCodes.F6,
+    Phaser.Input.Keyboard.KeyCodes.F7
+  ]);
+  scene.cameraKeys = scene.input.keyboard?.createCursorKeys();
     scene.cameraKeys.w = scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     scene.cameraKeys.a = scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     scene.cameraKeys.s = scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);

@@ -514,6 +514,7 @@ export class Battlefield extends Phaser.Scene {
     if (this.simulation.gameState !== 'playing') return;
     this.isPaused = force ?? !this.isPaused;
     this.message = this.isPaused ? 'Game paused.' : 'Game resumed.';
+    this.updateUi();
   }
 
   useBuildingAction(action) {

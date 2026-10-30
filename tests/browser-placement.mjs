@@ -133,7 +133,11 @@ test('desktop: blocked placement, Escape cancel, successful single charge', asyn
     assert.ok(blocked, 'blocked desktop position exists');
     await page.mouse.click(blocked.x, blocked.y);
     assert.equal((await state(page)).active, true);
-    assert.equal((await state(page)).metal, before.metal);
+    const restoreInfo = await page.evaluate(() => ({
+      metal: window.__WEBRTS_E2E__().simulation.resources[0],
+      message: window.__WEBRTS_E2E__().message
+    }));
+    assert.equal(restoreInfo.metal, before.metal, restoreInfo.message);
     await page.keyboard.press('Escape');
     assert.equal((await state(page)).active, false);
     await page.mouse.click(refinery.x, refinery.y);
