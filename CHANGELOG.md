@@ -6,7 +6,7 @@
 - Modular Phaser bootstrap, game scene, terrain renderer, camera and input adapters, and UI geometry
 - Versioned command/event contracts and content data validation
 - Deterministic seeded random stream, command journal, state hashes and save/load validation
-- Full skirmish save/load and autosaves; touch Pause with Save/Load, desktop F6/F7
+- Full skirmish save/load and autosaves; touch Pause with Save/Load, desktop Shift+S/Shift+O (F6/F7 optional)
 - Data registries for maps, factions, units, buildings, weapons, armor and abilities
 - Optional performance/FPS debugging overlay (H) and dev-only stress scenarios (J)
 - Chromium regression matrix for desktop, phone portrait/landscape, and tablet

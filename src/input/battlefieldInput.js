@@ -180,6 +180,14 @@ export function installBattlefieldInput(scene) {
       scene.debugText.setVisible(scene.debugVisible);
     });
     scene.input.keyboard?.on('keydown-J', () => scene.runDebugScenario());
+    // Browser-safe desktop save/open shortcuts; F6/F7 can be reserved by the
+    // address bar or caret-navigation settings on some browsers.
+    scene.input.keyboard?.on('keydown-S', event => {
+      if (event.shiftKey) scene.saveSkirmish();
+    });
+    scene.input.keyboard?.on('keydown-O', event => {
+      if (event.shiftKey) scene.loadSkirmish();
+    });
     scene.input.keyboard?.on('keydown-B', () => scene.useCommandButton('build'));
     scene.input.keyboard?.on('keydown-P', () => scene.produceSelected());
     scene.input.keyboard?.on('keydown-Q', () => scene.setCategory('buildings'));

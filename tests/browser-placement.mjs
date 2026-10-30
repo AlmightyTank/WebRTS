@@ -230,15 +230,15 @@ test('mobile: a deliberate tap constructs and charges exactly once', async () =>
 });
 
 // v0.2 release device matrix: desktop input, portrait/landscape touch and tablet.
-test('desktop: complete match save/load, deterministic hash and F3 diagnostics', async () => {
+test('desktop: browser-safe match save/load and deterministic diagnostics', async () => {
   const { page, context, errors } = await launch({ viewport: { width: 1280, height: 800 } });
   try {
     const before = await state(page);
-    await page.keyboard.press('F6');
+    await page.keyboard.press('Shift+S');
     const saved = await page.evaluate(() => window.localStorage.getItem('webrts.skirmish.v1'));
     assert.ok(saved?.includes('webrts-game'));
     await page.evaluate(() => { window.__WEBRTS_E2E__().simulation.resources[0] = 23; });
-    await page.keyboard.press('F7');
+    await page.keyboard.press('Shift+O');
     assert.equal((await state(page)).metal, before.metal);
     await page.keyboard.press('h');
     await page.waitForTimeout(700);
