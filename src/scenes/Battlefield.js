@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { drawTerrain, drawResources } from '../rendering/terrain.js';
 import { worldPoint, zoomAtPoint, getTouchPointers as activeTouchPointers } from '../engine/cameraInput.js';
 import { sidebarLayout } from '../ui/sidebarLayout.js';
+import { PerformanceMonitor, debugScenario } from '../debug/performance.js';
+import { AUTOSAVE_KEY, SKIRMISH_SAVE_KEY, saveGameToStorage, readGameFromStorage } from '../engine/gameStorage.js';
 import { Simulation } from '../simulation/Simulation.js';
 import { attackCommand, buildCommand, defendCommand, moveCommand, produceCommand, repairCommand, sellCommand, stopCommand } from '../simulation/commands.js';
 import { BUILDING_TYPES } from '../simulation/content.js';
@@ -24,6 +26,10 @@ export class Battlefield extends Phaser.Scene {
   init() {
     this.simulation = new Simulation({ seed: 1337 });
     this.units = this.simulation.units;
+    this.performanceMonitor = new PerformanceMonitor();
+    this.debugVisible = false;
+    this.debugRefreshMs = 0;
+    this.nextAutosaveTime = 60;
     this.selected = new Set();
     this.selectedBuildings = new Set();
     this.dragStart = null;
@@ -421,6 +427,59 @@ export class Battlefield extends Phaser.Scene {
     if (this.uiCamera) this.layoutUi();
   }
 
+  saveSkirmish(automatic = false) {
+    const result = saveGameToStorage(this, window.localStorage, automatic ? AUTOSAVE_KEY : SKIRMISH_SAVE_KEY);
+    if (!automatic) {
+      this.message = result.ok ? 'Skirmish saved to this browser.' : `Save failed: ${result.reason}.`;
+      this.pauseDetail.setText(this.message);
+    }
+    return result;
+  }
+
+  loadSkirmish() {
+    let loaded = readGameFromStorage(window.localStorage);
+    if (!loaded.ok && loaded.reason === 'no_save') loaded = readGameFromStorage(window.localStorage, AUTOSAVE_KEY);
+    if (!loaded.ok) {
+      this.message = `Load failed: ${loaded.reason}.`;
+      this.pauseDetail.setText(this.message);
+      return loaded;
+    }
+    try {
+      const restored = Simulation.fromSaveState(loaded.data.simulation);
+      this.simulation = restored;
+      this.units = restored.units;
+      this.selected.clear();
+      this.selectedBuildings.clear();
+      this.commandMode = null;
+      this.utilityMode = null;
+      this.cancelPlacement();
+      this.mobilePanelOpen = false;
+      this.isPaused = false;
+      this.cameras.main.setZoom(Math.max(this.minZoom, Math.min(1.5, loaded.data.camera.zoom)));
+      this.cameras.main.setScroll(loaded.data.camera.scrollX, loaded.data.camera.scrollY);
+      this.nextAutosaveTime = restored.time + 60;
+      this.message = 'Skirmish loaded.';
+      this.layoutUi();
+      return { ok: true };
+    } catch (error) {
+      this.message = `Load failed: ${error?.message ?? error}.`;
+      this.pauseDetail.setText(this.message);
+      return { ok: false, reason: this.message };
+    }
+  }
+
+  runDebugScenario(name = 'unit_stress') {
+    if (!import.meta.env.DEV && import.meta.env.MODE !== 'e2e') return false;
+    const scenario = debugScenario(name);
+    for (let i = 0; i < scenario.units; i++) {
+      const col = i % scenario.columns, row = Math.floor(i / scenario.columns);
+      this.simulation.addUnit({ playerId: i % 2, team: i % 2, type: 'rifle_squad',
+        x: 900 + col * scenario.spacing, y: 250 + row * scenario.spacing });
+    }
+    this.message = `DEBUG ${name}: ${scenario.units} units spawned.`;
+    return true;
+  }
+
   togglePause(force) {
     if (this.simulation.gameState !== 'playing') return;
     this.isPaused = force ?? !this.isPaused;
@@ -690,6 +749,14 @@ export class Battlefield extends Phaser.Scene {
       else this.togglePause();
     });
     this.input.keyboard?.on('keydown-SPACE', () => this.centerOnSelection());
+    this.input.keyboard?.on('keydown-F6', (event) => { event?.preventDefault?.(); this.saveSkirmish(); });
+    this.input.keyboard?.on('keydown-F7', (event) => { event?.preventDefault?.(); this.loadSkirmish(); });
+    this.input.keyboard?.on('keydown-F3', (event) => {
+      event?.preventDefault?.();
+      this.debugVisible = !this.debugVisible;
+      this.debugText.setVisible(this.debugVisible);
+    });
+    this.input.keyboard?.on('keydown-F4', (event) => { event?.preventDefault?.(); this.runDebugScenario(); });
     this.input.keyboard?.on('keydown-B', () => this.useCommandButton('build'));
     this.input.keyboard?.on('keydown-P', () => this.produceSelected());
     this.input.keyboard?.on('keydown-Q', () => this.setCategory('buildings'));
@@ -909,10 +976,23 @@ export class Battlefield extends Phaser.Scene {
   }
 
   update(_time, delta) {
+    this.performanceMonitor.record(delta);
+    this.debugRefreshMs += delta;
+    if (this.debugVisible && this.debugRefreshMs >= 500) {
+      this.debugRefreshMs = 0;
+      const p = this.performanceMonitor.summary(this.simulation);
+      this.debugText.setText(`FPS ${p.fps} | AVG ${p.avgFrameMs}ms | MAX ${p.maxFrameMs}ms\n` +
+        `SLOW ${p.slowFrames} | UNITS ${p.units} | BUILD ${p.buildings}\n` +
+        `CMD ${p.commands} | TICK ${p.tick} | HASH ${p.hash}`);
+    }
     const dt = Math.min(delta / 1000, 0.05);
     if (!this.isPaused) {
       this.updateKeyboardPan(dt);
       this.simulation.advance(dt);
+      if (this.simulation.time >= this.nextAutosaveTime) {
+        this.nextAutosaveTime = this.simulation.time + 60;
+        this.saveSkirmish(true);
+      }
       const constructionEvent = this.simulation.events.find((event) =>
         event.type === 'building_rejected' || event.type === 'building_created');
       if (constructionEvent) {
