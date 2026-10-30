@@ -50,6 +50,8 @@ Target performance numbers are **acceptance goals**, not measured claims. Establ
 
 ### v0.2 — Engine, data and repository foundation
 
+**Progress:** Slice A — repository hygiene, exact dependency lock, local/VPS setup guide and regression coverage (complete when CI is green).
+
 - **Slice A:** Repository hygiene: remove tracked node_modules/build outputs, add .gitignore, lock dependency versions and document boot/deploy.
 - **Slice B:** Separate app shell, scene renderer, camera/input adapter, HUD, simulation and content registries without changing behavior.
 - **Slice C:** Define versioned commands/events and entity schemas; reject malformed commands at boundaries.

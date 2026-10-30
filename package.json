@@ -10,9 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "phaser": "^4.2.1"
+    "phaser": "4.2.1"
   },
   "devDependencies": {
-    "vite": "^7.1.7"
+    "vite": "7.3.7"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
