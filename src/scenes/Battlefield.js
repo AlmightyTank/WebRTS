@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { drawTerrain, drawResources } from '../rendering/terrain.js';
 import { worldPoint, zoomAtPoint, getTouchPointers as activeTouchPointers } from '../engine/cameraInput.js';
 import { sidebarLayout } from '../ui/sidebarLayout.js';
+import { installBattlefieldInput } from '../input/battlefieldInput.js';
 import { PerformanceMonitor, debugScenario } from '../debug/performance.js';
 import { AUTOSAVE_KEY, SKIRMISH_SAVE_KEY, saveGameToStorage, readGameFromStorage } from '../engine/gameStorage.js';
 import { Simulation } from '../simulation/Simulation.js';
@@ -10,8 +11,8 @@ import { BUILDING_TYPES } from '../simulation/content.js';
 import { getMobileHudLayout } from '../mobileHudLayout.js';
 import { PlacementState, UiPointerGate } from '../placementState.js';
 import { describePlacement, defaultPreviewAnchor } from '../placementPreview.js';
-import { getPlacementHudGeometry, getPinchUpdate, isPlacementTap } from '../mobilePlacement.js';
-import { isTouchGesturePointer, getDragPanDelta } from '../mobileGestures.js';
+import { getPlacementHudGeometry } from '../mobilePlacement.js';
+import { isTouchGesturePointer } from '../mobileGestures.js';
 
 const WORLD = { width: 2400, height: 1500 };
 const TEAM = { PLAYER: 0x54b7ff, ENEMY: 0xff6575 };
@@ -621,184 +622,7 @@ export class Battlefield extends Phaser.Scene {
     drawResources(this.resourceLayer, this.simulation.resourceNodes);
   }
 
-  installInput() {
-    this.game.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-    this.input.addPointer(1);
-    this.pinchDistance = null;
-    this.pinchCenter = null;
-    this.touchGestureOccurred = false;
-    this.cameraKeys = this.input.keyboard?.createCursorKeys();
-    this.cameraKeys.w = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.cameraKeys.a = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.cameraKeys.s = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);
-    this.cameraKeys.d = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.input.on('pointerdown', (pointer) => {
-      if (this.uiPointerGate.active) {
-        this.dragStart = null;
-        this.pointerMode = 'ui';
-        return;
-      }
-      if (pointer.button === 2 && this.placement.active) {
-        this.cancelPlacement();
-        this.uiPointerGate.block();
-        this.message = 'Building placement cancelled.';
-        this.pointerMode = 'ui';
-        this.dragStart = null;
-        return;
-      }
-      const touches = this.getTouchPointers();
-      if (this.isTouchPointer(pointer) && touches.length >= 2) {
-        this.pointerMode = 'touch';
-        this.touchGestureOccurred = true;
-        this.dragStart = null;
-        const gesture = getPinchUpdate(null, touches[0], touches[1], this.cameras.main.zoom, this.minZoom);
-        this.pinchDistance = gesture.distance;
-        this.pinchCenter = gesture.center;
-        return;
-      }
-      if (this.isUiPointer(pointer)) {
-        this.dragStart = null;
-        this.pointerMode = 'ui';
-        return;
-      }
-      const world = this.toWorld(pointer);
-      // Touch pan keeps the ghost at its screen anchor; only a deliberate tap
-      // relocates it. Desktop mouse placement still follows the cursor.
-      if (this.placement.active && !this.isTouchPointer(pointer)) {
-        this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
-      }
-      this.dragStart = { screenX: pointer.x, screenY: pointer.y, lastX: pointer.x, lastY: pointer.y,
-      pointerId: pointer.id, panStarted: false, worldX: world.x, worldY: world.y };
-      if (pointer.button === 1) {
-        this.pointerMode = 'pan';
-        return;
-      }
-      this.pointerMode = this.isTouchPointer(pointer) ? 'touch' : 'mouse';
-      this.touchGestureOccurred = false;
-    });
-
-    this.input.on('pointermove', (pointer) => {
-      if (this.pointerMode === 'ui' || this.uiPointerGate.active) return;
-      if (this.placement.active && !this.isUiPointer(pointer) && !this.isTouchPointer(pointer)) {
-        this.previewScreenAnchor = { x: pointer.x, y: pointer.y };
-      }
-      const touches = this.getTouchPointers();
-      if (this.pointerMode === 'touch' && touches.length >= 2) {
-        const previous = this.pinchCenter ? { center: this.pinchCenter, distance: this.pinchDistance } : null;
-        const gesture = getPinchUpdate(previous, touches[0], touches[1],
-          this.cameras.main.zoom, this.minZoom);
-        // Both fingers moving together pans; their separation controls zoom.
-        this.cameras.main.scrollX -= gesture.panX / this.cameras.main.zoom;
-        this.cameras.main.scrollY -= gesture.panY / this.cameras.main.zoom;
-        this.zoomAt(gesture.center.x, gesture.center.y, gesture.zoom);
-        this.pinchDistance = gesture.distance;
-        this.pinchCenter = gesture.center;
-        this.touchGestureOccurred = true;
-        return;
-      }
-      if (!pointer.isDown || !this.dragStart || pointer.id !== this.dragStart.pointerId) return;
-      const point = { x: pointer.x, y: pointer.y };
-      const start = { x: this.dragStart.screenX, y: this.dragStart.screenY };
-      if (this.pointerMode === 'pan' || this.pointerMode === 'touch') {
-        // Phaser may update prevPosition before scene callbacks on mobile.
-        // Keep our own last position and retain the full initial drag delta.
-        const delta = getDragPanDelta(start,
-          { x: this.dragStart.lastX, y: this.dragStart.lastY },
-          point, this.dragStart.panStarted || this.pointerMode === 'pan');
-        if (delta) {
-          this.cameras.main.scrollX -= delta.x / this.cameras.main.zoom;
-          this.cameras.main.scrollY -= delta.y / this.cameras.main.zoom;
-          this.dragStart.panStarted = true;
-          this.dragStart.lastX = point.x;
-          this.dragStart.lastY = point.y;
-          if (this.pointerMode === 'touch') this.touchGestureOccurred = true;
-        }
-        return;
-      }
-      if (this.pointerMode === 'mouse' && Phaser.Math.Distance.Between(start.x, start.y, point.x, point.y) > 8) this.drawSelectionBox(pointer);
-    });
-
-    this.input.on('pointerup', (pointer) => {
-      if (this.uiPointerGate.release()) {
-        this.dragStart = null;
-        this.pointerMode = null;
-        this.selectionLayer.clear();
-        return;
-      }
-      if (this.isTouchPointer(pointer) && this.touchGestureOccurred) {
-        // Never convert a pan or a two-finger pinch into an accidental move/order.
-        this.dragStart = null;
-        this.selectionLayer.clear();
-        // Keep pinch suppression until the last finger has lifted.
-        this.pinchDistance = null;
-        this.pinchCenter = null;
-        if (this.getTouchPointers().filter((active) => active.id !== pointer.id).length === 0) {
-          this.pointerMode = null;
-          this.touchGestureOccurred = false;
-        }
-        return;
-      }
-      if (this.pointerMode === 'ui' || this.isUiPointer(pointer)) {
-        this.dragStart = null;
-        this.pointerMode = null;
-        this.pinchDistance = null;
-        this.pinchCenter = null;
-        this.selectionLayer.clear();
-        return;
-      }
-      if (!this.dragStart) return;
-      const start = this.dragStart;
-      const world = this.toWorld(pointer);
-      const distance = Phaser.Math.Distance.Between(start.screenX, start.screenY, pointer.x, pointer.y);
-      this.dragStart = null;
-      this.pinchDistance = null;
-      this.pinchCenter = null;
-      this.selectionLayer.clear();
-      if (this.pointerMode === 'pan') return;
-      if (this.placement.active && this.isTouchPointer(pointer)) {
-        if (isPlacementTap(
-          { x: start.screenX, y: start.screenY },
-          { x: pointer.x, y: pointer.y },
-          { panned: start.panStarted, pinched: this.touchGestureOccurred }
-        )) this.handleTap(world, pointer);
-        return;
-      }
-      if (distance > 8 && this.pointerMode === 'mouse') this.selectBox(start.worldX, start.worldY, world.x, world.y);
-      else if (distance <= 8) this.handleTap(world, pointer);
-    });
-
-    this.input.on('wheel', (_pointer, _over, _dx, dy) => {
-      const pointer = this.input.activePointer;
-      const next = Phaser.Math.Clamp(this.cameras.main.zoom - dy * 0.001, this.minZoom, 1.5);
-      this.zoomAt(pointer.x, pointer.y, next);
-    });
-
-    this.input.keyboard?.on('keydown-ESC', () => {
-      if (this.cancelPlacement()) this.message = 'Building placement cancelled.';
-      else this.togglePause();
-    });
-    this.input.keyboard?.on('keydown-SPACE', () => this.centerOnSelection());
-    this.input.keyboard?.on('keydown-F6', (event) => { event?.preventDefault?.(); this.saveSkirmish(); });
-    this.input.keyboard?.on('keydown-F7', (event) => { event?.preventDefault?.(); this.loadSkirmish(); });
-    this.input.keyboard?.on('keydown-F3', (event) => {
-      event?.preventDefault?.();
-      this.debugVisible = !this.debugVisible;
-      this.debugText.setVisible(this.debugVisible);
-    });
-    this.input.keyboard?.on('keydown-F4', (event) => { event?.preventDefault?.(); this.runDebugScenario(); });
-    this.input.keyboard?.on('keydown-B', () => this.useCommandButton('build'));
-    this.input.keyboard?.on('keydown-P', () => this.produceSelected());
-    this.input.keyboard?.on('keydown-Q', () => this.setCategory('buildings'));
-    this.input.keyboard?.on('keydown-T', () => this.setCategory('defensive'));
-    this.input.keyboard?.on('keydown-E', () => this.setCategory('infantry'));
-    this.input.keyboard?.on('keydown-R', () => this.setCategory('vehicles'));
-    this.input.keyboard?.on('keydown-Y', () => this.setCategory('aircraft'));
-    this.input.keyboard?.on('keydown-U', () => this.setCategory('navy'));
-    this.input.keyboard?.on('keydown-K', () => this.useBuildingAction('repair'));
-    this.input.keyboard?.on('keydown-L', () => this.useBuildingAction('sell'));
-    this.input.keyboard?.on('keydown-ONE', () => this.choosePreferredBuilding('refinery'));
-    this.input.keyboard?.on('keydown-TWO', () => this.choosePreferredBuilding('barracks'));
-  }
+  installInput() { installBattlefieldInput(this); }
 
   handleTap(world, pointer) {
     const building = this.hitBuilding(world);
