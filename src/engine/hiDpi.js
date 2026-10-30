@@ -1,11 +1,19 @@
 // Phaser 4 requires a denser backing canvas, an inverse CSS zoom,
 // and coordinated camera / pointer transforms (scale.resolution is ignored).
-export function renderDensity(width, height, devicePixelRatio = 1, maxPixels = 2600000) {
+// Match the device's *native* screen density whenever the GPU budget permits.
+// Fractional upscaling (e.g. rendering at 2.5x on a 3x screen) causes the browser
+// to resample the finished canvas and soften every glyph, line, and silhouette.
+// 5.5M backing pixels covers common 3x / 3.5x phones; large windows fall back
+// within the pixel budget rather than allocating an unbounded framebuffer.
+export function renderDensity(width, height, devicePixelRatio = 1, maxPixels = 5500000) {
   if (!(width > 0) || !(height > 0)) return 1;
-  // More than 2x noticeably helps small HUD glyphs and thin vector edges.
-  // Bound fill-rate on large displays and stay strictly inside the pixel budget.
-  const ratio = Number.isFinite(devicePixelRatio) ? Math.max(1, Math.min(2.5, devicePixelRatio)) : 1;
-  return Math.max(1, Math.floor(Math.min(ratio, Math.sqrt(maxPixels / (width * height))) * 100) / 100);
+  const nativeDensity = Number.isFinite(devicePixelRatio)
+    ? Math.max(1, Math.min(4, devicePixelRatio)) : 1;
+  const pixelBudgetDensity = Math.sqrt(maxPixels / (width * height));
+  // Return the unrounded native DPR when possible to avoid accidental scaling.
+  if (nativeDensity <= pixelBudgetDensity) return nativeDensity;
+  // Round *down* only for budget-constrained displays.
+  return Math.max(1, Math.floor(pixelBudgetDensity * 100) / 100);
 }
 
 export function gamePixels(value, ratio) { return Math.round(value * ratio); }
