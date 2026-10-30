@@ -347,6 +347,20 @@ test('high-DPI Android: crisp canvas and aligned touch construction', async () =
         canvas: scene.game.canvas.getBoundingClientRect().toJSON(),
         layout: scene.uiSize(),
         cameraZoom: scene.uiCamera.zoom,
+        uiCameraWorld: scene.uiCamera.getWorldPoint(660, 54),
+        mainCameraWorld: scene.cameras.main.getWorldPoint(660, 54),
+        menuActive: scene.mobileMenuButton.active,
+        menuVisible: scene.mobileMenuButton.visible,
+        menuInputEnabled: scene.mobileMenuButton.input?.enabled,
+        interactiveHits: (() => {
+          try {
+            const p = scene.input.manager.pointers.find(p => p.downX);
+            return scene.input.hitTestPointer(p).map(o => ({
+              x: o.x, y: o.y, type: o.type, width: o.width, height: o.height
+            })).slice(0, 8);
+          } catch(e) { return String(e); }
+        })(),
+        pointerGate: scene.uiPointerGate.active,
         drawer: scene.mobilePanelOpen
       };
     });
