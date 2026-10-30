@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { drawTerrain, drawResources } from '../rendering/terrain.js';
+import { drawBuildingDetails, drawUnitDetails } from '../rendering/spriteDetails.js';
 import { worldPoint, zoomAtPoint, getTouchPointers as activeTouchPointers } from '../engine/cameraInput.js';
 import { installHighDpiText, logicalPointer } from '../engine/hiDpi.js';
 import { sidebarLayout } from '../ui/sidebarLayout.js';
@@ -919,6 +920,7 @@ export class Battlefield extends Phaser.Scene {
       this.unitLayer.fillStyle(0x07101a, opacity).fillRect(building.x - width / 2, building.y + height / 2 - 12, width, 12);
       this.unitLayer.fillStyle(color, building.complete ? 1 : 0.35).fillRect(building.x - width / 2, building.y - height / 2, 7, height - 12);
       this.drawBuildingSymbol(building, color, opacity);
+      drawBuildingDetails(this.unitLayer, building, color, opacity);
       this.unitLayer.lineStyle(this.selectedBuildings.has(building.id) ? 4 : 2, this.selectedBuildings.has(building.id) ? 0xffe66d : color, 1).strokeRect(building.x - width / 2, building.y - height / 2, width, height);
       const healthRatio = Math.max(0, Math.min(1, building.hp / building.maxHp));
       if (this.selectedBuildings.has(building.id) || healthRatio < 1) {
@@ -946,10 +948,14 @@ export class Battlefield extends Phaser.Scene {
     this.units.forEach((unit) => {
       const color = unit.team === 0 ? TEAM.PLAYER : TEAM.ENEMY;
       const isSelected = this.selected.has(unit.id);
-      if (isSelected) this.unitLayer.lineStyle(3, 0xffe66d, 1).strokeCircle(unit.x, unit.y, 30);
-      this.drawUnitSilhouette(unit, color);
-      this.unitLayer.fillStyle(0x07101a, 1).fillRect(unit.x - 22, unit.y - 34, 44, 5);
-      this.unitLayer.fillStyle(0x65e39b, 1).fillRect(unit.x - 22, unit.y - 34, 44 * (unit.hp / unit.maxHp), 5);
+      // Only round positions used for painting. Simulation, pathing and target
+      // positions keep their full precision.
+      const paintedUnit = { ...unit, x: Math.round(unit.x), y: Math.round(unit.y) };
+      if (isSelected) this.unitLayer.lineStyle(3, 0xffe66d, 1).strokeCircle(paintedUnit.x, paintedUnit.y, 30);
+      this.drawUnitSilhouette(paintedUnit, color);
+      drawUnitDetails(this.unitLayer, paintedUnit, color);
+      this.unitLayer.fillStyle(0x07101a, 1).fillRect(paintedUnit.x - 22, paintedUnit.y - 34, 44, 5);
+      this.unitLayer.fillStyle(0x65e39b, 1).fillRect(paintedUnit.x - 22, paintedUnit.y - 34, 44 * (unit.hp / unit.maxHp), 5);
     });
   }
 
@@ -1299,8 +1305,8 @@ export class Battlefield extends Phaser.Scene {
     this.statusText.setVisible(false);
 
     this.hudText.sidebarCredit.setPosition(12, 8).setFontSize(13).setVisible(true);
-    this.hudText.sidebarPower.setPosition(12, 31).setFontSize(9).setVisible(true);
-    this.hudText.selection.setPosition(12, bottomTop + 9).setFontSize(11)
+    this.hudText.sidebarPower.setPosition(12, 30).setFontSize(11).setVisible(true);
+    this.hudText.selection.setPosition(12, bottomTop + 9).setFontSize(12)
       .setWordWrapWidth(width - 24).setVisible(true);
 
     const placing = this.placement.active;
@@ -1316,9 +1322,9 @@ export class Battlefield extends Phaser.Scene {
     this.mobilePauseButton.setPosition(width / 2, 27).setVisible(!this.isPaused);
     this.mobilePauseText.setPosition(width / 2, 27).setVisible(!this.isPaused);
     this.mobilePlacementStatus.setPosition(placementHud.status.x, placementHud.status.y)
-      .setFontSize(width < 355 ? 10 : 11).setVisible(placing);
+      .setFontSize(width < 355 ? 11 : 12).setVisible(placing);
     this.mobilePlacementHint.setPosition(placementHud.hint.x, placementHud.hint.y)
-      .setFontSize(width < 355 ? 9 : 10).setVisible(placing);
+      .setFontSize(width < 355 ? 10 : 11).setVisible(placing);
 
     const gap = 5;
     const buttonWidth = Math.floor((width - 20 - 4 * gap) / 5);
@@ -1326,7 +1332,7 @@ export class Battlefield extends Phaser.Scene {
       const labels = { move: 'MOVE', attack: 'ATTACK', stop: 'STOP', defend: 'GUARD', select_all: 'ALL' };
       const x = 10 + buttonWidth * (index + 0.5) + index * gap;
       const y = bottomTop + 66;
-      button.text.setText(labels[button.action]).setPosition(x, y).setFontSize(width < 340 ? 9 : 10);
+      button.text.setText(labels[button.action]).setPosition(x, y).setFontSize(width < 340 ? 10 : 11);
       button.background.setSize(buttonWidth, 44).setPosition(x, y).setVisible(!placing);
       if (button.background.input?.hitArea?.setSize) button.background.input.hitArea.setSize(buttonWidth, 44);
       button.text.setVisible(!placing);
@@ -1393,8 +1399,8 @@ export class Battlefield extends Phaser.Scene {
       if (!visible) return;
       card.background.setSize(cardWidth, cardHeight).setPosition(x, y);
       if (card.background.input?.hitArea?.setSize) card.background.input.hitArea.setSize(cardWidth, cardHeight);
-      card.text.setPosition(x - cardWidth / 2 + 9, y - 9).setFontSize(width < 340 ? 9 : 10);
-      card.costText.setPosition(x - cardWidth / 2 + 9, y + 10).setFontSize(9);
+      card.text.setPosition(x - cardWidth / 2 + 9, y - 9).setFontSize(width < 340 ? 10 : 11);
+      card.costText.setPosition(x - cardWidth / 2 + 9, y + 10).setFontSize(10);
     };
     this.buildCards.forEach((card) => positionCard(card, current));
     this.unitCards.forEach((card) => positionCard(card, current));
