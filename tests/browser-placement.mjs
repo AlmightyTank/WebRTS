@@ -93,7 +93,7 @@ async function spot(page, valid, type = 'refinery') {
     const bottom = mobile ? height - 115 : height - 175;
     for (let y = 98; y < bottom; y += 24) {
       for (let x = 32; x < right; x += 24) {
-        const position = s.cameras.main.getWorldPoint(x, y);
+        const position = s.cameras.main.getWorldPoint(x * s.renderDensity, y * s.renderDensity);
         if (Boolean(s.simulation.validateCommand({
           type: 'build', playerId: 0, buildingType: type, position
         }).ok) === valid) return { x, y };
@@ -309,3 +309,45 @@ for (const [name, viewport] of [
     } finally { await context.close(); }
   });
 }
+
+test('high-DPI Android: crisp canvas and aligned touch construction', async () => {
+  const { page, context, errors } = await launch({
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 3,
+    isMobile: true, hasTouch: true
+  });
+  try {
+    const quality = await page.evaluate(() => {
+      const s = window.__WEBRTS_E2E__();
+      const canvas = s.game.canvas;
+      const rect = canvas.getBoundingClientRect();
+      return {
+        density: s.renderDensity, logical: s.uiSize(),
+        backing: { width: canvas.width, height: canvas.height },
+        css: { width: rect.width, height: rect.height }
+      };
+    });
+    assert.equal(quality.density, 2);
+    assert.ok(Math.abs(quality.logical.width - 390) < 2, 'logical HUD stays phone-sized');
+    assert.ok(Math.abs(quality.logical.height - 844) < 2);
+    assert.equal(quality.backing.width, 780);
+    assert.equal(quality.backing.height, 1688);
+    assert.ok(Math.abs(quality.css.width - 390) < 2, 'CSS display remains phone-sized');
+    assert.ok(Math.abs(quality.css.height - 844) < 2);
+    const before = await state(page);
+    const menu = await target(page, 'menu');
+    await page.touchscreen.tap(menu.x, menu.y);
+    const card = await target(page, 'barracks');
+    await page.touchscreen.tap(card.x, card.y);
+    assert.equal((await state(page)).active, true);
+    const valid = await spot(page, true, 'barracks');
+    assert.ok(valid, 'valid placement location within visible viewport');
+    await page.touchscreen.tap(valid.x, valid.y);
+    await page.waitForTimeout(200);
+    const result = await state(page);
+    assert.equal(result.active, false);
+    assert.equal(result.buildings.length, before.buildings.length + 1);
+    assert.equal(result.metal, before.metal - 250);
+    await page.screenshot({ path: 'test-results/hidpi-android-placement.png' });
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
