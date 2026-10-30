@@ -4,6 +4,7 @@ import { worldPoint, zoomAtPoint, getTouchPointers as activeTouchPointers } from
 import { sidebarLayout } from '../ui/sidebarLayout.js';
 import { installBattlefieldInput } from '../input/battlefieldInput.js';
 import { PerformanceMonitor, debugScenario } from '../debug/performance.js';
+import { RuntimeErrorLog } from '../debug/errorLog.js';
 import { AUTOSAVE_KEY, SKIRMISH_SAVE_KEY, saveGameToStorage, readGameFromStorage } from '../engine/gameStorage.js';
 import { Simulation } from '../simulation/Simulation.js';
 import { attackCommand, buildCommand, defendCommand, moveCommand, produceCommand, repairCommand, sellCommand, stopCommand } from '../simulation/commands.js';
@@ -28,6 +29,7 @@ export class Battlefield extends Phaser.Scene {
     this.simulation = new Simulation({ seed: 1337 });
     this.units = this.simulation.units;
     this.performanceMonitor = new PerformanceMonitor();
+    this.runtimeErrors = new RuntimeErrorLog();
     this.debugVisible = false;
     this.debugRefreshMs = 0;
     this.nextAutosaveTime = 60;
@@ -87,6 +89,7 @@ export class Battlefield extends Phaser.Scene {
     }
     this.drawWorld();
     this.installInput();
+    this.installErrorDiagnostics();
     this.scale.on('resize', () => {
       this.updateZoomLimits();
       const { width, height } = this.uiSize();
@@ -243,6 +246,11 @@ export class Battlefield extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '11px', color: '#b7e7cb',
       backgroundColor: '#06131bef', padding: { x: 8, y: 7 }
     }).setScrollFactor(0).setDepth(33).setVisible(false);
+    this.errorText = this.add.text(12, 80, '', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#ffc0c5',
+      backgroundColor: '#381821f2', padding: { x: 9, y: 7 },
+      wordWrap: { width: 350 }
+    }).setScrollFactor(0).setDepth(35).setVisible(false);
     this.pauseResume.on('pointerdown', () => { this.uiPointerGate.block(); this.togglePause(false); });
     this.pauseRestart.on('pointerdown', () => this.scene.restart());
     this.setBuildTab('main');
@@ -259,7 +267,7 @@ export class Battlefield extends Phaser.Scene {
       this.buildTitle,
       this.mobileMenuButton, this.mobileMenuText, this.mobilePageText,
       this.mobilePlacementStatus, this.mobilePlacementHint,
-      this.mobilePauseButton, this.mobilePauseText, this.debugText,
+      this.mobilePauseButton, this.mobilePauseText, this.debugText, this.errorText,
       ...this.mobilePagerButtons.flatMap((button) => [button.background, button.text]),
       ...this.categoryTabs.flatMap((tab) => [tab.background, tab.text]),
       ...Object.values(this.sidebarSections).flatMap((section) => [section.title, section.row]),
@@ -455,6 +463,24 @@ export class Battlefield extends Phaser.Scene {
     // Reflow cards immediately when switching tabs; otherwise cards keep the
     // positions calculated for the previously selected category.
     if (this.uiCamera) this.layoutUi();
+  }
+
+  installErrorDiagnostics() {
+    const runtimeError = event => this.reportRuntimeError(event.message || 'Unknown runtime error', 'ERROR');
+    const rejection = event => this.reportRuntimeError(event.reason, 'PROMISE');
+    window.addEventListener('error', runtimeError);
+    window.addEventListener('unhandledrejection', rejection);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('error', runtimeError);
+      window.removeEventListener('unhandledrejection', rejection);
+    });
+  }
+
+  reportRuntimeError(error, kind = 'ERROR') {
+    const entry = this.runtimeErrors.record(error, kind);
+    this.errorText.setText(`${entry.category}: ${entry.message}`)
+      .setWordWrapWidth(Math.max(160, this.uiSize().width - 42))
+      .setVisible(true);
   }
 
   saveSkirmish(automatic = false) {
