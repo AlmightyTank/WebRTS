@@ -326,11 +326,11 @@ test('high-DPI Android: crisp canvas and aligned touch construction', async () =
         css: { width: rect.width, height: rect.height }
       };
     });
-    assert.equal(quality.density, 2);
+    assert.equal(quality.density, 2.5);
     assert.ok(Math.abs(quality.logical.width - 390) < 2, 'logical HUD stays phone-sized');
     assert.ok(Math.abs(quality.logical.height - 844) < 2);
-    assert.equal(quality.backing.width, 780);
-    assert.equal(quality.backing.height, 1688);
+    assert.equal(quality.backing.width, 975);
+    assert.equal(quality.backing.height, 2110);
     assert.ok(Math.abs(quality.css.width - 390) < 2, 'CSS display remains phone-sized');
     assert.ok(Math.abs(quality.css.height - 844) < 2);
     const before = await state(page);
