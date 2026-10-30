@@ -36,10 +36,10 @@ export function validateContentRegistry(data = {
       if (!units[produced]) errors.push(`${id} produces an unknown unit ${produced}`);
     }
   }
-  for (const [id, equipment] of Object.entries(equipment)) {
+  for (const [id, loadout] of Object.entries(equipment)) {
     if (!units[id]) errors.push(`Unknown equipped unit ${id}`);
-    if (!armor[equipment.armor]) errors.push(`Unknown armor ${equipment.armor} for ${id}`);
-    if (equipment.weapon && !weapons[equipment.weapon]) errors.push(`Unknown weapon ${equipment.weapon} for ${id}`);
+    if (!armor[loadout.armor]) errors.push(`Unknown armor ${loadout.armor} for ${id}`);
+    if (loadout.weapon && !weapons[loadout.weapon]) errors.push(`Unknown weapon ${loadout.weapon} for ${id}`);
   }
   for (const faction of Object.values(factions)) {
     for (const id of faction.startingUnits || []) if (!units[id]) errors.push(`Unknown starting unit ${id}`);
