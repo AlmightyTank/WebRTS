@@ -326,13 +326,18 @@ test('high-DPI Android: crisp canvas and aligned touch construction', async () =
         css: { width: rect.width, height: rect.height }
       };
     });
-    assert.equal(quality.density, 2.5);
+    assert.equal(quality.density, 3, 'native DPR avoids browser upscaling');
     assert.ok(Math.abs(quality.logical.width - 390) < 2, 'logical HUD stays phone-sized');
     assert.ok(Math.abs(quality.logical.height - 844) < 2);
-    assert.equal(quality.backing.width, 975);
-    assert.equal(quality.backing.height, 2110);
+    assert.equal(quality.backing.width, 1170);
+    assert.equal(quality.backing.height, 2532);
     assert.ok(Math.abs(quality.css.width - 390) < 2, 'CSS display remains phone-sized');
     assert.ok(Math.abs(quality.css.height - 844) < 2);
+    const firstZoom = await page.evaluate(() => {
+      const s = window.__WEBRTS_E2E__();
+      return s.cameras.main.zoom / s.renderDensity;
+    });
+    assert.ok(Math.abs(firstZoom - 1) < 0.001, 'mobile opens at native 1:1 world zoom');
     const before = await state(page);
     const menu = await target(page, 'menu');
     await page.touchscreen.tap(menu.x, menu.y);
