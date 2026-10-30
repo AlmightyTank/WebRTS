@@ -264,7 +264,7 @@ export class Battlefield extends Phaser.Scene {
   setupUiCamera() {
     const { width, height } = this.uiSize();
     this.uiCamera = this.cameras.add(0, 0, width * this.renderDensity, height * this.renderDensity);
-    this.uiCamera.setScroll(0, 0).setZoom(this.renderDensity);
+    this.uiCamera.setOrigin(0, 0).setScroll(0, 0).setZoom(this.renderDensity);
     const hudObjects = [
       this.hud,
       ...Object.values(this.hudText),
