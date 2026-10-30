@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { getDragPanDelta } from '../mobileGestures.js';
 import { getPinchUpdate, isPlacementTap } from '../mobilePlacement.js';
+import { logicalPointer } from '../engine/hiDpi.js';
 
 export function installBattlefieldInput(scene) {
     scene.game.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -19,7 +20,8 @@ export function installBattlefieldInput(scene) {
     scene.cameraKeys.a = scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     scene.cameraKeys.s = scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     scene.cameraKeys.d = scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    scene.input.on('pointerdown', (pointer) => {
+    scene.input.on('pointerdown', (rawPointer) => {
+      const pointer = logicalPointer(rawPointer, scene.renderDensity);
       if (scene.uiPointerGate.active) {
         scene.dragStart = null;
         scene.pointerMode = 'ui';
@@ -38,7 +40,7 @@ export function installBattlefieldInput(scene) {
         scene.pointerMode = 'touch';
         scene.touchGestureOccurred = true;
         scene.dragStart = null;
-        const gesture = getPinchUpdate(null, touches[0], touches[1], scene.cameras.main.zoom, scene.minZoom);
+        const gesture = getPinchUpdate(null, touches[0], touches[1], scene.cameras.main.zoom, scene.minZoom, 1.5 * scene.renderDensity);
         scene.pinchDistance = gesture.distance;
         scene.pinchCenter = gesture.center;
         return;
@@ -64,7 +66,8 @@ export function installBattlefieldInput(scene) {
       scene.touchGestureOccurred = false;
     });
 
-    scene.input.on('pointermove', (pointer) => {
+    scene.input.on('pointermove', (rawPointer) => {
+      const pointer = logicalPointer(rawPointer, scene.renderDensity);
       if (scene.pointerMode === 'ui' || scene.uiPointerGate.active) return;
       if (scene.placement.active && !scene.isUiPointer(pointer) && !scene.isTouchPointer(pointer)) {
         scene.previewScreenAnchor = { x: pointer.x, y: pointer.y };
@@ -73,10 +76,10 @@ export function installBattlefieldInput(scene) {
       if (scene.pointerMode === 'touch' && touches.length >= 2) {
         const previous = scene.pinchCenter ? { center: scene.pinchCenter, distance: scene.pinchDistance } : null;
         const gesture = getPinchUpdate(previous, touches[0], touches[1],
-          scene.cameras.main.zoom, scene.minZoom);
+          scene.cameras.main.zoom, scene.minZoom, 1.5 * scene.renderDensity);
         // Both fingers moving together pans; their separation controls zoom.
-        scene.cameras.main.scrollX -= gesture.panX / scene.cameras.main.zoom;
-        scene.cameras.main.scrollY -= gesture.panY / scene.cameras.main.zoom;
+        scene.cameras.main.scrollX -= gesture.panX * scene.renderDensity / scene.cameras.main.zoom;
+        scene.cameras.main.scrollY -= gesture.panY * scene.renderDensity / scene.cameras.main.zoom;
         scene.zoomAt(gesture.center.x, gesture.center.y, gesture.zoom);
         scene.pinchDistance = gesture.distance;
         scene.pinchCenter = gesture.center;
@@ -93,8 +96,8 @@ export function installBattlefieldInput(scene) {
           { x: scene.dragStart.lastX, y: scene.dragStart.lastY },
           point, scene.dragStart.panStarted || scene.pointerMode === 'pan');
         if (delta) {
-          scene.cameras.main.scrollX -= delta.x / scene.cameras.main.zoom;
-          scene.cameras.main.scrollY -= delta.y / scene.cameras.main.zoom;
+          scene.cameras.main.scrollX -= delta.x * scene.renderDensity / scene.cameras.main.zoom;
+          scene.cameras.main.scrollY -= delta.y * scene.renderDensity / scene.cameras.main.zoom;
           scene.dragStart.panStarted = true;
           scene.dragStart.lastX = point.x;
           scene.dragStart.lastY = point.y;
@@ -105,7 +108,8 @@ export function installBattlefieldInput(scene) {
       if (scene.pointerMode === 'mouse' && Phaser.Math.Distance.Between(start.x, start.y, point.x, point.y) > 8) scene.drawSelectionBox(pointer);
     });
 
-    scene.input.on('pointerup', (pointer) => {
+    scene.input.on('pointerup', (rawPointer) => {
+      const pointer = logicalPointer(rawPointer, scene.renderDensity);
       if (scene.uiPointerGate.release()) {
         scene.dragStart = null;
         scene.pointerMode = null;
@@ -155,8 +159,8 @@ export function installBattlefieldInput(scene) {
     });
 
     scene.input.on('wheel', (_pointer, _over, _dx, dy) => {
-      const pointer = scene.input.activePointer;
-      const next = Phaser.Math.Clamp(scene.cameras.main.zoom - dy * 0.001, scene.minZoom, 1.5);
+      const pointer = logicalPointer(scene.input.activePointer, scene.renderDensity);
+      const next = Phaser.Math.Clamp(scene.cameras.main.zoom - dy * 0.001 * scene.renderDensity, scene.minZoom, 1.5 * scene.renderDensity);
       scene.zoomAt(pointer.x, pointer.y, next);
     });
 

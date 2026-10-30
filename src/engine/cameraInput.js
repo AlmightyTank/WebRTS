@@ -1,5 +1,5 @@
-export function worldPoint(camera, pointer) {
-  return camera.getWorldPoint(pointer.x, pointer.y);
+export function worldPoint(camera, pointer, density = 1) {
+  return camera.getWorldPoint(pointer.x * density, pointer.y * density);
 }
 
 export function zoomAtPoint(camera, screenX, screenY, zoom) {
