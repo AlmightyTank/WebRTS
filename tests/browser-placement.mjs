@@ -337,37 +337,29 @@ test('high-DPI Android: crisp canvas and aligned touch construction', async () =
     const menu = await target(page, 'menu');
     await page.touchscreen.tap(menu.x, menu.y);
     const opened = await state(page);
-    const inputDebug = await page.evaluate(() => {
-      const scene = window.__WEBRTS_E2E__();
-      return {
-        menu: { x: scene.mobileMenuButton.x, y: scene.mobileMenuButton.y,
-          width: scene.mobileMenuButton.width, height: scene.mobileMenuButton.height },
-        pointers: scene.input.manager.pointers.map(p =>
-          ({ x: p.x, y: p.y, downX: p.downX, downY: p.downY, isDown: p.isDown })),
-        canvas: scene.game.canvas.getBoundingClientRect().toJSON(),
-        layout: scene.uiSize(),
-        cameraZoom: scene.uiCamera.zoom,
-        uiCameraWorld: scene.uiCamera.getWorldPoint(660, 54),
-        mainCameraWorld: scene.cameras.main.getWorldPoint(660, 54),
-        menuActive: scene.mobileMenuButton.active,
-        menuVisible: scene.mobileMenuButton.visible,
-        menuInputEnabled: scene.mobileMenuButton.input?.enabled,
-        interactiveHits: (() => {
-          try {
-            const p = scene.input.manager.pointers.find(p => p.downX);
-            return scene.input.hitTestPointer(p).map(o => ({
-              x: o.x, y: o.y, type: o.type, width: o.width, height: o.height
-            })).slice(0, 8);
-          } catch(e) { return String(e); }
-        })(),
-        pointerGate: scene.uiPointerGate.active,
-        drawer: scene.mobilePanelOpen
-      };
-    });
-    assert.equal(opened.drawer, true, JSON.stringify(inputDebug));
+    assert.equal(opened.drawer, true, 'high-DPI Build button should receive touch');
     const card = await target(page, 'barracks');
     await page.touchscreen.tap(card.x, card.y);
     assert.equal((await state(page)).active, true);
+    const beforeGesture = await state(page);
+    await gesture(page, [
+      [{ x: 190, y: 310 }],
+      [{ x: 205, y: 325 }],
+      [{ x: 220, y: 340 }]
+    ]);
+    const afterPan = await state(page);
+    assert.ok(Math.abs(afterPan.camera.x - beforeGesture.camera.x) > 3 ||
+      Math.abs(afterPan.camera.y - beforeGesture.camera.y) > 3,
+      'high-DPI one-finger pan must move camera');
+    assert.equal(afterPan.buildings.length, before.buildings.length);
+    await gesture(page, [
+      [{ x: 125, y: 300 }, { x: 230, y: 300 }],
+      [{ x: 105, y: 300 }, { x: 250, y: 300 }]
+    ]);
+    const afterPinch = await state(page);
+    assert.ok(Math.abs(afterPinch.camera.zoom - afterPan.camera.zoom) > 0.02,
+      'high-DPI pinch should zoom');
+    assert.equal(afterPinch.buildings.length, before.buildings.length);
     const valid = await spot(page, true, 'barracks');
     assert.ok(valid, 'valid placement location within visible viewport');
     await page.touchscreen.tap(valid.x, valid.y);
