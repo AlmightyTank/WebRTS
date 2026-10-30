@@ -8,6 +8,9 @@ the old `scale.resolution` fix.
 
 - Start with `Phaser.Scale.NONE` and a backing canvas of logical size × chosen density.
 - Use `scale.zoom = 1/density` to keep the visible canvas at logical CSS size.
+- Prefer exact device DPR (including 3× and 3.5× on modern phones) rather than
+  a fractional backing scale that the browser must enlarge. Begin mobile play
+  at 1:1 logical camera zoom so units and buildings are not downsampled at 0.8×.
 - Scale world and UI cameras by the same density. The UI camera uses
   `setOrigin(0, 0)` so its rendering and hit tests stay aligned at the top-left.
 - Rasterize Phaser text at higher resolution and inversely scale the Text objects.
@@ -22,11 +25,16 @@ the old `scale.resolution` fix.
 
 ## Performance budget
 
-The default density is the smaller of the device's pixel ratio and 2.5×, further
-restricted to approximately 2.6 million backing pixels. A typical 390×844 CSS
-phone with DPR 3 now uses a 975×2110 canvas (2.5×), giving text and vector outlines
-more detail without exceeding the pixel budget. On larger screens density is
-reduced automatically; a higher multiplier costs GPU fill rate and battery.
+Sharp mode (default) matches the full device pixel ratio up to 4× when within
+a **5.5-million-pixel** budget on mobile screens; larger desktop/tablet
+viewports use a **3-million-pixel** budget. A typical 390×844 CSS phone with
+DPR 3 now uses a **1170×2532** canvas (3×), rather than stretching 2.5×
+rendering across a 3× screen. A 412×915 CSS phone with DPR 3.5 likewise renders
+at its native DPR. Large displays scale down when needed to bound GPU fill rate.
+
+If rendering causes lag or excess battery usage on a phone, load the game with
+`?quality=balanced` to use a **2.6-million-pixel** budget instead.
+Density is selected on startup; reload after changing the URL.
 
 The density is chosen at startup; phone orientation changes are handled by a
 ResizeObserver and Phaser ScaleManager, without changing the scale mid-session.
@@ -37,12 +45,13 @@ ResizeObserver and Phaser ScaleManager, without changing the scale mid-session.
 text scaling, and finite whole-pixel unit/building artwork.
 CI Chromium playtests use real touch gestures for an emulated DPR-3 Android phone
 in addition to existing desktop/mobile/tablet scenarios, checking:
-- Backing pixel dimensions versus CSS canvas bounds (2.5× Android baseline)
+- Backing pixel dimensions versus CSS canvas bounds (native 3× Android baseline)
+- Mobile world camera starts at 1:1 logical zoom; pan/pinch remain enabled
 - Build-menu touch hit testing at scaled density
 - One-finger camera panning and two-finger pinch zoom
 - Construction validity and exactly-once resource deductions
 
 Physical-phone verification is still necessary to measure FPS/temperature and
-inspect text clarity in actual Chrome/Safari. If frame rate is too low, reduce
-the density cap in `src/engine/hiDpi.js`; do not resize the canvas backing
-without also updating Phaser cameras and pointer transforms.
+inspect text clarity in actual Chrome/Safari. If frame rate is too low, try `?quality=balanced` before changing the
+default budget. Do not resize the canvas backing without also updating Phaser
+cameras and pointer transforms.
