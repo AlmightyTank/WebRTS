@@ -258,6 +258,7 @@ export class Battlefield extends Phaser.Scene {
       this.buildTitle,
       this.mobileMenuButton, this.mobileMenuText, this.mobilePageText,
       this.mobilePlacementStatus, this.mobilePlacementHint,
+      this.mobilePauseButton, this.mobilePauseText, this.debugText,
       ...this.mobilePagerButtons.flatMap((button) => [button.background, button.text]),
       ...this.categoryTabs.flatMap((tab) => [tab.background, tab.text]),
       ...Object.values(this.sidebarSections).flatMap((section) => [section.title, section.row]),
@@ -266,6 +267,7 @@ export class Battlefield extends Phaser.Scene {
       this.supportNotice,
       this.gameOverPanel, this.gameOverTitle, this.gameOverDetail, this.restartButton, this.restartButtonText,
       this.pausePanel, this.pauseTitle, this.pauseDetail, this.pauseResume, this.pauseResumeText, this.pauseRestart, this.pauseRestartText,
+      this.pauseSave, this.pauseSaveText, this.pauseLoad, this.pauseLoadText,
       ...this.commandButtons.flatMap((button) => [button.background, button.text]),
       this.buildPanel,
       ...this.buildCards.flatMap((card) => [card.background, card.text, card.costText]),
@@ -1284,6 +1286,10 @@ export class Battlefield extends Phaser.Scene {
       this.pauseResumeText.setVisible(paused);
       this.pauseRestart.setVisible(paused);
       this.pauseRestartText.setVisible(paused);
+      this.pauseSave.setVisible(paused);
+      this.pauseSaveText.setVisible(paused);
+      this.pauseLoad.setVisible(paused);
+      this.pauseLoadText.setVisible(paused);
       this.drawHud();
   }
 
@@ -1296,6 +1302,8 @@ export class Battlefield extends Phaser.Scene {
     }
     this.mobileMenuButton.setVisible(false);
     this.mobileMenuText.setVisible(false);
+    this.mobilePauseButton.setVisible(false);
+    this.mobilePauseText.setVisible(false);
     this.mobilePlacementStatus.setVisible(false);
     this.mobilePlacementHint.setVisible(false);
     this.mobilePageText.setVisible(false);
@@ -1334,6 +1342,10 @@ export class Battlefield extends Phaser.Scene {
     this.pauseResumeText.setPosition(width / 2, height / 2 + 8);
     this.pauseRestart.setPosition(width / 2, height / 2 + 62);
     this.pauseRestartText.setPosition(width / 2, height / 2 + 62);
+    this.pauseSave.setPosition(width / 2 - 66, height / 2 + 116);
+    this.pauseSaveText.setPosition(width / 2 - 66, height / 2 + 116);
+    this.pauseLoad.setPosition(width / 2 + 66, height / 2 + 116);
+    this.pauseLoadText.setPosition(width / 2 + 66, height / 2 + 116);
      const buttonWidth = mobile ? Math.max(42, Math.floor((playWidth - 24) / this.commandButtons.length)) : 112;
     const gap = mobile ? 5 : 8;
     const buttonAreaWidth = buttonWidth * this.commandButtons.length + gap * (this.commandButtons.length - 1);
@@ -1444,6 +1456,8 @@ export class Battlefield extends Phaser.Scene {
     }
     this.mobileMenuText.setVisible(true).setPosition(cancel.x, cancel.y)
       .setText(placing ? 'CANCEL ×' : opened ? 'CLOSE ×' : 'BUILD ▣');
+    this.mobilePauseButton.setPosition(width / 2, 27).setVisible(!this.isPaused);
+    this.mobilePauseText.setPosition(width / 2, 27).setVisible(!this.isPaused);
     this.mobilePlacementStatus.setPosition(placementHud.status.x, placementHud.status.y)
       .setFontSize(width < 355 ? 10 : 11).setVisible(placing);
     this.mobilePlacementHint.setPosition(placementHud.hint.x, placementHud.hint.y)
@@ -1473,6 +1487,10 @@ export class Battlefield extends Phaser.Scene {
     this.pauseResumeText.setPosition(width / 2, height / 2 + 8);
     this.pauseRestart.setPosition(width / 2, height / 2 + 62);
     this.pauseRestartText.setPosition(width / 2, height / 2 + 62);
+    this.pauseSave.setPosition(width / 2 - 66, height / 2 + 116);
+    this.pauseSaveText.setPosition(width / 2 - 66, height / 2 + 116);
+    this.pauseLoad.setPosition(width / 2 + 66, height / 2 + 116);
+    this.pauseLoadText.setPosition(width / 2 + 66, height / 2 + 116);
 
     this.buildTabs.forEach((tab) => {
       tab.background.setVisible(false);
