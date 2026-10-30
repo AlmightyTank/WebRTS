@@ -224,3 +224,84 @@ test('mobile: a deliberate tap constructs and charges exactly once', async () =>
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
+
+// v0.2 release device matrix: desktop input, portrait/landscape touch and tablet.
+test('desktop: complete match save/load, deterministic hash and F3 diagnostics', async () => {
+  const { page, context, errors } = await launch({ viewport: { width: 1280, height: 800 } });
+  try {
+    const before = await state(page);
+    await page.keyboard.press('F6');
+    const saved = await page.evaluate(() => window.localStorage.getItem('webrts.skirmish.v1'));
+    assert.ok(saved?.includes('webrts-game'));
+    await page.evaluate(() => { window.__WEBRTS_E2E__().simulation.resources[0] = 23; });
+    await page.keyboard.press('F7');
+    assert.equal((await state(page)).metal, before.metal);
+    await page.keyboard.press('F3');
+    await page.waitForTimeout(700);
+    const overlay = await page.evaluate(() => {
+      const s = window.__WEBRTS_E2E__();
+      return { visible: s.debugText.visible, text: s.debugText.text, tick: s.simulation.tick };
+    });
+    assert.equal(overlay.visible, true);
+    assert.match(overlay.text, /FPS/);
+    assert.match(overlay.text, /HASH/);
+    const count = (await state(page)).buildings.length;
+    await page.keyboard.press('F4');
+    const units = await page.evaluate(() => window.__WEBRTS_E2E__().units.length);
+    assert.ok(units >= 60);
+    assert.equal((await state(page)).buildings.length, count);
+    await page.screenshot({ path: 'test-results/v02-desktop-diagnostics.png' });
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+for (const [name, viewport] of [
+  ['portrait-small', { width: 320, height: 568 }],
+  ['landscape-phone', { width: 844, height: 390 }],
+  ['tablet', { width: 820, height: 1180 }]
+]) {
+  test('v0.2 mobile ' + name + ': pause/save/load and responsive HUD', async () => {
+    const { page, context, errors } = await launch({
+      viewport, isMobile: true, hasTouch: true
+    });
+    try {
+      const before = await state(page);
+      const positions = await page.evaluate(() => {
+        const s = window.__WEBRTS_E2E__();
+        return {
+          pause: { x: s.mobilePauseButton.x, y: s.mobilePauseButton.y, visible: s.mobilePauseButton.visible },
+          menu: { x: s.mobileMenuButton.x, y: s.mobileMenuButton.y, visible: s.mobileMenuButton.visible }
+        };
+      });
+      assert.equal(positions.pause.visible, true, 'Pause available on touch device');
+      assert.ok(positions.pause.x > 0 && positions.pause.x < viewport.width);
+      assert.ok(positions.menu.x > positions.pause.x);
+      await page.touchscreen.tap(positions.pause.x, positions.pause.y);
+      const paused = await page.evaluate(() => {
+        const s = window.__WEBRTS_E2E__();
+        return {
+          paused: s.isPaused, save: { x: s.pauseSave.x, y: s.pauseSave.y, visible: s.pauseSave.visible },
+          load: { x: s.pauseLoad.x, y: s.pauseLoad.y, visible: s.pauseLoad.visible }
+        };
+      });
+      assert.equal(paused.paused, true);
+      assert.equal(paused.save.visible, true);
+      assert.equal(paused.load.visible, true);
+      for (const p of [paused.save, paused.load]) {
+        assert.ok(p.x > 0 && p.x < viewport.width && p.y > 0 && p.y < viewport.height,
+          'pause actions stay within touch viewport');
+      }
+      await page.touchscreen.tap(paused.save.x, paused.save.y);
+      const saved = await page.evaluate(() => window.localStorage.getItem('webrts.skirmish.v1'));
+      assert.ok(saved && saved.includes('webrts-game'));
+      await page.evaluate(() => { window.__WEBRTS_E2E__().simulation.resources[0] = 50; });
+      await page.touchscreen.tap(paused.load.x, paused.load.y);
+      const restored = await state(page);
+      assert.equal(restored.metal, before.metal);
+      assert.equal(restored.active, false);
+      assert.ok(restored.actions.every(Boolean));
+      await page.screenshot({ path: 'test-results/v02-' + name + '.png' });
+      assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+  });
+}
