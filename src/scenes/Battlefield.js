@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { drawTerrain, drawResources } from '../rendering/terrain.js';
 import { worldPoint, zoomAtPoint, getTouchPointers as activeTouchPointers } from '../engine/cameraInput.js';
+import { installHighDpiText, logicalPointer } from '../engine/hiDpi.js';
 import { sidebarLayout } from '../ui/sidebarLayout.js';
 import { installBattlefieldInput } from '../input/battlefieldInput.js';
 import { PerformanceMonitor, debugScenario } from '../debug/performance.js';
@@ -53,9 +54,11 @@ export class Battlefield extends Phaser.Scene {
   }
 
   create() {
+    this.renderDensity = this.game.scale.zoom ? 1 / this.game.scale.zoom : 1;
+    installHighDpiText(this, this.renderDensity);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
     this.updateZoomLimits();
-    this.cameras.main.setZoom(Math.max(this.isTouchDevice() ? 0.8 : 1, this.minZoom));
+    this.cameras.main.setZoom(Math.max((this.isTouchDevice() ? 0.8 : 1) * this.renderDensity, this.minZoom));
 
     this.worldLayer = this.add.graphics();
     this.resourceLayer = this.add.graphics();
@@ -93,7 +96,8 @@ export class Battlefield extends Phaser.Scene {
     this.scale.on('resize', () => {
       this.updateZoomLimits();
       const { width, height } = this.uiSize();
-      this.uiCamera?.setViewport(0, 0, width, height).setSize(width, height);
+      this.uiCamera?.setViewport(0, 0, width * this.renderDensity, height * this.renderDensity)
+        .setSize(width * this.renderDensity, height * this.renderDensity);
       if (this.placement.active) this.previewScreenAnchor = this.defaultPlacementScreenAnchor();
       this.layoutUi();
     });
@@ -259,8 +263,8 @@ export class Battlefield extends Phaser.Scene {
 
   setupUiCamera() {
     const { width, height } = this.uiSize();
-    this.uiCamera = this.cameras.add(0, 0, width, height);
-    this.uiCamera.setScroll(0, 0).setZoom(1);
+    this.uiCamera = this.cameras.add(0, 0, width * this.renderDensity, height * this.renderDensity);
+    this.uiCamera.setScroll(0, 0).setZoom(this.renderDensity);
     const hudObjects = [
       this.hud,
       ...Object.values(this.hudText),
@@ -291,8 +295,8 @@ export class Battlefield extends Phaser.Scene {
 
   uiSize() {
     return {
-      width: this.scale.gameSize?.width ?? this.scale.width,
-      height: this.scale.gameSize?.height ?? this.scale.height
+      width: (this.scale.gameSize?.width ?? this.scale.width) / this.renderDensity,
+      height: (this.scale.gameSize?.height ?? this.scale.height) / this.renderDensity
     };
   }
 
@@ -511,7 +515,7 @@ export class Battlefield extends Phaser.Scene {
       this.cancelPlacement();
       this.mobilePanelOpen = false;
       this.isPaused = false;
-      this.cameras.main.setZoom(Math.max(this.minZoom, Math.min(1.5, loaded.data.camera.zoom)));
+      this.cameras.main.setZoom(Math.max(this.minZoom, Math.min(1.5 * this.renderDensity, loaded.data.camera.zoom)));
       this.cameras.main.setScroll(loaded.data.camera.scrollX, loaded.data.camera.scrollY);
       this.nextAutosaveTime = restored.time + 60;
       this.message = 'Skirmish loaded.';
@@ -621,7 +625,8 @@ export class Battlefield extends Phaser.Scene {
   updateZoomLimits() {
     // Keep the viewport no larger than the world, otherwise camera bounds
     // force the view to the exact middle when zooming out.
-    this.minZoom = Math.max(0.55, this.scale.width / WORLD.width, this.scale.height / WORLD.height);
+    this.minZoom = Math.max(0.55 * this.renderDensity, this.scale.width / WORLD.width,
+      this.scale.height / WORLD.height);
   }
 
   createUnits() {
@@ -775,7 +780,7 @@ export class Battlefield extends Phaser.Scene {
       return;
     }
     const anchor = this.previewScreenAnchor ?? this.defaultPlacementScreenAnchor();
-    this.updateBuildPreview(this.cameras.main.getWorldPoint(anchor.x, anchor.y));
+    this.updateBuildPreview(this.cameras.main.getWorldPoint(anchor.x * this.renderDensity, anchor.y * this.renderDensity));
   }
 
   updateBuildPreview(world) {
@@ -838,15 +843,16 @@ export class Battlefield extends Phaser.Scene {
     this.produceSelected(type);
   }
 
-  toWorld(pointer) { return worldPoint(this.cameras.main, pointer); }
+  toWorld(pointer) { return worldPoint(this.cameras.main, pointer, this.renderDensity); }
   isTouchPointer(pointer) {
     return isTouchGesturePointer(pointer, this.isTouchDevice());
   }
   getTouchPointers() {
-    return activeTouchPointers(this.input, (pointer) => this.isTouchPointer(pointer));
+    return activeTouchPointers(this.input, (pointer) => this.isTouchPointer(pointer))
+      .map(pointer => logicalPointer(pointer, this.renderDensity));
   }
   zoomAt(screenX, screenY, zoom) {
-    zoomAtPoint(this.cameras.main, screenX, screenY, zoom);
+    zoomAtPoint(this.cameras.main, screenX * this.renderDensity, screenY * this.renderDensity, zoom);
   }
   getUnit(id) { return this.units.find((unit) => unit.id === id); }
 
@@ -895,7 +901,7 @@ export class Battlefield extends Phaser.Scene {
     const horizontal = Number(this.cameraKeys.right.isDown || this.cameraKeys.d.isDown) - Number(this.cameraKeys.left.isDown || this.cameraKeys.a.isDown);
     const vertical = Number(this.cameraKeys.down.isDown || this.cameraKeys.s.isDown) - Number(this.cameraKeys.up.isDown || this.cameraKeys.w.isDown);
     if (horizontal === 0 && vertical === 0) return;
-    const speed = 720 * dt / this.cameras.main.zoom;
+    const speed = 720 * dt * this.renderDensity / this.cameras.main.zoom;
     this.cameras.main.scrollX += horizontal * speed;
     this.cameras.main.scrollY += vertical * speed;
   }
