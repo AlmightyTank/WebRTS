@@ -26,8 +26,7 @@ The default density is the smaller of the device's pixel ratio and 2.5×, furthe
 restricted to approximately 2.6 million backing pixels. A typical 390×844 CSS
 phone with DPR 3 now uses a 975×2110 canvas (2.5×), giving text and vector outlines
 more detail without exceeding the pixel budget. On larger screens density is
-reduced automatically; a higher multiplier costs GPU fill rate and battery. Large desktop screens may use a smaller density to avoid
-GPU fill-rate spikes.
+reduced automatically; a higher multiplier costs GPU fill rate and battery.
 
 The density is chosen at startup; phone orientation changes are handled by a
 ResizeObserver and Phaser ScaleManager, without changing the scale mid-session.
