@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { renderDensity, gamePixels, logicalPointer, textFontSize, installHighDpiText } from './hiDpi.js';
 
 test('render density is capped for high-DPI phones and large displays', () => {
-  assert.equal(renderDensity(390, 844, 3), 2);
+  assert.equal(renderDensity(390, 844, 3), 2.5);
+  assert.equal(renderDensity(390, 844, 2), 2);
+  assert.equal(renderDensity(360, 640, 3), 2.5);
+  assert.ok(renderDensity(430, 932, 3) <= 2.5);
+  const constrained = renderDensity(1000, 1000, 3);
+  assert.ok(1000 * 1000 * constrained ** 2 <= 2600000, 'density respects GPU pixel cap');
   assert.equal(renderDensity(390, 844, 1), 1);
   assert.ok(renderDensity(1920, 1080, 3) < 1.2);
   assert.equal(renderDensity(0, 844, 3), 1);
