@@ -50,7 +50,9 @@ Target performance numbers are **acceptance goals**, not measured claims. Establ
 
 ### v0.2 — Engine, data and repository foundation
 
-**Progress:** Slice A — repository hygiene, exact dependency lock, local/VPS setup guide and regression coverage (complete when CI is green).
+**Progress:** Slices A–H implemented on the v0.2 release branch: repository hygiene, engine extraction, versioned contracts, deterministic hashes, local saves, content registries, diagnostics and desktop/mobile/tablet playtests. Mark release complete after both CI jobs pass on main.
+
+[Read the v0.2 engine foundation notes](V0.2-ENGINE-FOUNDATION-RELEASE.md).
 
 - **Slice A:** Repository hygiene: remove tracked node_modules/build outputs, add .gitignore, lock dependency versions and document boot/deploy.
 - **Slice B:** Separate app shell, scene renderer, camera/input adapter, HUD, simulation and content registries without changing behavior.
