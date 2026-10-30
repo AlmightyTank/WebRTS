@@ -41,7 +41,8 @@ test('same seed and identical commands produce matching tick state hashes', () =
     assert.equal(a.getStateHash(), b.getStateHash(), 'tick ' + i);
   }
   assert.equal(a.commandJournal[0].tick, 1);
-  assert.equal(a.commandJournal[1].tick, 13);
+  assert.equal(a.commandJournal.find(entry =>
+    entry.command.type === 'build' && entry.command.playerId === 0).tick, 13);
 });
 
 test('accepted commands are immutable snapshots in queue and journal', () => {
