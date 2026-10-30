@@ -59,7 +59,10 @@ export class Battlefield extends Phaser.Scene {
     installHighDpiText(this, this.renderDensity);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
     this.updateZoomLimits();
-    this.cameras.main.setZoom(Math.max((this.isTouchDevice() ? 0.8 : 1) * this.renderDensity, this.minZoom));
+    // Native-size world pixels at startup: the former 0.8x mobile camera
+    // downsampled units and buildings even when the backing canvas was sharp.
+    // Players can still pinch to zoom out or in after starting.
+    this.cameras.main.setZoom(Math.max(this.renderDensity, this.minZoom));
 
     this.worldLayer = this.add.graphics();
     this.resourceLayer = this.add.graphics();
