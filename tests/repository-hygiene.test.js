@@ -13,12 +13,12 @@ test('locked direct dependencies match the manifest exactly', () => {
   assert.deepEqual(lock.packages[''].devDependencies, pkg.devDependencies);
   assert.deepEqual(lock.packages[''].engines, pkg.engines);
   for (const [name, version] of Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })) {
-    assert.match(version, /^\\d+\\.\\d+\\.\\d+$/, name + ' should have an exact version');
+    assert.match(version, /^\d+\.\d+\.\d+$/, name + ' should have an exact version');
     assert.equal(lock.packages['node_modules/' + name]?.version, version);
   }
 });
 
-test('local dependencies, build outputs and environment files are ignored', () => {
+test('dependencies, builds and local environment files are ignored', () => {
   for (const file of [
     'node_modules/.cache/example.js', 'dist/assets/game.js', 'build/index.html',
     'coverage/report.html', 'test-results/screenshot.png', '.env.local'
@@ -26,16 +26,18 @@ test('local dependencies, build outputs and environment files are ignored', () =
     const output = execFileSync('git', ['check-ignore', '--no-index', file], { encoding: 'utf8' }).trim();
     assert.equal(output, file, file + ' must be ignored');
   }
-  assert.match(ignore, /^!\\.env\\.example$/m);
+  assert.match(ignore, /^!\.env\.example$/m);
 });
 
-test('tracked repository content excludes generated directories and secrets', () => {
+test('tracked files exclude generated directories and secrets', () => {
   const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
-    .split('\\0').filter(Boolean);
+    .split('\0').filter(Boolean);
   assert.ok(tracked.includes('package-lock.json'), 'committed lockfile required');
   assert.ok(tracked.includes('.gitignore'), 'committed ignore rules required');
+  const generated = ['node_modules/', 'dist/', 'build/', 'coverage/',
+    'test-results/', 'playwright-report/'];
   const unwanted = tracked.filter(path =>
-    /^(?:node_modules|dist|build|coverage|test-results|playwright-report)\\//.test(path)
-    || /^(?:\\.env|npm-debug\\.log)/.test(path));
+    generated.some(prefix => path.startsWith(prefix)) ||
+    path === '.env' || path.startsWith('.env.') || path.startsWith('npm-debug.log'));
   assert.deepEqual(unwanted, [], 'generated files must not be committed');
 });
