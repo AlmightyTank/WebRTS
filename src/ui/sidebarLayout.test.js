@@ -12,6 +12,6 @@ for (const [width, height, touch] of [
     assert.ok(layout.width >= 140 && layout.width <= 208);
     assert.ok(layout.mapX >= layout.left && layout.mapX + layout.mapWidth <= width);
     assert.ok(layout.cardsTop > layout.buildingsY);
-    assert.ok(layout.sections.units !== undefined);
+    assert.ok(layout.sections.infantry !== undefined);
   });
 }
