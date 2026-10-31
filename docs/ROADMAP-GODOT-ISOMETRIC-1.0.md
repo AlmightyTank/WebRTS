@@ -18,7 +18,7 @@
 - [x] **A:** Godot project and initial procedural isometric battlefield foundation (committed; runtime verification outstanding).
 - [x] **B:** Procedurally generated PNG-compatible terrain atlas and TileMapLayer (committed; runtime validation and artist-authored PNG import pending).
 - [x] **C:** Terrain blending and transitions (procedural feathered overlay committed; Godot runtime verification pending).
-- [ ] **D:** Camera pan, zoom, bounds and desktop/mobile behavior.
+- [x] **D:** Smooth camera pan, cursor zoom, map bounds, edge scrolling, desktop drag and mobile pan/pinch (implemented; Godot runtime verification pending).
 - [ ] **E:** Y-sorting and sprite depth rules.
 - [ ] **F:** Terrain decorations and collision obstacles.
 - [ ] **G:** Map serialization, loading and editor workflow.
