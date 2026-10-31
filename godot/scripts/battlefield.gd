@@ -11,10 +11,12 @@ const TILE_COLORS := [
 var camera: Camera2D
 var terrain: TileMapLayer
 var transitions: TileMapLayer
+var actors: Node2D
 const COMMAND_CENTER_SCENE: PackedScene = preload("res://scenes/buildings/command_center.tscn")
 
 func _ready() -> void:
 	_build_terrain()
+	_create_actor_layer()
 	_spawn_initial_command_center()
 	camera = Camera2D.new()
 	camera.set_script(preload("res://scripts/rts_camera.gd"))
@@ -26,10 +28,18 @@ func _ready() -> void:
 	var vertical_extent := float(WIDTH + HEIGHT) * TILE_H * 0.5
 	camera.call("configure", Rect2(-horizontal_extent, -TILE_H * 0.5, horizontal_extent * 2.0, vertical_extent + TILE_H), tile_to_world(Vector2i(WIDTH / 2, HEIGHT / 2)))
 
+func _create_actor_layer() -> void:
+	# All world actors share one Y-sorted parent. Ground layers remain behind.
+	actors = Node2D.new()
+	actors.name = "WorldActors"
+	actors.y_sort_enabled = true
+	actors.z_index = 1
+	add_child(actors)
+
 func _spawn_initial_command_center() -> void:
 	# Initial static headquarters preview; interactive placement is scheduled for v0.3.
 	var headquarters := COMMAND_CENTER_SCENE.instantiate()
-	add_child(headquarters)
+	actors.add_child(headquarters)
 	headquarters.place_on_grid(terrain, Vector2i(WIDTH / 2, HEIGHT / 2))
 
 func _make_atlas_image() -> Image:
