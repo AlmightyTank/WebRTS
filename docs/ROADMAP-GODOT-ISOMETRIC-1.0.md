@@ -16,7 +16,7 @@
 
 ## v0.1 — Isometric Engine Foundation (8 slices)
 - [x] **A:** Godot project and initial procedural isometric battlefield foundation (committed; runtime verification outstanding).
-- [ ] **B:** PNG terrain atlas and TileMapLayer.
+- [x] **B:** Procedurally generated PNG-compatible terrain atlas and TileMapLayer (committed; runtime validation and artist-authored PNG import pending).
 - [ ] **C:** Terrain blending and transitions.
 - [ ] **D:** Camera pan, zoom, bounds and desktop/mobile behavior.
 - [ ] **E:** Y-sorting and sprite depth rules.
