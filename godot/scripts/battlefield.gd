@@ -11,15 +11,23 @@ const TILE_COLORS := [
 var camera: Camera2D
 var terrain: TileMapLayer
 var dragging := false
+const COMMAND_CENTER_SCENE: PackedScene = preload("res://scenes/buildings/command_center.tscn")
 
 func _ready() -> void:
 	_build_terrain()
+	_spawn_initial_command_center()
 	camera = Camera2D.new()
 	camera.name = "RTSCamera"
 	add_child(camera)
 	camera.enabled = true
 	camera.position = tile_to_world(Vector2i(WIDTH / 2, HEIGHT / 2))
 	camera.zoom = Vector2(0.75, 0.75)
+
+func _spawn_initial_command_center() -> void:
+	# Initial static headquarters preview; interactive placement is scheduled for v0.3.
+	var headquarters := COMMAND_CENTER_SCENE.instantiate()
+	add_child(headquarters)
+	headquarters.place_on_grid(terrain, Vector2i(WIDTH / 2, HEIGHT / 2))
 
 func _make_atlas_image() -> Image:
 	var atlas := Image.create(TILE_W * 3, TILE_H * 2, false, Image.FORMAT_RGBA8)
