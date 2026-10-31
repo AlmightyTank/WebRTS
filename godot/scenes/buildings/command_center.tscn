@@ -4,7 +4,6 @@
 [ext_resource type="Texture2D" path="res://assets/buildings/command_center.svg" id="2"]
 
 [node name="CommandCenter" type="Node2D"]
-z_index = 2
 script = ExtResource("1")
 
 [node name="BuildingSprite" type="Sprite2D" parent="."]
