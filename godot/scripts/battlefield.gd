@@ -11,18 +11,20 @@ const TILE_COLORS := [
 var camera: Camera2D
 var terrain: TileMapLayer
 var transitions: TileMapLayer
-var dragging := false
 const COMMAND_CENTER_SCENE: PackedScene = preload("res://scenes/buildings/command_center.tscn")
 
 func _ready() -> void:
 	_build_terrain()
 	_spawn_initial_command_center()
 	camera = Camera2D.new()
+	camera.set_script(preload("res://scripts/rts_camera.gd"))
 	camera.name = "RTSCamera"
 	add_child(camera)
 	camera.enabled = true
-	camera.position = tile_to_world(Vector2i(WIDTH / 2, HEIGHT / 2))
-	camera.zoom = Vector2(0.75, 0.75)
+	# Diamond map bounds from the four extreme tile corners.
+	var horizontal_extent := float(WIDTH + HEIGHT) * TILE_W * 0.25
+	var vertical_extent := float(WIDTH + HEIGHT) * TILE_H * 0.5
+	camera.configure(Rect2(-horizontal_extent, -TILE_H * 0.5, horizontal_extent * 2.0, vertical_extent + TILE_H), tile_to_world(Vector2i(WIDTH / 2, HEIGHT / 2)))
 
 func _spawn_initial_command_center() -> void:
 	# Initial static headquarters preview; interactive placement is scheduled for v0.3.
@@ -139,41 +141,3 @@ func terrain_kind(x: int, y: int) -> int:
 		return 3 if (x + y) % 7 == 0 else 2
 	return posmod(x * 13 + y * 7 + x * y, 4) if (x + y) % 11 == 0 else posmod(x * 3 + y * 5, 3)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
-			dragging = event.pressed
-		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			set_zoom(camera.zoom.x * 1.12)
-		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			set_zoom(camera.zoom.x / 1.12)
-	elif event is InputEventMouseMotion and dragging:
-		camera.position -= event.relative / camera.zoom
-		clamp_camera()
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		dragging = false
-
-func set_zoom(value: float) -> void:
-	var z: float = clampf(value, 0.4, 2.0)
-	camera.zoom = Vector2(z, z)
-	clamp_camera()
-
-func clamp_camera() -> void:
-	var max_x := WIDTH * TILE_W * 0.5
-	var max_y := HEIGHT * TILE_H
-	camera.position.x = clampf(camera.position.x, -max_x, max_x)
-	camera.position.y = clampf(camera.position.y, 0.0, max_y)
-
-func _process(delta: float) -> void:
-	var movement := Vector2.ZERO
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		movement.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		movement.x += 1.0
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		movement.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		movement.y += 1.0
-	if movement != Vector2.ZERO:
-		camera.position += movement.normalized() * 700.0 * delta / camera.zoom.x
-		clamp_camera()
