@@ -26,7 +26,7 @@ func _make_atlas_image() -> Image:
 	atlas.fill(Color.TRANSPARENT)
 	for index in range(TILE_COLORS.size()):
 		var ox: int = (index % 3) * TILE_W
-		var oy: int = (index / 3) * TILE_H
+		var oy: int = floori(float(index) / 3.0) * TILE_H
 		for y in range(TILE_H):
 			for x in range(TILE_W):
 				var normalized: float = absf(float(x) - TILE_W * 0.5) / (TILE_W * 0.5) + absf(float(y) - TILE_H * 0.5) / (TILE_H * 0.5)
@@ -46,13 +46,13 @@ func _build_terrain() -> void:
 	source.texture = ImageTexture.create_from_image(atlas_image)
 	source.texture_region_size = Vector2i(TILE_W, TILE_H)
 	for index in range(TILE_COLORS.size()):
-		source.create_tile(Vector2i(index % 3, index / 3))
+		source.create_tile(Vector2i(index % 3, floori(float(index) / 3.0)))
 	tileset.add_source(source, 0)
 	terrain.tile_set = tileset
 	for y in range(HEIGHT):
 		for x in range(WIDTH):
 			var index := terrain_kind(x, y)
-			terrain.set_cell(Vector2i(x, y), 0, Vector2i(index % 3, index / 3))
+			terrain.set_cell(Vector2i(x, y), 0, Vector2i(index % 3, floori(float(index) / 3.0)))
 	# Generated image can be exported as PNG for artists to replace.
 	# The game uses the in-memory atlas, so packaged builds do not write files.
 
