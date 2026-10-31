@@ -19,7 +19,7 @@
 - [x] **B:** Procedurally generated PNG-compatible terrain atlas and TileMapLayer (committed; runtime validation and artist-authored PNG import pending).
 - [x] **C:** Terrain blending and transitions (procedural feathered overlay committed; Godot runtime verification pending).
 - [x] **D:** Smooth camera pan, cursor zoom, map bounds, edge scrolling, desktop drag and mobile pan/pinch (implemented; Godot runtime verification pending).
-- [ ] **E:** Y-sorting and sprite depth rules.
+- [x] **E:** Shared Y-sorted world actor layer and foot-anchor depth rules (implemented; Godot runtime verification pending).
 - [ ] **F:** Terrain decorations and collision obstacles.
 - [ ] **G:** Map serialization, loading and editor workflow.
 - [ ] **H:** Performance profiling, automated checks and Godot runtime validation.
