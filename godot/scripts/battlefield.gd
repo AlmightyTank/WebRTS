@@ -24,7 +24,7 @@ func _ready() -> void:
 	# Diamond map bounds from the four extreme tile corners.
 	var horizontal_extent := float(WIDTH + HEIGHT) * TILE_W * 0.25
 	var vertical_extent := float(WIDTH + HEIGHT) * TILE_H * 0.5
-	camera.configure(Rect2(-horizontal_extent, -TILE_H * 0.5, horizontal_extent * 2.0, vertical_extent + TILE_H), tile_to_world(Vector2i(WIDTH / 2, HEIGHT / 2)))
+	camera.call("configure", Rect2(-horizontal_extent, -TILE_H * 0.5, horizontal_extent * 2.0, vertical_extent + TILE_H), tile_to_world(Vector2i(WIDTH / 2, HEIGHT / 2)))
 
 func _spawn_initial_command_center() -> void:
 	# Initial static headquarters preview; interactive placement is scheduled for v0.3.
