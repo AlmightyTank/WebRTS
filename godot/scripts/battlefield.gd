@@ -61,6 +61,8 @@ func _build_terrain() -> void:
 	for y in range(HEIGHT):
 		for x in range(WIDTH):
 			var index := terrain_kind(x, y)
+			if index == 2 or index == 3 or index == 4:
+				index = posmod(x * 3 + y * 5, 2)
 			terrain.set_cell(Vector2i(x, y), 0, Vector2i(index % 3, floori(float(index) / 3.0)))
 	_build_transitions()
 	# Generated image can be exported as PNG for artists to replace.
