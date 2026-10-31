@@ -1,24 +1,14 @@
-# Meridian Warfront — Godot 2D isometric prototype
-
-Slice A is a standalone Godot 4 project in this folder. It does not replace the existing Phaser/WebRTS game.
+# Meridian Warfront — Godot 4 Isometric Prototype
 
 ## Run
 1. Install Godot 4.x.
-2. Import this folder by selecting `godot/project.godot` in the Project Manager.
-3. Press F6 in the battlefield scene or F5 to run the project.
+2. Import `godot/project.godot` in Godot Project Manager.
+3. Press F5.
 
-## Controls
-- WASD / arrow keys: pan
-- Right- or middle-mouse drag: pan
-- Mouse wheel: zoom
-
-## Implementation
-- 64×64 diamond grid with 128×64 logical tile dimensions.
-- Procedurally colored terrain is intentionally placeholder artwork; future slices replace it with transparent PNG atlas tiles and a TileMapLayer.
-- Deterministic dirt, grass, road, and concrete patches.
-- Isometric tile/world coordinate helpers.
-- Camera clamping and zoom.
-- Buildings, Y-sort actors, touch input, and construction belong to subsequent slices.
-
-## Caveat
-Godot runtime validation has not yet been performed in CI.
+## Slice B
+- Uses Godot 4 `TileMapLayer` and an isometric `TileSet` with 128×64 tile cells.
+- Builds a six-tile transparent RGBA atlas in memory at startup (grass variants, dirt, concrete/road).
+- Terrain uses a 64×64 tile map with deterministic variation.
+- Atlas can be exported as PNG or replaced with artist-authored PNG in a later art pass; no binary PNG file is committed yet.
+- Camera: WASD/arrows to pan, right/middle drag to pan, wheel to zoom.
+- The battlefield has not yet been verified in a Godot runtime or CI. Terrain transitions, actor Y-sorting and mobile touch input remain future slices.
