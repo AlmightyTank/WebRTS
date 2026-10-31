@@ -12,12 +12,15 @@ var camera: Camera2D
 var terrain: TileMapLayer
 var transitions: TileMapLayer
 var actors: Node2D
+var blocked_cells: Dictionary = {}
+const OBSTACLE_SCRIPT := preload("res://scripts/terrain_obstacle.gd")
 const COMMAND_CENTER_SCENE: PackedScene = preload("res://scenes/buildings/command_center.tscn")
 
 func _ready() -> void:
 	_build_terrain()
 	_create_actor_layer()
 	_spawn_initial_command_center()
+	_spawn_terrain_obstacles()
 	camera = Camera2D.new()
 	camera.set_script(preload("res://scripts/rts_camera.gd"))
 	camera.name = "RTSCamera"
@@ -35,6 +38,33 @@ func _create_actor_layer() -> void:
 	actors.y_sort_enabled = true
 	actors.z_index = 1
 	add_child(actors)
+
+func _spawn_terrain_obstacles() -> void:
+	# Deterministic sparse decoration; avoid the initial HQ and paved road.
+	for y in range(2, HEIGHT - 2):
+		for x in range(2, WIDTH - 2):
+			var cell := Vector2i(x, y)
+			if abs(x - WIDTH / 2) <= 3 and abs(y - HEIGHT / 2) <= 3:
+				continue
+			if terrain_kind(x, y) == 4:
+				continue
+			var hash_value: int = posmod(x * 73856093 ^ y * 19349663, 997)
+			if hash_value >= 22:
+				continue
+			var obstacle := Node2D.new()
+			obstacle.set_script(OBSTACLE_SCRIPT)
+			obstacle.name = "Obstacle_%d_%d" % [x, y]
+			actors.add_child(obstacle)
+			obstacle.call("configure", hash_value % 3, cell, tile_to_world(cell))
+			blocked_cells[cell] = true
+
+func is_cell_blocked(cell: Vector2i) -> bool:
+	if cell.x < 0 or cell.y < 0 or cell.x >= WIDTH or cell.y >= HEIGHT:
+		return true
+	if blocked_cells.has(cell):
+		return true
+	# Reserve the headquarters footprint for future navigation/placement.
+	return abs(cell.x - WIDTH / 2) <= 1 and abs(cell.y - HEIGHT / 2) <= 1
 
 func _spawn_initial_command_center() -> void:
 	# Initial static headquarters preview; interactive placement is scheduled for v0.3.
