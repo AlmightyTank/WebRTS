@@ -20,7 +20,7 @@
 - [x] **C:** Terrain blending and transitions (procedural feathered overlay committed; Godot runtime verification pending).
 - [x] **D:** Smooth camera pan, cursor zoom, map bounds, edge scrolling, desktop drag and mobile pan/pinch (implemented; Godot runtime verification pending).
 - [x] **E:** Shared Y-sorted world actor layer and foot-anchor depth rules (implemented; Godot runtime verification pending).
-- [ ] **F:** Terrain decorations and collision obstacles.
+- [x] **F:** Deterministic tree, rock and debris decorations with grid occupancy queries (committed; runtime verification pending).
 - [ ] **G:** Map serialization, loading and editor workflow.
 - [ ] **H:** Performance profiling, automated checks and Godot runtime validation.
 
