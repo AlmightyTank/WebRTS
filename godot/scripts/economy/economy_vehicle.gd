@@ -25,6 +25,7 @@ var state := "IDLE"
 var mine_timer := 0.0
 var deposits := 0
 var purchase_cost := 0.0
+var resume_harvest_on_arrival := false
 
 func configure(world, data: Dictionary, side: int, pos: Vector2, harvester: bool) -> void:
  arena=world
@@ -52,11 +53,18 @@ func order_stop() -> void:
  route.clear()
 
 func order_move(point: Vector2, _attack_move: bool=false) -> void:
+ resume_harvest_on_arrival=false
  working=false
  state="MOVE"
  _route_to(point)
 
+func order_rally(point: Vector2) -> void:
+ var automatic=unit_id in ["a_harvester","r_hauler"]
+ order_move(point)
+ resume_harvest_on_arrival=automatic
+
 func set_harvest() -> void:
+ resume_harvest_on_arrival=false
  working=true
  state="SEEK"
  moving=false
@@ -110,14 +118,18 @@ func _physics_process(delta: float) -> void:
 func _step(delta: float) -> void:
  if route_index>=route.size():
   moving=false
-  if state=="MOVE": state="IDLE"
+  if state=="MOVE":
+   if resume_harvest_on_arrival: set_harvest()
+   else: state="IDLE"
   return
  var waypoint: Vector2=route[route_index]
  if position.distance_to(waypoint)<12.0:
   route_index+=1
   if route_index>=route.size():
    moving=false
-   if state=="MOVE": state="IDLE"
+   if state=="MOVE":
+    if resume_harvest_on_arrival: set_harvest()
+    else: state="IDLE"
    return
   waypoint=route[route_index]
  var direction=(waypoint-position).normalized()

@@ -36,6 +36,11 @@ var sell_button: Button
 var refund_button: Button
 var cancel_queue_button: Button
 var sale_confirm_deadline := 0.0
+var active_producers: Array = []
+var rally_placing := false
+var rally_source = null
+var activate_producer_button: Button
+var rally_button: Button
 
 func _ready() -> void:
  super._ready()
@@ -61,6 +66,9 @@ func reset_battle() -> void:
  selected_building=null
  pending_sale=null
  sale_confirm_deadline=0.0
+ rally_placing=false
+ rally_source=null
+ active_producers=[{"infantry":null,"vehicle":null},{"infantry":null,"vehicle":null}]
  states=[_new_state(),_new_state()]
  ore_fields=[
   {"position":Vector2(630,330),"remaining":7200.0,"initial":7200.0},
@@ -148,6 +156,9 @@ func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-
  b.paid_value=0.0 if id=="relay" or (id=="yard" and paid_value<0.0) else (float(STRUCTURE_DATA[id]["cost"]) if paid_value<0.0 else paid_value)
  b.destroyed.connect(_building_destroyed)
  structures.append(b)
+ if side>=0 and id in ["barracks","factory"]:
+  b.rally_point=clamp_point(point+Vector2(0,240 if side==0 else -240))
+  _set_active_producer(side,"infantry" if id=="barracks" else "vehicle",b)
  _rebuild_navigation()
  if side>=0: _calculate_power(side)
  if id=="refinery":
@@ -171,6 +182,12 @@ func _find_open_position(point: Vector2, radius: float) -> Vector2:
 
 func _building_destroyed(building) -> void:
  if selected_building==building: selected_building=null
+ if rally_source==building:
+  rally_source=null
+  rally_placing=false
+ for side in range(active_producers.size()):
+  for lane in ["infantry","vehicle"]:
+   if active_producers[side][lane]==building: active_producers[side][lane]=null
  if pending_sale==building: pending_sale=null
  structures.erase(building)
  _rebuild_navigation()
@@ -242,6 +259,81 @@ func has_structure(side: int, id: String) -> bool:
  for b in structures:
   if is_instance_valid(b) and b.hp>0 and b.team==side and b.kind==id: return true
  return false
+
+# The active producer chooses the physical exit; all factories still boost one shared lane.
+func _set_active_producer(side: int, lane: String, b) -> bool:
+ if side<0 or side>=active_producers.size() or lane not in ["infantry","vehicle"]: return false
+ var kind="barracks" if lane=="infantry" else "factory"
+ if b==null or not is_instance_valid(b) or not structures.has(b) or b.hp<=0.0 or b.team!=side or b.kind!=kind: return false
+ active_producers[side][lane]=b
+ queue_redraw()
+ return true
+
+func _active_producer(side: int, lane: String):
+ if side<0 or side>=active_producers.size() or lane not in ["infantry","vehicle"]: return null
+ var kind="barracks" if lane=="infantry" else "factory"
+ var b=active_producers[side][lane]
+ if b!=null and is_instance_valid(b) and structures.has(b) and b.hp>0.0 and b.team==side and b.kind==kind: return b
+ active_producers[side][lane]=null
+ for i in range(structures.size()-1,-1,-1):
+  b=structures[i]
+  if is_instance_valid(b) and b.hp>0.0 and b.team==side and b.kind==kind:
+   active_producers[side][lane]=b
+   return b
+ return null
+
+func set_producer_rally(side: int, lane: String, target: Vector2) -> bool:
+ var b=_active_producer(side,lane)
+ if b==null: return false
+ var point=clamp_point(target)
+ var cell=world_cell(point)
+ if navigation.is_point_solid(cell):
+  cell=_nearby_open_cell(cell)
+  if navigation.is_point_solid(cell): return false
+  point=cell_center(cell)
+ b.rally_point=point
+ b.rally_custom=true
+ queue_redraw()
+ return true
+
+func _rally_candidate():
+ if selected_building!=null and is_instance_valid(selected_building) and selected_building.team==0 and selected_building.kind in ["barracks","factory"]:
+  return selected_building
+ if current_tab==2: return _active_producer(0,"infantry")
+ if current_tab==3: return _active_producer(0,"vehicle")
+ return null
+
+func _begin_rally() -> void:
+ var b=_rally_candidate()
+ if b==null:
+  hud_status="Select Barracks or War Factory to set rally."
+ else:
+  _set_active_producer(0,"infantry" if b.kind=="barracks" else "vehicle",b)
+  rally_source=b
+  rally_placing=true
+  placement_lane=""
+  hud_status="Click/tap a destination for this producer. Esc/right-click cancels."
+ _update_hud()
+
+func _set_rally_at(point: Vector2) -> bool:
+ if not rally_placing or rally_source==null or not is_instance_valid(rally_source): return false
+ var b=rally_source
+ var lane="infantry" if b.kind=="barracks" else "vehicle"
+ if not _set_active_producer(0,lane,b): return false
+ if not set_producer_rally(0,lane,point): return false
+ rally_placing=false
+ rally_source=null
+ hud_status="Rally point updated; new units will automatically move there."
+ _update_hud()
+ return true
+
+func _activate_selected_producer() -> void:
+ var b=selected_building
+ if b!=null and is_instance_valid(b) and b.kind in ["barracks","factory"] and _set_active_producer(0,"infantry" if b.kind=="barracks" else "vehicle",b):
+  hud_status="Active producer changed; existing rally point retained."
+ else:
+  hud_status="Select a friendly Barracks or War Factory first."
+ _update_hud()
 
 func _has_producer(side: int, lane: String) -> bool:
  if lane in ["build","defense"]: return has_structure(side,"yard")
@@ -347,6 +439,9 @@ func capture_structure(engineer, b) -> bool:
  if engineer.unit_id not in ["a_engineer","r_engineer"] or engineer.team==b.team: return false
  var old_owner: int=b.team
  b.team=engineer.team
+ if b.kind in ["barracks","factory"]:
+  b.rally_point=clamp_point(b.position+Vector2(0,240 if b.team==0 else -240))
+  _set_active_producer(b.team,"infantry" if b.kind=="barracks" else "vehicle",b)
  b.name=("Alliance" if b.team==0 else "Republic")+"_"+b.kind
  b.repairing=false
  b.selected=false
@@ -406,21 +501,26 @@ func _tick_production(side: int, delta: float) -> void:
     if _produce_unit(side,str(job["id"])): lanes[lane]={}
 
 func _produce_unit(side: int, id: String) -> bool:
- var producer="barracks" if id in ["a_ranger","a_javelin","r_line","r_hunter","a_engineer","r_engineer"] else "factory"
- for b in structures:
-  if is_instance_valid(b) and b.team==side and b.kind==producer:
-   var offset=Vector2(0,125) if side==0 else Vector2(0,-125)
-   var where=_find_open_position(b.position+offset,20.0)
-   if where==Vector2.ZERO: return false
-   if id in ["a_harvester","r_hauler","a_mcv","r_mcv"]:
-    var vehicle=_spawn_economy(id,side,where,id in ["a_harvester","r_hauler"])
-    if vehicle!=null and id in ["a_mcv","r_mcv"]: vehicle.purchase_cost=float(_recipe(id)["cost"])
-   elif id in ["a_engineer","r_engineer"]:
-    _spawn_engineer(id,side,where)
-   else:
-    _spawn(id,side,where)
-   return true
- return false
+ var lane="infantry" if id in ["a_ranger","a_javelin","r_line","r_hunter","a_engineer","r_engineer"] else "vehicle"
+ var producer=_active_producer(side,lane)
+ if producer==null: return false
+ # A blocked active exit stalls READY production, never secretly uses another factory.
+ var offset=Vector2(0,125) if side==0 else Vector2(0,-125)
+ var where=_find_open_position(producer.position+offset,20.0)
+ if where==Vector2.ZERO: return false
+ var unit=null
+ if id in ["a_harvester","r_hauler","a_mcv","r_mcv"]:
+  unit=_spawn_economy(id,side,where,id in ["a_harvester","r_hauler"])
+  if unit!=null and id in ["a_mcv","r_mcv"]: unit.purchase_cost=float(_recipe(id)["cost"])
+ elif id in ["a_engineer","r_engineer"]:
+  unit=_spawn_engineer(id,side,where)
+ else:
+  unit=_spawn(id,side,where)
+ if unit==null: return false
+ if producer.rally_point!=Vector2.ZERO:
+  if unit.has_method("order_rally"): unit.order_rally(producer.rally_point)
+  elif unit.has_method("order_move"): unit.order_move(producer.rally_point)
+ return true
 
 func _spawn_engineer(id: String, side: int, where: Vector2) -> void:
  # The engineer uses the same combat-unit steering/selection, but cannot attack.
@@ -431,6 +531,7 @@ func _spawn_engineer(id: String, side: int, where: Vector2) -> void:
  u.configure(self,data,side,where,{"type":"UNARMED","damage":0.0,"interval":1.0,"range":0.0,"anti_ground":false})
  u.destroyed.connect(_on_destroyed)
  units.append(u)
+ return u
 
 func _ai_place_ready(lane: String, id: String) -> void:
  var sites=[Vector2(-235,-205),Vector2(-225,-10),Vector2(-225,190),Vector2(80,-225),Vector2(200,15),Vector2(170,195),Vector2(-400,110),Vector2(40,360),Vector2(-400,-230),Vector2(340,-250)]
@@ -553,6 +654,38 @@ func _physics_process(delta: float) -> void:
   _ai_economy()
 
 func _unhandled_input(event: InputEvent) -> void:
+ if rally_placing:
+  if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+   rally_placing=false
+   rally_source=null
+   hud_status="Rally placement canceled."
+   _update_hud()
+   get_viewport().set_input_as_handled()
+   return
+  if event is InputEventMouseButton and event.pressed:
+   if event.button_index==MOUSE_BUTTON_RIGHT:
+    rally_placing=false
+    rally_source=null
+    hud_status="Rally placement canceled."
+   elif event.button_index==MOUSE_BUTTON_LEFT:
+    _set_rally_at(get_global_mouse_position())
+   else: return
+   _update_hud()
+   get_viewport().set_input_as_handled()
+   return
+  if event is InputEventScreenTouch and event.index==0 and not event.pressed and not touch_dragged:
+   _set_rally_at(_screen_to_world(event.position))
+   get_viewport().set_input_as_handled()
+   return
+ if placement_lane=="" and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT and event.pressed:
+  if selected.is_empty() and selected_building!=null and is_instance_valid(selected_building) and selected_building.kind in ["barracks","factory"]:
+   var b=selected_building
+   var lane="infantry" if b.kind=="barracks" else "vehicle"
+   if _set_active_producer(0,lane,b) and set_producer_rally(0,lane,get_global_mouse_position()):
+    hud_status="Updated the selected producer rally."
+    _update_hud()
+    get_viewport().set_input_as_handled()
+    return
  if placement_lane=="" and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
   var picked=_hit_building(get_global_mouse_position(),0)
   _select_building(picked)
@@ -566,6 +699,10 @@ func _unhandled_input(event: InputEvent) -> void:
    get_viewport().set_input_as_handled()
    return
  if event is InputEventKey and event.pressed and not event.echo:
+  if event.keycode==KEY_G:
+   _begin_rally()
+   get_viewport().set_input_as_handled()
+   return
   if event.keycode==KEY_H:
    if _deploy_mcv(0): _update_hud()
    get_viewport().set_input_as_handled()
@@ -603,6 +740,9 @@ func _select_building(b) -> void:
   selected_building.queue_redraw()
  selected_building=b
  pending_sale=null
+ if b!=null and is_instance_valid(b) and b.team==0 and b.kind in ["barracks","factory"]:
+  _set_active_producer(0,"infantry" if b.kind=="barracks" else "vehicle",b)
+  _set_selected([])
  if b!=null and is_instance_valid(b):
   b.selected=true
   b.queue_redraw()
@@ -658,7 +798,7 @@ func _create_hud() -> void:
  var column=VBoxContainer.new()
  dock.add_child(column)
  var header=Label.new()
- header.text="CONSTRUCTION SIDEBAR"
+ header.text="CONSTRUCTION + RALLY"
  column.add_child(header)
  var tabs=HBoxContainer.new()
  column.add_child(tabs)
@@ -714,6 +854,18 @@ func _create_hud() -> void:
  sell.pressed.connect(_on_sell_selected)
  column.add_child(sell)
  sell_button=sell
+ var activate=Button.new()
+ activate.text="USE SELECTED PRODUCTION BUILDING"
+ activate.custom_minimum_size=Vector2(240,34)
+ activate.pressed.connect(_activate_selected_producer)
+ column.add_child(activate)
+ activate_producer_button=activate
+ var rally=Button.new()
+ rally.text="SET RALLY POINT (G)"
+ rally.custom_minimum_size=Vector2(240,34)
+ rally.pressed.connect(_begin_rally)
+ column.add_child(rally)
+ rally_button=rally
  var bottom=PanelContainer.new()
  bottom.anchor_top=1.0
  bottom.anchor_bottom=1.0
@@ -820,6 +972,10 @@ func _update_hud() -> void:
    details.append("%s %s %d%%" % [lane.to_upper(),str(recipe.get("name",job["id"])),percentage])
  if selected_building!=null and is_instance_valid(selected_building):
   details.append("SELECTED %s HP %d/%d %s" % [selected_building.kind,int(selected_building.hp),int(selected_building.max_hp),"REPAIRING" if selected_building.repairing else ""])
+ for lane in ["infantry","vehicle"]:
+  var b=_active_producer(0,lane)
+  if b!=null:
+   details.append("%s EXIT (%d,%d) RALLY (%d,%d)" % [lane.to_upper(),int(b.position.x),int(b.position.y),int(b.rally_point.x),int(b.rally_point.y)])
  info_text.text=" | ".join(details)+" | "+hud_status if not details.is_empty() else hud_status
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
@@ -839,10 +995,22 @@ func _update_hud() -> void:
  if is_instance_valid(cancel_queue_button): cancel_queue_button.disabled=current_tab not in [2,3] or state["queued"][["infantry","vehicle"][maxi(0,current_tab-2)]].is_empty()
  if is_instance_valid(repair_button): repair_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
  if is_instance_valid(sell_button): sell_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
+ if is_instance_valid(activate_producer_button): activate_producer_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0 or selected_building.kind not in ["barracks","factory"]
+ if is_instance_valid(rally_button):
+  rally_button.disabled=_rally_candidate()==null
+  rally_button.text="PICK RALLY ON MAP (Esc cancels)" if rally_placing else "SET RALLY POINT (G)"
  queue_redraw()
 
 func _draw() -> void:
  super._draw()
+ for lane in ["infantry","vehicle"]:
+  var b=_active_producer(0,lane)
+  if b!=null and b.rally_point!=Vector2.ZERO:
+   var marker_color=Color("#79d7ff") if lane=="infantry" else Color("#f8c878")
+   draw_line(b.position,b.rally_point,Color(marker_color,0.3),2.0)
+   draw_arc(b.rally_point,15.0,0.0,TAU,24,marker_color,2.5)
+   draw_line(b.rally_point+Vector2(-7,0),b.rally_point+Vector2(7,0),marker_color,1.5)
+   draw_line(b.rally_point+Vector2(0,-7),b.rally_point+Vector2(0,7),marker_color,1.5)
  for field in ore_fields:
   if float(field["remaining"])<=0: continue
   var amount=float(field["remaining"])/maxf(1.0,float(field["initial"]))

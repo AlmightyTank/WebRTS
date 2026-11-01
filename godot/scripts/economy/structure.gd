@@ -13,6 +13,8 @@ var footprint := Vector2(126, 106)
 var selected := false
 var repairing := false
 var paid_value := 0.0
+var rally_point := Vector2.ZERO
+var rally_custom := false
 var timer := 0.0
 var weapon := {"type":"SMALL_ARMS", "damage":16.0, "interval":0.7, "range":165.0, "projectile_speed":620.0}
 
