@@ -21,7 +21,7 @@ func verify_layout(dim: Vector2, expanded: bool) -> void:
  expect(dock.position.y>=0 and dock.end.y<=dim.y+0.01,"Drawer vertically fits %s" % [str(dim)])
  expect(top.position.x>=0 and top.end.x<=dim.x+0.01,"Status fits %s" % [str(dim)])
  expect(toolbar.position.x>=0 and toolbar.end.x<=dim.x+0.01,"Command bar fits %s" % [str(dim)])
- expect(toolbar.end.y<dock.position.y or not bool(layout["compact"]),"Compact command bar does not overlap drawer %s" % [str(dim)])
+ expect(not toolbar.intersects(dock) or not bool(layout["compact"]),"Compact command bar does not overlap drawer %s" % [str(dim)])
  expect(dock.size.y>=48.0,"Drawer always retains accessible toggle")
 
 func run_checks() -> void:

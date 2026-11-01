@@ -1,5 +1,6 @@
 extends Node2D
 ## Code-drawn combat actor. Physics state, weapons and orders are independent of rendering.
+const IndustrialArt = preload("res://scripts/ui/industrial_art.gd")
 signal destroyed(unit: Node2D)
 
 var arena
@@ -222,107 +223,15 @@ func receive_damage(value: float, attacker) -> void:
     else:
         queue_redraw()
 
-func _faction_colors() -> Dictionary:
-    if team == 0:
-        return {"main": Color("#4b9fc2"), "dark": Color("#173d52"), "accent": Color("#bfe8e7"), "signal": Color("#75e0c0")}
-    return {"main": Color("#b9654d"), "dark": Color("#4d2929"), "accent": Color("#f1c28f"), "signal": Color("#f09b68")}
-
-func _draw_infantry(colors: Dictionary) -> void:
-    var main: Color = colors["main"]
-    var dark: Color = colors["dark"]
-    var accent: Color = colors["accent"]
-    draw_circle(Vector2(1, 4), radius + 2.0, Color(0, 0, 0, 0.25))
-    if unit_id in ["a_engineer", "r_engineer"]:
-        draw_arc(Vector2.ZERO, 12.0, 0.0, TAU, 20, Color("#f3d991"), 2.0)
-        draw_rect(Rect2(-10, -4, 20, 8), accent)
-    else:
-        draw_colored_polygon(PackedVector2Array([Vector2(-8, 8), Vector2(-6, -7), Vector2(0, -12), Vector2(6, -7), Vector2(8, 8), Vector2(3, 12), Vector2(-3, 12)]), main)
-        draw_circle(Vector2(0, -10), 6.0, accent)
-        draw_rect(Rect2(-5, -8, 10, 4), dark)
-    if unit_id in ["a_javelin", "r_hunter"]:
-        draw_line(Vector2(-4, 3), Vector2(17, -12), accent, 3.0)
-        draw_circle(Vector2(17, -12), 3.0, colors["signal"])
-    elif unit_id in ["a_engineer", "r_engineer"]:
-        draw_line(Vector2(6, 2), Vector2(16, 13), Color("#e0b05d"), 3.0)
-        draw_circle(Vector2(18, 14), 4.0, Color("#e0b05d"))
-    else:
-        draw_line(Vector2(0, 1), Vector2.RIGHT.rotated(turret_angle) * 14.0, dark, 3.0)
-
-func _draw_aircraft(colors: Dictionary) -> void:
-    var main: Color = colors["main"]
-    var dark: Color = colors["dark"]
-    var accent: Color = colors["accent"]
-    draw_circle(Vector2(0.0, 18.0), 14.0, Color(0, 0, 0, 0.23))
-    if unit_id in ["r_siege_heli", "a_siege_heli"]:
-        draw_colored_polygon(PackedVector2Array([Vector2(18, 0), Vector2(4, -8), Vector2(-13, -8), Vector2(-19, -3), Vector2(-19, 3), Vector2(-13, 8), Vector2(4, 8)]), main)
-        draw_line(Vector2(-10, -10), Vector2(11, -10), accent, 3.0)
-        draw_line(Vector2(0, -10), Vector2(0, -19), accent, 2.0)
-    else:
-        draw_colored_polygon(PackedVector2Array([Vector2(23, 0), Vector2(-8, -15), Vector2(-4, -4), Vector2(-21, -7), Vector2(-21, 7), Vector2(-4, 4), Vector2(-8, 15)]), main)
-        draw_line(Vector2(-5, 0), Vector2(16, 0), accent, 3.0)
-        draw_line(Vector2(-12, -8), Vector2(-2, 8), dark, 3.0)
-    draw_circle(Vector2.ZERO, 5.0, dark)
-
-func _draw_rotating_turret(colors: Dictionary) -> void:
-    var main: Color = colors["main"]
-    var dark: Color = colors["dark"]
-    var accent: Color = colors["accent"]
-    var signal_color: Color = colors["signal"]
-    draw_set_transform(Vector2.ZERO, turret_angle)
-    if unit_id in ["a_sentinel_aa", "r_flak"]:
-        draw_circle(Vector2.ZERO, 11.0, dark)
-        draw_rect(Rect2(-8, -9, 16, 18), main)
-        draw_line(Vector2(4, -5), Vector2(31, -9), accent, 4.0)
-        draw_line(Vector2(4, 5), Vector2(31, 9), accent, 4.0)
-        draw_circle(Vector2(31, -9), 2.5, signal_color)
-        draw_circle(Vector2(31, 9), 2.5, signal_color)
-    elif unit_id in ["a_striker", "r_hunter"]:
-        draw_colored_polygon(PackedVector2Array([Vector2(-11, -8), Vector2(8, -8), Vector2(14, 0), Vector2(8, 8), Vector2(-11, 8)]), main)
-        draw_line(Vector2(4, 0), Vector2(31, 0), accent, 5.0)
-        draw_line(Vector2(10, -5), Vector2(28, -5), signal_color, 2.0)
-        draw_line(Vector2(10, 5), Vector2(28, 5), signal_color, 2.0)
-    else:
-        draw_circle(Vector2.ZERO, 11.0, dark)
-        draw_colored_polygon(PackedVector2Array([Vector2(-11, -8), Vector2(7, -8), Vector2(13, 0), Vector2(7, 8), Vector2(-11, 8)]), main)
-        draw_line(Vector2(3, 0), Vector2(33, 0), accent, 5.0)
-        draw_line(Vector2(23, 0), Vector2(33, 0), signal_color, 2.0)
-    draw_set_transform(Vector2.ZERO, 0.0)
-
-func _draw_vehicle(colors: Dictionary) -> void:
-    var main: Color = colors["main"]
-    var dark: Color = colors["dark"]
-    var accent: Color = colors["accent"]
-    var signal_color: Color = colors["signal"]
-    draw_set_transform(Vector2.ZERO, facing)
-    draw_colored_polygon(PackedVector2Array([Vector2(-22, -15), Vector2(14, -15), Vector2(22, -7), Vector2(22, 11), Vector2(12, 16), Vector2(-22, 16)]), dark)
-    if unit_id in ["a_sentinel_aa", "r_flak"]:
-        draw_rect(Rect2(-16, -12, 32, 25), main)
-        draw_line(Vector2(-17, 13), Vector2(17, 13), signal_color, 3.0)
-    elif unit_id in ["a_striker", "r_hunter"]:
-        draw_colored_polygon(PackedVector2Array([Vector2(-16, -12), Vector2(10, -12), Vector2(17, -4), Vector2(17, 10), Vector2(-16, 10)]), main)
-        draw_rect(Rect2(-8, -9, 18, 7), accent)
-    else:
-        draw_rect(Rect2(-16, -12, 32, 25), main)
-        draw_rect(Rect2(-10, -8, 20, 16), dark)
-    draw_set_transform(Vector2.ZERO, 0.0)
-    _draw_rotating_turret(colors)
-
 func _draw() -> void:
-    var colors := _faction_colors()
     if selected:
-        draw_arc(Vector2.ZERO, radius + 8.0, 0.0, TAU, 36, Color("#e1f39e"), 2.2)
-    if air:
-        draw_set_transform(Vector2.ZERO, facing)
-        _draw_aircraft(colors)
-    else:
-        if profile_name == "infantry":
-            _draw_infantry(colors)
-        else:
-            _draw_vehicle(colors)
-    draw_set_transform(Vector2.ZERO, 0.0)
+        draw_arc(Vector2.ZERO,radius+8.0,0.0,TAU,36,Color("#e1f39e"),2.2)
+    var artwork = unit_id if IndustrialArt.has_asset(unit_id) else ("gunship" if air else ("rifleman" if profile_name=="infantry" else "tank"))
+    IndustrialArt.draw_asset(self,artwork,team,facing,turret_angle)
     if capture_target != null and is_instance_valid(capture_target):
         draw_rect(Rect2(-19,-radius-23,38,4),Color("#182c25"))
         draw_rect(Rect2(-19,-radius-23,38 * minf(1.0,capture_progress / (0.7 if capture_target.team==-1 else 3.0)),4),Color("#efcd76"))
     var amount := hp / maxf(1.0, max_hp)
-    draw_rect(Rect2(-19, -radius - 15, 38, 4), Color("#1d2524"))
-    draw_rect(Rect2(-19, -radius - 15, 38 * amount, 4), Color("#94d889") if amount > 0.4 else Color("#e2a052"))
+    var bar_y = -51.0 if profile_name=="infantry" else -64.0
+    draw_rect(Rect2(-19, bar_y, 38, 4), Color("#1d2524"))
+    draw_rect(Rect2(-19, bar_y, 38 * amount, 4), Color("#94d889") if amount > 0.4 else Color("#e2a052"))

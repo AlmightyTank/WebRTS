@@ -31,7 +31,7 @@ func run_checks() -> void:
  expect(world.radar_view.map_point(Vector2(0,0)).is_equal_approx(Vector2.ZERO),"Radar maps battlefield origin")
  expect(world.radar_view.map_point(Vector2(960,600)).x>=0.0,"Radar projection operates for on-map points")
  world._update_hud()
- expect(world.retro_economy_label.text.contains("CREDITS"),"Economy readout displays credits")
+ expect(world.retro_economy_label.text.contains("IRON"),"Economy readout displays reference IRON currency label")
  expect(world.retro_economy_label.text.contains("POWER"),"Economy readout displays power")
  expect(world._deploy_mcv(0),"Initial MCV deploys")
  world._place_structure("power",0,Vector2(420,460))

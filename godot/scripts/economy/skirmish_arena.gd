@@ -930,12 +930,12 @@ func _hud_layout_for_size(view_size: Vector2, expanded: bool=true) -> Dictionary
  var toolbar_height=clampf(h*0.16,48.0,80.0)
  if compact:
   var expanded_height=minf(320.0,maxf(144.0,h*0.46))
-  var drawer_height=expanded_height if expanded else 42.0
+  var drawer_height=expanded_height if expanded else 48.0
   return {
    "compact":true,
    "top":Rect2(edge,edge,w-edge*2.0,top_height),
    "toolbar":Rect2(edge,h-toolbar_height-edge,w-edge*2.0,toolbar_height),
-   "dock":Rect2(edge,h-drawer_height-edge,w-edge*2.0,drawer_height)
+   "dock":Rect2(edge,h-toolbar_height-drawer_height-edge*2.0,w-edge*2.0,drawer_height)
   }
  var dock_width=clampf(w*0.20,220.0,300.0)
  var play_width=w-dock_width-edge*3.0
@@ -972,6 +972,10 @@ func _apply_hud_layout(view_size: Vector2) -> void:
    hud_build_column.custom_minimum_size=Vector2.ZERO
  if is_instance_valid(radar_view):
   radar_view.custom_minimum_size=Vector2(0,82 if compact_hud else 108)
+ for chip in stage_chips:
+  chip.custom_minimum_size.y=44.0 if compact_hud else 27.0
+ for tab in tab_buttons:
+  tab.custom_minimum_size.y=44.0 if compact_hud else 27.0
  if is_instance_valid(rally_stage_selector):
   rally_stage_selector.visible=not compact_hud
  if is_instance_valid(activate_producer_button):
@@ -1185,15 +1189,17 @@ func _create_hud() -> void:
  for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
   var button=Button.new()
   button.text=id
-  button.custom_minimum_size=Vector2(0,56)
+  button.custom_minimum_size=Vector2(0,76)
   button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   button.pressed.connect(_on_build_button.bind(id))
   RetroSkin.button(button)
   build_container.add_child(button)
   var icon=Control.new()
   icon.set_script(RetroIcon)
-  icon.position=Vector2(3,2)
-  icon.size=Vector2(34,25)
+  icon.anchor_left=0.5
+  icon.anchor_right=0.5
+  icon.position=Vector2(-24,2)
+  icon.size=Vector2(48,35)
   button.add_child(icon)
   icon.configure(id)
   production_tile_icons[id]=icon
@@ -1510,7 +1516,7 @@ func _update_hud() -> void:
   if ready: label_tail="READY"
   elif not job.is_empty() and str(job["id"])==id:
    label_tail="%d%%" % int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1))))
-  button.text="\n\n"+str(short_label)+"\n"+label_tail
+  button.text="\n\n\n"+str(short_label)+"\n"+label_tail
   button.tooltip_text="%s | %d credits | %d seconds" % [label,cost,int(recipe.get("time",0))]
   button.disabled=not ready and (not _tech_ready(0,id) or not _has_producer(0,lane) or (not job.is_empty() and lane in ["build","defense"]))
  if is_instance_valid(refund_button): refund_button.disabled=state["lanes"][["build","defense","infantry","vehicle"][current_tab]].is_empty()
@@ -1536,6 +1542,10 @@ func _update_hud() -> void:
   sidebar_toggle.text="PRODUCTION ▼   "+producer_summary.text
  queue_redraw()
 
+func _scenery_obstacles() -> Array[Rect2]:
+ # Navigation also contains building footprints; those are not scenery artwork.
+ return static_obstacles.filter(func(bounds): return not tree_footprints.has(bounds))
+
 func _draw() -> void:
  super._draw()
  for b in structures:
@@ -1557,14 +1567,9 @@ func _draw() -> void:
   draw_circle(point,5.0,stage_color)
   draw_string(ThemeDB.fallback_font,point+Vector2(24,-10),id,HORIZONTAL_ALIGNMENT_LEFT,-1,16,stage_color)
  for field in ore_fields:
-  if float(field["remaining"])<=0: continue
   var amount=float(field["remaining"])/maxf(1.0,float(field["initial"]))
   var pos: Vector2=field["position"]
-  draw_circle(pos,30.0,Color("#65593d"))
-  for i in range(9):
-   var angle=float(i)*2.399
-   var dist=6.0+float(i%3)*9.0
-   draw_colored_polygon(PackedVector2Array([pos+Vector2.RIGHT.rotated(angle)*dist+Vector2(-9,7),pos+Vector2.RIGHT.rotated(angle)*dist+Vector2(0,-10),pos+Vector2.RIGHT.rotated(angle)*dist+Vector2(11,7)]),Color("#c9ae72").darkened(0.4*(1.0-amount)))
+  SceneryArt.ore(self,pos,amount)
  if placement_lane!="" and states.size()>0:
   var job: Dictionary=states[0]["lanes"][placement_lane]
   if not job.is_empty():

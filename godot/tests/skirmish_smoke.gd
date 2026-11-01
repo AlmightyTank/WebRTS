@@ -25,8 +25,23 @@ func run_checks() -> void:
  expect(world.units.size()==1,"Initial Alliance starts with one MCV; AI MCV deployed")
  expect(world.structures.size()==2 and world.has_structure(1,"yard"),"AI Yard and neutral outpost are present")
  expect(world.selected.size()==1,"Player MCV selected by default")
+ expect(world.scenery.any(func(item): return item["kind"]=="tree") and world.scenery.any(func(item): return item["kind"]=="shrub") and world.scenery.any(func(item): return item["kind"]=="stones"),"Sparse scenery includes trees, shrubs and small rocks")
+ var clear_routes=true
+ var trees_solid=true
+ for item in world.scenery:
+  if world.SceneryArt.road_distance(item["position"])<110: clear_routes=false
+  if item["kind"]=="tree" and world.can_occupy(item["position"],5,false): trees_solid=false
+ expect(clear_routes,"New scenery leaves the road and its shoulders clear")
+ expect(trees_solid,"Visible tree trunks block ground units")
+ var ore_access=true
+ for field in world.ore_fields:
+  if not world.can_occupy(field["position"],20,false): ore_access=false
+ expect(ore_access,"Every ore deposit retains open access for harvesters")
  expect(world._deploy_mcv(0),"Deploy MCV to Construction Yard")
  expect(world.has_structure(0,"yard"),"Deployed Yard grants base build authority")
+ var yard=world.structures.filter(func(b): return b.team==0 and b.kind=="yard")[0]
+ expect(not world._scenery_obstacles().has(yard.ground_bounds()),"Building footprint does not render as a second concrete pedestal")
+ expect(world.navigation.is_point_solid(world.world_cell(yard.position)),"Building still blocks navigation after removing footprint artwork")
  expect(not world.queue_production(0,"build","refinery"),"Tech gating prevents refinery before power")
  build("power",Vector2(310,420))
  expect(int(world.states[0]["power"])==150,"Power plant contributes 150 generation")

@@ -1,6 +1,6 @@
 # Meridian Warfront
 
-A native **Godot 4**, 2D isometric real-time strategy game, inspired by classic Command & Conquer base-building and modern military warfare.
+A native **Godot 4**, top-down 2D real-time strategy game, inspired by classic Command & Conquer base-building and modern military warfare.
 
 ## Run the game
 
@@ -12,7 +12,13 @@ The Godot project is the primary implementation. Source code and artwork live in
 
 ## Status
 
-The isometric battlefield, terrain transitions, camera controls, Y-sorted actor layer, and initial decorations are under development. Many visuals remain placeholders. The GitHub Actions Godot smoke test validates import and startup; it is not a substitute for an interactive playtest.
+The default scene is the playable skirmish: a green grid battlefield, steel status panel, bottom tactical command bar, and right production sidebar with a live minimap. The desktop window opens at 1280 × 720 to match the visual reference. Smaller screens use a collapsible production drawer. Units and structures use procedural placeholder artwork. The GitHub Actions Godot smoke tests validate gameplay, HUD behavior, import and startup; they are not a substitute for an interactive playtest.
+
+## Procedural art preview
+
+Open `godot/scenes/art_preview.tscn` and press **F6** to inspect the low-poly-style MCV, construction yard and power plant, including faction variants and production icons. The shared renderer in `godot/scripts/ui/industrial_art.gd` draws shaded polygon faces directly on the 2D canvas; it requires no image assets or 3D models. These designs also appear in the playable skirmish.
+
+Open `godot/scenes/roster_art_preview.tscn` with **F6** for the full active roster. Press **Tab** to switch between eight structures and the mobile-unit designs, including infantry, harvesters, tanks, anti-air vehicles and aircraft. Production icons use the same procedural renderer. Face shading provides depth without cast shadows.
 
 ## Previous WebRTS prototype
 

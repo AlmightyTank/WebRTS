@@ -2,6 +2,8 @@ extends Node2D
 ## Combat Lab: standalone code-drawn top-down RTS test battlefield.
 ## Combat uses the committed v0.4 armor/HP/speed data. Fire profiles are explicit
 ## provisional v0.5 translations of the readable weapon descriptions.
+const TerrainScript = preload("res://scripts/ui/battlefield_terrain.gd")
+const SceneryArt = preload("res://scripts/ui/field_scenery.gd")
 const UnitScript = preload("res://scripts/combat/combat_unit.gd")
 const ProjectileScript = preload("res://scripts/combat/combat_projectile.gd")
 const CameraScript = preload("res://scripts/combat/combat_camera.gd")
@@ -30,6 +32,8 @@ var roster: Dictionary = {}
 var units: Array = []
 var projectiles: Array = []
 var obstacles: Array[Rect2] = []
+var scenery: Array[Dictionary] = []
+var tree_footprints: Array[Rect2] = []
 var navigation: AStarGrid2D
 var camera: Camera2D
 var actors: Node2D
@@ -57,6 +61,12 @@ var kills := [0, 0]
 
 func _ready() -> void:
  _load_balance()
+ var terrain = Node2D.new()
+ terrain.set_script(TerrainScript)
+ terrain.name = "BattlefieldTerrain"
+ terrain.z_index = -10
+ add_child(terrain)
+ terrain.configure(BOARD)
  _make_obstacles()
  _create_navigation()
  actors = Node2D.new()
@@ -88,6 +98,12 @@ func _load_balance() -> void:
 func _make_obstacles() -> void:
  # Rectangle obstacles deliberately create chokepoints for navigation tests.
  obstacles = [Rect2(840, 120, 92, 285), Rect2(840, 565, 92, 270), Rect2(1050, 430, 150, 100), Rect2(375, 825, 155, 95), Rect2(1430, 220, 105, 95)]
+ scenery = SceneryArt.generate(BOARD,obstacles)
+ tree_footprints.clear()
+ for item in scenery:
+  if item["kind"]=="tree":
+   tree_footprints.append(item["bounds"])
+   obstacles.append(item["bounds"])
 
 func _create_navigation() -> void:
  navigation = AStarGrid2D.new()
@@ -538,21 +554,15 @@ func _update_hud() -> void:
  hud_text.text = "ALLIANCE %d   |   REPUBLIC %d   |   HITS %d/%d   |   KILLS %d:%d" % [blue,red,hits,shots,kills[0],kills[1]]
  info_text.text = "%s | Selected %d | %s | %s" % [SCENARIOS[scenario_index],selected.size(),formation,"PAUSED" if paused else "Mode: " + mode]
 
+func _scenery_obstacles() -> Array[Rect2]:
+ return obstacles.filter(func(bounds): return not tree_footprints.has(bounds))
+
 func _draw() -> void:
- draw_rect(BOARD,Color("#344d3b"))
- for x in range(COLS + 1):
-  draw_line(Vector2(x*CELL,0),Vector2(x*CELL,BOARD.size.y),Color(0.65,0.75,0.57,0.10),1.0)
- for y in range(ROWS + 1):
-  draw_line(Vector2(0,y*CELL),Vector2(BOARD.size.x,y*CELL),Color(0.65,0.75,0.57,0.10),1.0)
- draw_rect(Rect2(210,110,150,120),Color("#4a6048"))
- draw_rect(Rect2(1510,940,170,120),Color("#485c43"))
- draw_line(Vector2(80,960),Vector2(1700,225),Color("#a29977"),21.0)
- draw_line(Vector2(80,960),Vector2(1700,225),Color("#c8b795"),1.5)
- for box in obstacles:
-  draw_rect(box.grow(5),Color(0,0,0,0.18))
-  draw_rect(box,Color("#6b716b"))
-  draw_rect(Rect2(box.position+Vector2(8,8),box.size-Vector2(16,16)),Color("#818880"))
-  draw_line(box.position+Vector2(5,5),box.position+Vector2(box.size.x-5,5),Color("#b0b7a6"),3)
+ var scenery_bounds = _scenery_obstacles()
+ for i in range(scenery_bounds.size()):
+  SceneryArt.obstacle(self,scenery_bounds[i],i)
+ for item in scenery:
+  SceneryArt.decoration(self,item)
  if dragging_selection:
   var area := Rect2(drag_start,drag_end-drag_start).abs()
   draw_rect(area,Color(0.45,0.83,1,0.12),true)
