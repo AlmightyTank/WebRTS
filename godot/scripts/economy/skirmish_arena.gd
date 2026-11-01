@@ -522,7 +522,7 @@ func _produce_unit(side: int, id: String) -> bool:
   elif unit.has_method("order_move"): unit.order_move(producer.rally_point)
  return true
 
-func _spawn_engineer(id: String, side: int, where: Vector2) -> void:
+func _spawn_engineer(id: String, side: int, where: Vector2):
  # The engineer uses the same combat-unit steering/selection, but cannot attack.
  var data: Dictionary=roster[id]
  var u=Node2D.new()
