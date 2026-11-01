@@ -17,7 +17,7 @@
 - Left click: select one unit; drag: select several; right click: move, target, or attack.
 - Arrow keys / Q,W,D: camera movement; middle drag and mouse wheel: pan / zoom. Touch pan and pinch are supported through the existing camera input.
 - H: deploy an idle MCV. 1–4: Buildings, Defense, Infantry, Vehicles tabs. G: place selected producer rally/staging area. T: toggle selected producer's Move/Attack-Move rally mode.
-- A then click: attack move; M then click: move; S: stop; F: line/wedge formation.
+- A then click: attack move; M then click: move; S: stop; F: cycle group, line, and wedge. A group order packs units into free cells around the click and follows one corridor around walls.
 - Space: pause; R: restart skirmish; Esc or right click while placing: exit placement mode.
 - Bottom toolbar provides corresponding actions for touch. **AUTO-HARVEST SELECTED** reactivates a harvester after a manual move.
 

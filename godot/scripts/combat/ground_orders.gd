@@ -16,13 +16,18 @@ static func advance(actor) -> void:
 static func draw_route(actor) -> void:
  if not actor.selected:
   return
+ var color := Color("#e8cd78")
  var previous: Vector2 = actor.position
- if actor.moving:
-  actor.draw_line(Vector2.ZERO, actor.destination - actor.position, Color("#e8cd78"), 1.0)
-  actor.draw_circle(actor.destination - actor.position, 5.0, Color("#e8cd78"), false, 1.5)
+ if actor.moving and actor.route_index < actor.route.size():
+  var last := Vector2.ZERO
+  for i in range(actor.route_index, actor.route.size()):
+   var local: Vector2 = actor.route[i] - actor.position
+   actor.draw_line(last, local, color, 1.4)
+   last = local
+  actor.draw_circle(actor.destination - actor.position, 5.0, color, false, 1.5)
   previous = actor.destination
  for order in actor.pending_orders:
   var point: Vector2 = order["point"]
-  actor.draw_line(previous - actor.position, point - actor.position, Color("#e8cd78"), 1.5)
-  actor.draw_circle(point - actor.position, 5.0, Color("#e8cd78"), false, 1.5)
+  actor.draw_line(previous - actor.position, point - actor.position, color, 1.2)
+  actor.draw_circle(point - actor.position, 4.0, color, false, 1.2)
   previous = point

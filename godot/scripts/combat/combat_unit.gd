@@ -42,6 +42,7 @@ var capture_pause := 0.0
 var explicit_attack := false
 var blocked_time := 0.0
 var traffic_wait := 0.0
+var column_move := false
 
 func configure(world: Node2D, unit_data: Dictionary, side: int, pos: Vector2, gun: Dictionary, flying: bool = false) -> void:
     arena = world
@@ -76,6 +77,7 @@ func order_move(point: Vector2, attack_move: bool = false) -> void:
     aggressive = attack_move
     has_attack_move_goal = attack_move
     attack_move_goal = arena.clamp_point(point) if attack_move else Vector2.ZERO
+    column_move = false
     _begin_route(point)
 
 func order_attack(enemy) -> void:
@@ -206,6 +208,11 @@ func _step_movement(delta: float) -> void:
             moving = false
             return
         waypoint = route[route_index]
+    if arena.same_direction_holds_cell(self, waypoint):
+        traffic_wait += delta
+        if traffic_wait < 3.5:
+            return
+        traffic_wait = 0.0
     var direction := (waypoint - position).normalized()
     var separation := Vector2.ZERO
     if not air:

@@ -33,6 +33,7 @@ var deposits := 0
 var purchase_cost := 0.0
 var resume_harvest_on_arrival := false
 var blocked_time := 0.0
+var column_move := false
 
 func configure(world, data: Dictionary, side: int, pos: Vector2, harvester: bool) -> void:
  arena=world
@@ -66,6 +67,7 @@ func order_move(point: Vector2, _attack_move: bool=false) -> void:
  resume_harvest_on_arrival=false
  working=false
  state="MOVE"
+ column_move=false
  _route_to(point)
 
 func order_rally(point: Vector2) -> void:
@@ -146,6 +148,11 @@ func _step(delta: float) -> void:
     else: state="IDLE"
    return
   waypoint=route[route_index]
+ if arena.same_direction_holds_cell(self,waypoint):
+  blocked_time+=delta
+  if blocked_time<3.5:
+   return
+  blocked_time=0.0
  var direction=(waypoint-position).normalized()
  var proposed=position+direction*minf(move_speed*delta,position.distance_to(waypoint))
  if arena.can_traverse(position,proposed,radius,false,self):
