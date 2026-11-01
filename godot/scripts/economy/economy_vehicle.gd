@@ -1,6 +1,11 @@
 extends Node2D
 ## MCV and finite-ore harvester. All payments are credited by the arena on physical delivery.
 const IndustrialArt = preload("res://scripts/ui/industrial_art.gd")
+const GroundOrders = preload("res://scripts/combat/ground_orders.gd")
+var pending_orders: Array = []
+
+func queue_move(point: Vector2, attack_move: bool=false) -> void:
+ GroundOrders.enqueue(self,point,attack_move)
 signal destroyed(entity: Node2D)
 var arena
 var unit_id := ""
@@ -27,6 +32,7 @@ var mine_timer := 0.0
 var deposits := 0
 var purchase_cost := 0.0
 var resume_harvest_on_arrival := false
+var blocked_time := 0.0
 
 func configure(world, data: Dictionary, side: int, pos: Vector2, harvester: bool) -> void:
  arena=world
@@ -48,12 +54,15 @@ func order_attack(_enemy) -> void:
  pass
 
 func order_stop() -> void:
+ pending_orders.clear()
+ resume_harvest_on_arrival=false
  working=false
  state="IDLE"
  moving=false
  route.clear()
 
 func order_move(point: Vector2, _attack_move: bool=false) -> void:
+ pending_orders.clear()
  resume_harvest_on_arrival=false
  working=false
  state="MOVE"
@@ -65,6 +74,7 @@ func order_rally(point: Vector2) -> void:
  resume_harvest_on_arrival=automatic
 
 func set_harvest() -> void:
+ pending_orders.clear()
  resume_harvest_on_arrival=false
  working=true
  state="SEEK"
@@ -72,6 +82,7 @@ func set_harvest() -> void:
  route.clear()
 
 func _route_to(point: Vector2) -> void:
+ blocked_time=0.0
  destination=arena.clamp_point(point)
  route=arena.find_route(position,destination,false)
  route_index=0
@@ -79,6 +90,8 @@ func _route_to(point: Vector2) -> void:
 
 func _physics_process(delta: float) -> void:
  if hp<=0.0 or arena.paused or arena.battle_over: return
+ if not moving and not pending_orders.is_empty():
+  GroundOrders.advance(self)
  if working:
   if state=="SEEK":
    var ore=arena.find_ore(position,team)
@@ -124,7 +137,7 @@ func _step(delta: float) -> void:
    else: state="IDLE"
   return
  var waypoint: Vector2=route[route_index]
- if position.distance_to(waypoint)<12.0:
+ if position.distance_to(waypoint)<2.0:
   route_index+=1
   if route_index>=route.size():
    moving=false
@@ -135,9 +148,25 @@ func _step(delta: float) -> void:
   waypoint=route[route_index]
  var direction=(waypoint-position).normalized()
  var proposed=position+direction*minf(move_speed*delta,position.distance_to(waypoint))
- if arena.can_occupy(proposed,radius,false,self):
+ if arena.can_traverse(position,proposed,radius,false,self):
   position=proposed
+  arena.update_unit_occupancy(self)
+  blocked_time=0.0
   facing=lerp_angle(facing,direction.angle(),minf(1.0,delta*3.5))
+ else:
+  blocked_time+=delta
+  for angle in [0.52,-0.52,1.05,-1.05,1.57,-1.57]:
+   var candidate: Vector2=position+direction.rotated(angle)*minf(move_speed*delta,8.0)
+   if arena.can_traverse(position,candidate,radius,false,self):
+    position=candidate
+    arena.update_unit_occupancy(self)
+    break
+  if blocked_time>=0.75:
+   blocked_time=0.0
+   var alternative: PackedVector2Array=arena.find_route(position,destination,false,self)
+   if not alternative.is_empty():
+    route=alternative
+    route_index=0
 
 func receive_damage(value: float, _attacker) -> void:
  if hp<=0.0: return
@@ -148,6 +177,7 @@ func receive_damage(value: float, _attacker) -> void:
  queue_redraw()
 
 func _draw() -> void:
+ GroundOrders.draw_route(self)
  if selected:
   draw_arc(Vector2.ZERO,29.0,0.0,TAU,36,Color("#eef3b1"),2.2)
  IndustrialArt.draw_asset(self,unit_id,team,facing,NAN,cargo/maxf(1.0,capacity))

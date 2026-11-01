@@ -57,5 +57,14 @@ jobs:
           set -o pipefail
           timeout 45s godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd 2>&1 | tee retro-ui-smoke.log
           grep -q RETRO_COMMAND_HUD_SMOKE_PASS retro-ui-smoke.log
-      - name: Launch the playable skirmish
+      - name: Test ground movement and order regressions
+        timeout-minutes: 2
+        run: godot --headless --path godot --script res://tests/movement_orders_smoke.gd
+      - name: Test viewport movement input and queued commands
+        timeout-minutes: 2
+        run: godot --headless --path godot --script res://tests/movement_input_smoke.gd
+      - name: Test shared artwork meshes for every unit
+        timeout-minutes: 2
+        run: godot --headless --path godot --script res://tests/unit_mesh_cache_smoke.gd
+      - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180

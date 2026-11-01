@@ -30,6 +30,60 @@ const SCENARIOS := ["Combined Arms", "Infantry vs Tanks", "Air Interception", "F
 var registry: Dictionary = {}
 var roster: Dictionary = {}
 var units: Array = []
+var _occupancy: Dictionary = {}
+var _occupancy_cells: Dictionary = {}
+var _occupancy_frame: int = -1
+var _occupancy_count: int = -1
+var _occupancy_radius: float = 0.0
+
+func invalidate_occupancy() -> void:
+ _occupancy_frame = -1
+
+func _ensure_occupancy() -> void:
+ var frame := Engine.get_physics_frames()
+ if _occupancy_frame == frame and _occupancy_count == units.size():
+  return
+ _occupancy.clear()
+ _occupancy_cells.clear()
+ _occupancy_radius = 0.0
+ for unit in units:
+  if not is_instance_valid(unit) or unit.hp <= 0.0 or unit.air:
+   continue
+  var cell := world_cell(unit.position)
+  if not _occupancy.has(cell):
+   _occupancy[cell] = []
+  _occupancy[cell].append(unit)
+  _occupancy_cells[unit] = cell
+  _occupancy_radius = maxf(_occupancy_radius, unit.radius)
+ _occupancy_frame = frame
+ _occupancy_count = units.size()
+
+func update_unit_occupancy(unit) -> void:
+ _ensure_occupancy()
+ if unit.air or unit.hp <= 0.0:
+  return
+ var cell := world_cell(unit.position)
+ var previous: Vector2i = _occupancy_cells.get(unit, cell)
+ if _occupancy_cells.has(unit) and previous == cell:
+  return
+ if _occupancy.has(previous):
+  _occupancy[previous].erase(unit)
+ if not _occupancy.has(cell):
+  _occupancy[cell] = []
+ _occupancy[cell].append(unit)
+ _occupancy_cells[unit] = cell
+ _occupancy_radius = maxf(_occupancy_radius, unit.radius)
+
+func nearby_units(origin: Vector2, finish: Vector2, margin: float) -> Array:
+ _ensure_occupancy()
+ var padding := Vector2.ONE * (margin + _occupancy_radius)
+ var first := world_cell(origin.min(finish) - padding)
+ var last := world_cell(origin.max(finish) + padding)
+ var result: Array = []
+ for y in range(first.y, last.y + 1):
+  for x in range(first.x, last.x + 1):
+   result.append_array(_occupancy.get(Vector2i(x, y), []))
+ return result
 var projectiles: Array = []
 var obstacles: Array[Rect2] = []
 var scenery: Array[Dictionary] = []
@@ -115,7 +169,7 @@ func _create_navigation() -> void:
   for x in range(COLS):
    var cell := Vector2i(x, y)
    for obstacle in obstacles:
-    if obstacle.grow(17.0).has_point(cell_center(cell)):
+    if obstacle.grow(24.0).has_point(cell_center(cell)):
      navigation.set_point_solid(cell)
      break
 
@@ -136,14 +190,14 @@ func can_occupy(point: Vector2, radius: float, is_air: bool, actor = null) -> bo
  for box in obstacles:
   if box.grow(radius).has_point(point):
    return false
- for unit in units:
+ for unit in nearby_units(point, point, radius + 1.0):
   if not is_instance_valid(unit) or unit == actor or unit.hp <= 0.0 or unit.air:
    continue
   if point.distance_squared_to(unit.position) < pow(radius + unit.radius + 1.0, 2.0):
    return false
  return true
 
-func find_route(origin: Vector2, destination: Vector2, is_air: bool) -> PackedVector2Array:
+func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = null) -> PackedVector2Array:
  var end := clamp_point(destination)
  if is_air:
   return PackedVector2Array([end])
@@ -153,13 +207,55 @@ func find_route(origin: Vector2, destination: Vector2, is_air: bool) -> PackedVe
   goal_cell = _nearby_open_cell(goal_cell)
  if navigation.is_point_solid(start_cell):
   start_cell = _nearby_open_cell(start_cell)
+ var temporary: Array[Vector2i] = []
+ if actor != null:
+  for unit in units:
+   if not is_instance_valid(unit) or unit == actor or unit.air or unit.hp <= 0.0:
+    continue
+   var center := world_cell(unit.position)
+   for y in range(-2, 3):
+    for x in range(-2, 3):
+     var cell := center + Vector2i(x, y)
+     if cell == start_cell or cell == goal_cell or not navigation.is_in_boundsv(cell) or navigation.is_point_solid(cell):
+      continue
+     if cell_center(cell).distance_to(unit.position) < actor.radius + unit.radius + 10.0:
+      navigation.set_point_solid(cell)
+      temporary.append(cell)
+ var diagonal_mode := navigation.diagonal_mode
+ if actor != null:
+  navigation.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
  var ids: Array[Vector2i] = navigation.get_id_path(start_cell, goal_cell)
+ navigation.diagonal_mode = diagonal_mode
+ for cell in temporary:
+  navigation.set_point_solid(cell, false)
  var result := PackedVector2Array()
+ if ids.is_empty():
+  return result
  for cell in ids:
-  result.append(cell_center(cell))
+  if cell != start_cell:
+   result.append(cell_center(cell))
  if not navigation.is_point_solid(world_cell(end)) and end.distance_to(cell_center(goal_cell)) < 32.0:
   result.append(end)
  return result
+
+func can_traverse(origin: Vector2, finish: Vector2, radius: float, is_air: bool, actor = null) -> bool:
+ # Sweep the whole step: endpoint-only checks permit tunneling at low frame rates.
+ if not can_occupy(finish, radius, is_air, actor):
+  return false
+ if is_air:
+  return true
+ for box in obstacles:
+  if _segment_hits_rect(origin, finish, box.grow(radius)):
+   return false
+ for unit in nearby_units(origin, finish, radius + 1.0):
+  if not is_instance_valid(unit) or unit == actor or unit.hp <= 0.0 or unit.air:
+   continue
+  var nearest := Geometry2D.get_closest_point_to_segment(unit.position, origin, finish)
+  if nearest.distance_to(unit.position) < radius + unit.radius + 1.0:
+   # Allow already overlapping actors to separate, never deepen the overlap.
+   if finish.distance_to(unit.position) <= origin.distance_to(unit.position):
+    return false
+ return true
 
 func _nearby_open_cell(point: Vector2i) -> Vector2i:
  for radius in range(1, 8):
@@ -203,6 +299,7 @@ func _spawn(unit_id: String, side: int, pos: Vector2):
  u.configure(self, data, side, pos, WEAPONS[unit_id], str(data.get("armor", "")) == "AIR")
  u.connect("destroyed", Callable(self, "_on_destroyed"))
  units.append(u)
+ invalidate_occupancy()
  return u
 
 func reset_battle() -> void:
@@ -213,6 +310,7 @@ func reset_battle() -> void:
   if is_instance_valid(p):
    p.queue_free()
  units.clear()
+ invalidate_occupancy()
  projectiles.clear()
  selected.clear()
  shots = 0
@@ -265,6 +363,7 @@ func _on_destroyed(unit) -> void:
  selected.erase(unit)
  # Keep deleted nodes out of future targeting/collision decisions.
  units.erase(unit)
+ invalidate_occupancy()
  if not battle_over:
   var ally_count := 0
   var enemy_count := 0
@@ -331,10 +430,33 @@ func formation_targets(origin: Vector2, count: int, toward: Vector2, shape: Stri
   var cell := world_cell(clamp_point(point))
   if navigation.is_point_solid(cell):
    cell = _nearby_open_cell(cell)
-  result.append(cell_center(cell))
+  var slot := cell_center(cell)
+  # Grid snapping must not collapse vehicle formation slots onto each other.
+  var found := false
+  for ring in range(0, 20):
+   if found:
+    break
+   for y in range(-ring, ring + 1):
+    if found:
+     break
+    for x in range(-ring, ring + 1):
+     var candidate_cell := cell + Vector2i(x, y)
+     if not navigation.is_in_boundsv(candidate_cell) or navigation.is_point_solid(candidate_cell):
+      continue
+     var candidate := cell_center(candidate_cell)
+     var free := true
+     for reserved in result:
+      if reserved.distance_to(candidate) < 72.0:
+       free = false
+       break
+     if free:
+      slot = candidate
+      found = true
+      break
+  result.append(slot)
  return result
 
-func issue_order(point: Vector2, attack_move: bool = false) -> void:
+func issue_order(point: Vector2, attack_move: bool = false, queued: bool = false) -> void:
  var clicked = _hit_unit(point, -1)
  if clicked != null and clicked.team == 1:
   for u in selected:
@@ -347,7 +469,10 @@ func issue_order(point: Vector2, attack_move: bool = false) -> void:
  for i in range(selected.size()):
   var u = selected[i]
   if is_instance_valid(u):
-   u.order_move(targets[i], attack_move)
+    if queued:
+     u.queue_move(targets[i], attack_move)
+    else:
+     u.order_move(targets[i], attack_move)
 
 func _screen_to_world(screen_point: Vector2) -> Vector2:
  # InputEventScreenTouch coordinates are in viewport space, unlike mouse-world.
@@ -386,32 +511,32 @@ func _unhandled_input(event: InputEvent) -> void:
  if event is InputEventMouseButton:
   if event.button_index == MOUSE_BUTTON_LEFT:
    if event.pressed:
-    drag_start = get_global_mouse_position()
+    drag_start = _screen_to_world(event.position)
     drag_end = drag_start
     dragging_selection = true
    elif dragging_selection:
     dragging_selection = false
-    var point: Vector2 = get_global_mouse_position()
+    var point: Vector2 = _screen_to_world(event.position)
     if mode == "ATTACK_MOVE" or mode == "COMMAND":
-     issue_order(point, mode == "ATTACK_MOVE")
+     issue_order(point, mode == "ATTACK_MOVE", event.shift_pressed)
      mode = "MOVE"
     elif drag_start.distance_to(point) > 15.0:
      var selection := Rect2(drag_start,point-drag_start).abs()
      var picked: Array = []
      for u in units:
       if is_instance_valid(u) and u.team == 0 and selection.has_point(u.position): picked.append(u)
-     _set_selected(picked, Input.is_key_pressed(KEY_SHIFT))
+     _set_selected(picked, event.shift_pressed)
     else:
      var picked = _hit_unit(point,0)
      if picked != null:
-      _set_selected([picked],Input.is_key_pressed(KEY_SHIFT))
+      _set_selected([picked],event.shift_pressed)
      else:
       _set_selected([])
     queue_redraw()
   elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-   issue_order(get_global_mouse_position(),Input.is_key_pressed(KEY_A))
+   issue_order(_screen_to_world(event.position),Input.is_key_pressed(KEY_A),event.shift_pressed)
  elif event is InputEventMouseMotion and dragging_selection:
-  drag_end = get_global_mouse_position()
+  drag_end = _screen_to_world(event.position)
   queue_redraw()
  elif event is InputEventScreenTouch:
   if event.pressed and event.index == 0:

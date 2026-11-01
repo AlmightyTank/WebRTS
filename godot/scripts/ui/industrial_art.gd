@@ -6,6 +6,54 @@ const CONCRETE = Color("#a7ad9b")
 const YELLOW = Color("#efbc45")
 const INK = Color("#202e35")
 
+static var _batch_units: bool = false
+static var _mesh_vertices := PackedVector2Array()
+static var _mesh_colors := PackedColorArray()
+static var _mesh_indices := PackedInt32Array()
+static var _vehicle_mesh_cache: Dictionary = {}
+const VEHICLE_CACHE_LIMIT = 512
+const VEHICLE_ANGLE_STEPS = 64
+const UNIT_MESH_KINDS = [
+ "mcv","harvester","rifleman","missile_team","engineer",
+ "tank","heavy_tank","aa","flak","gunship","helicopter"
+]
+
+static func _polygon(c: CanvasItem, points: PackedVector2Array, color: Color) -> void:
+ if not _batch_units:
+  c.draw_colored_polygon(points,color)
+  return
+ var triangles = Geometry2D.triangulate_polygon(points)
+ var base = _mesh_vertices.size()
+ _mesh_vertices.append_array(points)
+ for point in points: _mesh_colors.append(color)
+ for index in triangles: _mesh_indices.append(base+index)
+
+static func _line(c: CanvasItem, a: Vector2, b: Vector2, color: Color, width: float) -> void:
+ if not _batch_units:
+  c.draw_line(a,b,color,width,true)
+  return
+ var normal = (b-a).orthogonal().normalized()*width*0.5
+ _polygon(c,PackedVector2Array([a-normal,b-normal,b+normal,a+normal]),color)
+
+static func _finish_unit_batch(c: CanvasItem, key: String) -> void:
+ var arrays: Array = []
+ arrays.resize(Mesh.ARRAY_MAX)
+ arrays[Mesh.ARRAY_VERTEX]=_mesh_vertices
+ arrays[Mesh.ARRAY_COLOR]=_mesh_colors
+ arrays[Mesh.ARRAY_INDEX]=_mesh_indices
+ var mesh = ArrayMesh.new()
+ mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+ var cache: Dictionary = _vehicle_mesh_cache
+ var limit: int = VEHICLE_CACHE_LIMIT
+ if cache.size()>=limit:
+  cache.erase(cache.keys()[0])
+ cache[key]=mesh
+ c.draw_mesh(mesh,null)
+ _batch_units=false
+ _mesh_vertices=PackedVector2Array()
+ _mesh_colors=PackedColorArray()
+ _mesh_indices=PackedInt32Array()
+
 static func project(p: Vector3, heading: float = 0.0) -> Vector2:
  var ground = Vector2(p.x, p.y).rotated(heading)
  return Vector2(ground.x + ground.y * 0.35, ground.y * 0.72 - p.z)
@@ -16,10 +64,10 @@ static func face(c: CanvasItem, points: Array, color: Color, heading: float = 0.
  var area = 0.0
  for i in range(polygon.size()): area+=polygon[i].cross(polygon[(i+1)%polygon.size()])
  if absf(area)<0.001: return # Edge-on faces have no visible area.
- c.draw_colored_polygon(polygon, color)
+ _polygon(c,polygon,color)
 
 static func beam(c: CanvasItem, a: Vector3, b: Vector3, color: Color, width: float, heading: float = 0.0) -> void:
- c.draw_line(project(a, heading), project(b, heading), color, width, true)
+ _line(c,project(a,heading),project(b,heading),color,width)
 
 static func box(c: CanvasItem, origin: Vector3, extent: Vector3, color: Color, heading: float = 0.0) -> void:
  var a = origin
@@ -55,6 +103,23 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
  kind = asset_kind(kind)
  var faction = Color("#389fda") if team == 0 else (Color("#d95c45") if team==1 else Color("#919b81"))
  if is_nan(aim): aim=heading
+ var vehicle_key := ""
+ if kind in UNIT_MESH_KINDS:
+  # Reuse one colored mesh rather than submitting every armor plate separately.
+  # Quantization only affects artwork; simulation facing/aim remain continuous.
+  var hull_frame := posmod(int(round(heading / TAU * VEHICLE_ANGLE_STEPS)), VEHICLE_ANGLE_STEPS)
+  var aim_frame := posmod(int(round(aim / TAU * VEHICLE_ANGLE_STEPS)), VEHICLE_ANGLE_STEPS)
+  if kind in ["mcv","harvester","gunship","helicopter","a_tempest"]:
+   aim_frame = hull_frame # These assets have no independent aiming geometry.
+  var cargo_frame := int(ceil(clampf(cargo, 0.0, 1.0) * 16.0)) if kind == "harvester" else 0
+  vehicle_key = "%s:%d:%d:%d:%d" % [kind, team, hull_frame, aim_frame, cargo_frame]
+  if _vehicle_mesh_cache.has(vehicle_key):
+   c.draw_mesh(_vehicle_mesh_cache[vehicle_key], null)
+   return
+  heading = hull_frame * TAU / VEHICLE_ANGLE_STEPS
+  aim = aim_frame * TAU / VEHICLE_ANGLE_STEPS
+  if kind == "harvester": cargo = cargo_frame / 16.0
+  _batch_units = true
  match kind:
   "mcv": _mcv(c,faction,heading)
   "yard": _yard(c,faction)
@@ -72,6 +137,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   "rifleman","missile_team","engineer": _infantry(c,faction,heading,aim,kind)
   "tank","heavy_tank","aa","flak": _tank(c,faction,heading,aim,kind)
   "gunship","helicopter": _aircraft(c,faction,heading,kind)
+ if not vehicle_key.is_empty(): _finish_unit_batch(c,vehicle_key)
 
 static func _mcv(c: CanvasItem, color: Color, heading: float) -> void:
  # Six chunky tires, armored chassis, forward cab and folded yellow crane.

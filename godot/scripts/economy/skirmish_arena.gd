@@ -93,6 +93,7 @@ func reset_battle() -> void:
  for b in structures:
   if is_instance_valid(b): b.queue_free()
  units.clear()
+ invalidate_occupancy()
  projectiles.clear()
  structures.clear()
  selected.clear()
@@ -153,6 +154,7 @@ func _spawn_economy(id: String, side: int, where: Vector2, harvester: bool):
  actor.configure(self,roster[id],side,where,harvester)
  actor.destroyed.connect(_on_destroyed)
  units.append(actor)
+ invalidate_occupancy()
  return actor
 
 func _deploy_mcv(side: int) -> bool:
@@ -174,6 +176,7 @@ func _deploy_mcv(side: int) -> bool:
  var where: Vector2=mcv.position
  var paid_for_mcv: float=mcv.purchase_cost
  units.erase(mcv)
+ invalidate_occupancy()
  selected.erase(mcv)
  mcv.queue_free()
  _place_structure("yard",side,where,paid_for_mcv)
@@ -232,6 +235,7 @@ func _on_destroyed(unit) -> void:
  kills[1-unit.team]+=1
  selected.erase(unit)
  units.erase(unit)
+ invalidate_occupancy()
  _check_victory()
 
 func _check_victory() -> void:
@@ -597,6 +601,7 @@ func capture_structure(engineer, b) -> bool:
  # No free harvester on capture; the bundled harvester is granted only on fresh construction.
  selected.erase(engineer)
  units.erase(engineer)
+ invalidate_occupancy()
  engineer.queue_free()
  hud_status="Captured "+str(STRUCTURE_DATA[b.kind]["name"]) if b.team==0 else hud_status
  _check_victory()
@@ -680,6 +685,7 @@ func _spawn_engineer(id: String, side: int, where: Vector2):
  u.configure(self,data,side,where,{"type":"UNARMED","damage":0.0,"interval":1.0,"range":0.0,"anti_ground":false})
  u.destroyed.connect(_on_destroyed)
  units.append(u)
+ invalidate_occupancy()
  return u
 
 func _ai_place_ready(lane: String, id: String) -> void:
@@ -901,7 +907,7 @@ func _select_building(b) -> void:
   b.queue_redraw()
  _update_hud()
 
-func issue_order(point: Vector2, attack_move: bool=false) -> void:
+func issue_order(point: Vector2, attack_move: bool=false, queued: bool=false) -> void:
  var capture_target=_hit_building(point,-2)
  if capture_target!=null and capture_target.team!=0:
   var assigned=false
@@ -917,7 +923,7 @@ func issue_order(point: Vector2, attack_move: bool=false) -> void:
   for u in selected:
    if is_instance_valid(u) and u.can_hit(enemy_building): u.order_attack(enemy_building)
   return
- super.issue_order(point,attack_move)
+ super.issue_order(point,attack_move,queued)
 
 # Godot 4 canvas-items stretch uses visible viewport coordinates on desktop
 # and Android. Keep a single geometry contract for landscape and portrait.
