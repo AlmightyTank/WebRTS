@@ -66,7 +66,7 @@ func run_checks() -> void:
  expect(world.queue_production(0,"vehicle","a_sentinel"),"Factory can queue a Sentinel tank")
  world._tick_production(0,24.0)
  expect(world.units.any(func(u): return is_instance_valid(u) and u.unit_id=="a_sentinel"),"New tank exits War Factory")
- expect(not world.can_place(Vector2(900,480),"barracks",0),"Static obstacle stops building placement")
+ expect(not world.can_place(Vector2(875,270),"barracks",0),"Static obstacle stops building placement")
  expect(not world.can_place(Vector2(1670,250),"power",0),"Enemy territory is outside build radius")
  var generator
  for b in world.structures:
@@ -82,3 +82,4 @@ func run_checks() -> void:
  else:
   print("SKIRMISH_SMOKE_FAIL "+str(failures.size()))
   quit(1)
+

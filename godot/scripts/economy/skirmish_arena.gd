@@ -583,7 +583,8 @@ func _update_hud() -> void:
   var job: Dictionary=state["lanes"][lane]
   if not job.is_empty():
    var recipe=_recipe(str(job["id"]))
-   details.append("%s %s %d%%" % [lane.to_upper(),str(recipe.get("name",job["id"])),int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1.0)))))])
+   var percentage=int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1.0))))
+   details.append("%s %s %d%%" % [lane.to_upper(),str(recipe.get("name",job["id"])),percentage])
  info_text.text=" | ".join(details) if not details.is_empty() else hud_status
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
@@ -618,3 +619,4 @@ func _draw() -> void:
    var pos=Vector2(roundf(get_global_mouse_position().x/24.0)*24.0,roundf(get_global_mouse_position().y/24.0)*24.0)
    var size: Vector2=STRUCTURE_DATA[str(job["id"])]["size"]
    draw_rect(Rect2(pos-size/2.0,size),Color(0.3,0.95,0.45,0.28) if can_place(pos,str(job["id"]),0) else Color(0.98,0.2,0.25,0.3))
+
