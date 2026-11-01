@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/core/animated_core_building.gd" id="1"]
+
+[node name="IndustrialOreWorks" type="Node2D"]
+script = ExtResource("1")
+faction = "republic"
+building_id = "industrial_ore_works"
+
+[node name="Visual" type="AnimatedSprite2D" parent="."]
