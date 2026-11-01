@@ -158,9 +158,18 @@ func clear_shot(from: Vector2, to: Vector2, from_air: bool, to_air: bool) -> boo
  if from_air or to_air:
   return true
  for box in obstacles:
-  if box.intersects_segment(from, to) != null:
+  if _segment_hits_rect(from, to, box):
    return false
  return true
+
+func _segment_hits_rect(start: Vector2, finish: Vector2, box: Rect2) -> bool:
+ if box.has_point(start) or box.has_point(finish):
+  return true
+ var top_left := box.position
+ var bottom_right := box.end
+ var top_right := Vector2(bottom_right.x, top_left.y)
+ var bottom_left := Vector2(top_left.x, bottom_right.y)
+ return Geometry2D.segment_intersects_segment(start, finish, top_left, top_right) != null or Geometry2D.segment_intersects_segment(start, finish, top_right, bottom_right) != null or Geometry2D.segment_intersects_segment(start, finish, bottom_right, bottom_left) != null or Geometry2D.segment_intersects_segment(start, finish, bottom_left, top_left) != null
 
 func armor_multiplier(kind: String, armor: String) -> float:
  return float(registry.get("weapon_armor_multipliers", {}).get(kind.to_upper(), {}).get(armor, 0.0))
