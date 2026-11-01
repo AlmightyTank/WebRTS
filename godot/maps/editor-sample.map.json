@@ -1,0 +1,24 @@
+{
+	"format": "meridian-warfront-map",
+	"version": 1,
+	"name": "editor-sample",
+	"width": 8,
+	"height": 8,
+	"tile_size": [128, 64],
+	"terrain": [
+		"00000005",
+		"01000000",
+		"44000000",
+		"00000000",
+		"00000000",
+		"00000000",
+		"00000030",
+		"20000033"
+	],
+	"obstacles": [
+		{"kind": "tree", "x": 1, "y": 1},
+		{"kind": "rock", "x": 6, "y": 1},
+		{"kind": "debris", "x": 1, "y": 6}
+	],
+	"headquarters": {"x": 4, "y": 4}
+}

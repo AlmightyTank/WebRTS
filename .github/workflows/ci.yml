@@ -19,5 +19,7 @@ jobs:
           include-templates: false
       - name: Import resources and check scripts
         run: godot --headless --path godot --editor --quit
+      - name: Map serialization round trip
+        run: godot --headless --path godot --script res://scripts/checks/map_roundtrip.gd
       - name: Launch battlefield smoke test
         run: godot --headless --path godot --quit-after 10

@@ -12,7 +12,7 @@ The Godot project is the primary implementation. Source code and artwork live in
 
 ## Status
 
-The isometric battlefield, terrain transitions, camera controls, Y-sorted actor layer, and initial decorations are under development. Many visuals remain placeholders. The GitHub Actions Godot smoke test validates import and startup; it is not a substitute for an interactive playtest.
+The battlefield loads a versioned JSON map. A desktop map editor can paint terrain, decorations, and the headquarters cell; see [`docs/MAP-FORMAT.md`](docs/MAP-FORMAT.md). Many visuals remain placeholders. GitHub Actions imports the project, runs the map round-trip check, and launches a headless smoke test.
 
 ## Previous WebRTS prototype
 
