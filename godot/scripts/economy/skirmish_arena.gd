@@ -964,9 +964,10 @@ func _apply_hud_layout(view_size: Vector2) -> void:
  if is_instance_valid(hud_scroll):
   hud_scroll.visible=sidebar_open
   hud_scroll.custom_minimum_size=Vector2.ZERO
- if is_instance_valid(radar_view): radar_view.custom_minimum_size=Vector2(260,92 if compact_hud else 135)
   if is_instance_valid(hud_build_column):
    hud_build_column.custom_minimum_size=Vector2.ZERO
+ if is_instance_valid(radar_view):
+  radar_view.custom_minimum_size=Vector2(260,92 if compact_hud else 135)
  if is_instance_valid(rally_stage_selector):
   rally_stage_selector.visible=not compact_hud
  if is_instance_valid(activate_producer_button):
