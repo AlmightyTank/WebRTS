@@ -73,7 +73,64 @@ var queue_preview_caption: Label
 var production_tile_icons: Dictionary = {}
 var action_palette_buttons: Array = []
 
+var fog_enabled := true
+var fog
+const ArmyRules = preload("res://scripts/economy/army_rules.gd")
+var army_choices: Array = ["alliance", "republic"]
+var fog_timer := 0.0
+
+func faction_style(side: int) -> int:
+ if side < 0: return 2
+ return {"alliance":0,"republic":1,"gia":2}[ArmyRules.faction(army_choices[side])]
+
+func _load_balance() -> void:
+ super._load_balance()
+ for data in registry.get("specialist_units", []):
+  if data.id in ["a_lance", "r_imperator", "g_volley"]: roster[data.id] = data
+
+func _spawn(id: String, side: int, point: Vector2):
+ var unit
+ if ArmyRules.PROFILES.has(id):
+  unit = Node2D.new()
+  unit.set_script(UnitScript)
+  actors.add_child(unit)
+  unit.configure(self, roster[id], side, point, ArmyRules.PROFILES[id], roster[id].armor == "AIR")
+  unit.destroyed.connect(_on_destroyed)
+  units.append(unit)
+  invalidate_occupancy()
+  unit.visible = entity_visible_to(0, unit)
+ else:
+  unit = super._spawn(id, side, point)
+ if unit != null: ArmyRules.apply_unit(army_choices[side], unit)
+ return unit
+var scouting = preload("res://scripts/combat/scouting.gd").new()
+
+func entity_visible_to(side: int, entity) -> bool:
+ if not is_instance_valid(entity): return false
+ return not fog_enabled or fog == null or entity.team == side or fog.sees(side, entity.position)
+
+func feedback_visible(point: Vector2) -> bool:
+ return not fog_enabled or fog == null or fog.sees(0, point)
+
+func _refresh_fog() -> void:
+ if not fog_enabled: return
+ if fog == null:
+  fog = load("res://scripts/combat/fog_of_war.gd").new()
+  add_child(fog)
+  fog.reset(self)
+ else:
+  fog.refresh()
+
+func _ai_decide() -> void:
+ super._ai_decide()
+ if not fog_enabled or battle_over: return
+ # Idle combat units explore using their team's knowledge, not enemy coordinates.
+ for unit in units:
+  if is_instance_valid(unit) and unit.team == 1 and unit.hp > 0 and not unit.weapon.is_empty() and not unit.moving and unit.target == null:
+   if not scouting.orders.has(unit): scouting.start(self, unit)
+
 func _ready() -> void:
+ army_choices = [ArmyRules.valid_choice(str(army_choices[0])), ArmyRules.valid_choice(str(army_choices[1]))]
  super._ready()
  # reset_battle() captures immutable scenery on the first run.
  _rebuild_navigation()
@@ -84,6 +141,10 @@ func _new_state() -> Dictionary:
  return {"credits":10000.0,"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
 
 func reset_battle() -> void:
+ if is_instance_valid(combat_feedback):
+  combat_feedback.effects.clear()
+  combat_feedback.queue_redraw()
+ scouting.orders.clear()
  # Override the Combat Lab's scenario starting point; its four benchmark
  # scenes remain available as res://scenes/combat_lab.tscn.
  for u in units:
@@ -125,8 +186,8 @@ func reset_battle() -> void:
  hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
  if static_obstacles.is_empty(): static_obstacles=obstacles.duplicate()
  _rebuild_navigation()
- var ally=_spawn_economy("a_mcv",0,Vector2(310,620),false)
- _spawn_economy("r_mcv",1,Vector2(1600,610),false)
+ var ally=_spawn_economy(ArmyRules.economic_id(army_choices[0]),0,Vector2(310,620),false)
+ _spawn_economy(ArmyRules.economic_id(army_choices[1]),1,Vector2(1600,610),false)
  # An AI follows the same construction/credit rules, but deploys its MCV immediately.
  _deploy_mcv(1)
  # A capturable neutral structure provides a tactical expansion objective.
@@ -135,6 +196,9 @@ func reset_battle() -> void:
   ally.selected=true
   selected=[ally]
  if is_instance_valid(result_text): result_text.text=""
+ if fog_enabled:
+  if fog != null: fog.reset(self)
+  else: _refresh_fog()
  _update_hud()
  queue_redraw()
 
@@ -152,6 +216,7 @@ func _spawn_economy(id: String, side: int, where: Vector2, harvester: bool):
  actor.set_script(EconomyVehicleScript)
  actors.add_child(actor)
  actor.configure(self,roster[id],side,where,harvester)
+ actor.visible=entity_visible_to(0,actor)
  actor.destroyed.connect(_on_destroyed)
  units.append(actor)
  invalidate_occupancy()
@@ -159,7 +224,7 @@ func _spawn_economy(id: String, side: int, where: Vector2, harvester: bool):
 
 func _deploy_mcv(side: int) -> bool:
  var mcv = null
- var expected_id="a_mcv" if side==0 else "r_mcv"
+ var expected_id=ArmyRules.economic_id(army_choices[side])
  # Deploy the currently selected MCV rather than an unrelated idle vehicle.
  if side==0:
   for unit in selected:
@@ -189,6 +254,7 @@ func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-
  b.set_script(StructureScript)
  actors.add_child(b)
  b.configure(self,id,side,point,size)
+ b.visible=entity_visible_to(0,b)
  # An MCV-derived yard and map-authored neutral outpost never generate sell money.
  b.paid_value=0.0 if id=="relay" or (id=="yard" and paid_value<0.0) else (float(STRUCTURE_DATA[id]["cost"]) if paid_value<0.0 else paid_value)
  b.destroyed.connect(_building_destroyed)
@@ -202,7 +268,7 @@ func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-
   var nearest=point+Vector2(0,135 if side==0 else -135)
   var spawn_site=_find_open_position(nearest,22.0)
   if spawn_site!=Vector2.ZERO:
-   _spawn_economy("a_harvester" if side==0 else "r_hauler",side,spawn_site,true)
+   _spawn_economy(ArmyRules.economic_id(army_choices[side],true),side,spawn_site,true)
    states[side]["harvesters"]=int(states[side]["harvesters"])+1
   else:
    push_warning("Refinery deployed but initial harvester spawn is obstructed")
@@ -249,7 +315,7 @@ func _check_victory() -> void:
     if building.kind!="turret": significant+=1
     if building.kind=="yard": deployed_or_mobile=true
   for actor in units:
-   if is_instance_valid(actor) and actor.team==side and actor.unit_id in ["a_mcv","r_mcv"]: deployed_or_mobile=true
+   if is_instance_valid(actor) and actor.team==side and actor.unit_id in ["a_mcv","r_mcv","g_mcv"]: deployed_or_mobile=true
   if significant==0 and not deployed_or_mobile:
    battle_over=true
    if is_instance_valid(result_text): result_text.text="VICTORY — REPUBLIC DEFEATED" if side==1 else "DEFEAT — ALLIANCE LOST"
@@ -264,7 +330,7 @@ func find_target(seeker, search_radius: float):
  var winner
  var best=INF
  for entity in projectile_targets():
-  if not is_instance_valid(entity) or entity.hp<=0 or not seeker.can_hit(entity): continue
+  if not is_instance_valid(entity) or entity.hp<=0 or not entity_visible_to(seeker.team, entity) or not seeker.can_hit(entity): continue
   var distance=seeker.position.distance_to(entity.position)
   if distance>search_radius: continue
   var score=distance
@@ -488,6 +554,15 @@ func _has_producer(side: int, lane: String) -> bool:
  return false
 
 func _tech_ready(side: int, id: String) -> bool:
+ if roster.has(id):
+  if not id in ArmyRules.roster_ids(army_choices[side]): return false
+  var base=ArmyRules.base_id(id)
+  if _lane_for(id)=="infantry":
+   return has_structure(side,"barracks") and (has_structure(side,"refinery") if base in ["a_javelin","r_hunter","g_rocket_cell"] else true)
+  if not has_structure(side,"factory"): return false
+  if base in ["a_mcv","r_mcv","g_mcv","r_mammoth"]: return has_structure(side,"depot")
+  if roster[id].armor=="AIR" or base in ["a_sentinel_aa","r_flak","g_rocket_truck"]: return has_structure(side,"power")
+  return true
  match id:
   "power": return has_structure(side,"yard")
   "refinery","barracks": return has_structure(side,"power")
@@ -501,17 +576,16 @@ func _tech_ready(side: int, id: String) -> bool:
   "a_sentinel_aa","r_flak": return has_structure(side,"factory") and has_structure(side,"power")
  return false
 
-func _recipe(id: String) -> Dictionary:
+func _recipe(id: String, side: int = 0) -> Dictionary:
  if STRUCTURE_DATA.has(id): return STRUCTURE_DATA[id]
  if roster.has(id):
-  return {"name":roster[id]["name"],"cost":float(roster[id]["credits"]),"time":float(roster[id]["build_seconds"])}
+  return {"name":roster[id]["name"],"cost":float(roster[id]["credits"])*ArmyRules.cost_factor(army_choices[side],roster[id]),"time":float(roster[id]["build_seconds"])}
  return {}
 
 func queue_production(side: int, lane: String, id: String) -> bool:
  if side<0 or side>=states.size() or not lane in ["build","defense","infantry","vehicle"]: return false
  if id=="relay" or _lane_for(id)!=lane or _recipe(id).is_empty(): return false
- if id.begins_with("a_") and side!=0: return false
- if id.begins_with("r_") and side!=1: return false
+ if roster.has(id) and not id in ArmyRules.roster_ids(army_choices[side]): return false
  if not _has_producer(side,lane) or not _tech_ready(side,id): return false
  var lanes: Dictionary=states[side]["lanes"]
  if lane in ["build","defense"]:
@@ -582,7 +656,7 @@ func sell_structure(side: int, b) -> bool:
 func capture_structure(engineer, b) -> bool:
  if engineer==null or b==null or not is_instance_valid(engineer) or not is_instance_valid(b): return false
  if not units.has(engineer) or not structures.has(b) or b.hp<=0.0: return false
- if engineer.unit_id not in ["a_engineer","r_engineer"] or engineer.team==b.team: return false
+ if not ArmyRules.engineer(engineer.unit_id) or engineer.team==b.team: return false
  var old_owner: int=b.team
  b.team=engineer.team
  if b.kind in ["barracks","factory"]:
@@ -634,7 +708,7 @@ func _tick_production(side: int, delta: float) -> void:
    elif side==1: _ai_place_ready(lane,str(job["id"]))
    continue
   if not _has_producer(side,lane): continue
-  var recipe=_recipe(str(job["id"]))
+  var recipe=_recipe(str(job["id"]),side)
   if recipe.is_empty(): continue
   var cost=float(recipe["cost"])
   var duration=maxf(0.25,float(recipe["time"]))
@@ -652,7 +726,8 @@ func _tick_production(side: int, delta: float) -> void:
     if _produce_unit(side,str(job["id"])): lanes[lane]={}
 
 func _produce_unit(side: int, id: String) -> bool:
- var lane="infantry" if id in ["a_ranger","a_javelin","r_line","r_hunter","a_engineer","r_engineer"] else "vehicle"
+ if not id in ArmyRules.roster_ids(army_choices[side]): return false
+ var lane=_lane_for(id)
  var producer=_active_producer(side,lane)
  if producer==null: return false
  # A blocked active exit stalls READY production, never secretly uses another factory.
@@ -662,10 +737,10 @@ func _produce_unit(side: int, id: String) -> bool:
  var where=_find_open_position(producer.position+offset,20.0)
  if where==Vector2.ZERO: return false
  var unit=null
- if id in ["a_harvester","r_hauler","a_mcv","r_mcv"]:
-  unit=_spawn_economy(id,side,where,id in ["a_harvester","r_hauler"])
-  if unit!=null and id in ["a_mcv","r_mcv"]: unit.purchase_cost=float(_recipe(id)["cost"])
- elif id in ["a_engineer","r_engineer"]:
+ if ArmyRules.economic(id):
+  unit=_spawn_economy(id,side,where,id in ["a_harvester","r_hauler","g_collector"])
+  if unit!=null and id in ["a_mcv","r_mcv","g_mcv"]: unit.purchase_cost=float(_recipe(id,side)["cost"])
+ elif ArmyRules.engineer(id):
   unit=_spawn_engineer(id,side,where)
  else:
   unit=_spawn(id,side,where)
@@ -675,13 +750,13 @@ func _produce_unit(side: int, id: String) -> bool:
  if waypoint!=Vector2.ZERO:
   if unit.has_method("order_rally"): unit.order_rally(waypoint)
   elif unit.has_method("order_move"):
-   var military=id not in ["a_engineer","r_engineer"]
+   var military=not ArmyRules.engineer(id)
    unit.order_move(waypoint,producer.rally_attack_move and military)
  return true
 
 func _infantry_exit_offset(side: int, producer) -> Vector2:
  var art = preload("res://scripts/ui/industrial_art.gd")
- var exit: Vector2 = art.building_exit(side)
+ var exit: Vector2 = art.building_exit(producer.art_style)
  # Clear the footprint before spawning; retain the door's horizontal alignment.
  return Vector2(exit.x,maxf(exit.y,producer.footprint.y*0.5+30.0))
 
@@ -718,7 +793,7 @@ func can_place(point: Vector2, id: String, side: int) -> bool:
  for u in units:
   if is_instance_valid(u) and u.hp>0 and rect.grow(u.radius+3).has_point(u.position):
    # Allow MCV to deploy on its own exact position.
-   if not (id=="yard" and u.unit_id in ["a_mcv","r_mcv"] and u.team==side and u.position.distance_to(point)<3.0): return false
+   if not (id=="yard" and u.unit_id in ["a_mcv","r_mcv","g_mcv"] and u.team==side and u.position.distance_to(point)<3.0): return false
  if id=="yard": return true
  if not has_structure(side,"yard"): return false
  for b in structures:
@@ -791,12 +866,14 @@ func _ai_economy() -> void:
  if state["lanes"]["defense"].is_empty() and has_structure(1,"barracks") and ai_build_tick%5==0:
   if _building_count(1,"turret")<2: queue_production(1,"defense","turret")
  if has_structure(1,"barracks") and float(state["credits"])>800.0 and ai_build_tick%2==0:
-  queue_production(1,"infantry","r_hunter" if has_structure(1,"refinery") and ai_build_tick%4==0 else "r_line")
+   var ids=ArmyRules.roster_ids(army_choices[1])
+   queue_production(1,"infantry",ids[1] if has_structure(1,"refinery") and ai_build_tick%4==0 else ids[0])
  if has_structure(1,"factory") and float(state["credits"])>1700.0:
   if not has_structure(1,"yard") and has_structure(1,"depot"):
-   queue_production(1,"vehicle","r_mcv")
+   queue_production(1,"vehicle",ArmyRules.economic_id(army_choices[1]))
   else:
-   queue_production(1,"vehicle","r_bastion" if ai_build_tick%3!=0 else "r_flak")
+   var options=ArmyRules.roster_ids(army_choices[1]).filter(func(id): return _lane_for(id)=="vehicle" and not ArmyRules.economic(id) and _tech_ready(1,id))
+   if not options.is_empty(): queue_production(1,"vehicle",options[ai_build_tick%options.size()])
  ai_build_tick+=1
 
 func _building_count(side: int, id: String) -> int:
@@ -806,6 +883,11 @@ func _building_count(side: int, id: String) -> int:
  return count
 
 func _physics_process(delta: float) -> void:
+ fog_timer -= delta
+ if fog_timer <= 0.0:
+  fog_timer = 0.15
+  _refresh_fog()
+  if not paused and not battle_over: scouting.tick(self)
  super._physics_process(delta)
  if paused or battle_over: return
  skirmish_time+=delta
@@ -818,6 +900,10 @@ func _physics_process(delta: float) -> void:
   _ai_economy()
 
 func _unhandled_input(event: InputEvent) -> void:
+ if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_G and not rally_placing and selected.any(func(unit): return is_instance_valid(unit) and unit.get("order_revision") != null):
+  _on_toolbar("SCOUT")
+  get_viewport().set_input_as_handled()
+  return
  if rally_placing:
   if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
    rally_placing=false
@@ -899,7 +985,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _hit_building(point: Vector2, side: int=-2):
  for b in structures:
-  if is_instance_valid(b) and b.hp>0 and (side==-2 or b.team==side) and b.ground_bounds().grow(8).has_point(point): return b
+  if is_instance_valid(b) and b.hp>0 and entity_visible_to(0, b) and (side==-2 or b.team==side) and b.ground_bounds().grow(8).has_point(point): return b
  return null
 
 func _select_building(b) -> void:
@@ -921,13 +1007,13 @@ func issue_order(point: Vector2, attack_move: bool=false, queued: bool=false) ->
  if capture_target!=null and capture_target.team!=0:
   var assigned=false
   for u in selected:
-   if is_instance_valid(u) and u.unit_id=="a_engineer":
+   if is_instance_valid(u) and ArmyRules.engineer(u.unit_id):
     u.order_capture(capture_target)
     assigned=true
   if assigned: return
  var enemy_building
  for b in structures:
-  if is_instance_valid(b) and b.team==1 and b.ground_bounds().grow(8).has_point(point): enemy_building=b; break
+  if is_instance_valid(b) and b.team==1 and entity_visible_to(0, b) and b.ground_bounds().grow(8).has_point(point): enemy_building=b; break
  if enemy_building!=null:
   for u in selected:
    if is_instance_valid(u) and u.can_hit(enemy_building): u.order_attack(enemy_building)
@@ -1159,7 +1245,7 @@ func _create_hud() -> void:
  badge.add_child(crest)
  crest.configure("EMBLEM")
  var faction=Label.new()
- faction.text="ALLIANCE  /  COMMAND"
+ faction.text=str(ArmyRules.CHOICES[army_choices[0]].name).to_upper()
  badge.add_child(faction)
  RetroSkin.label(faction,false,true)
  radar_view=Control.new()
@@ -1201,7 +1287,7 @@ func _create_hud() -> void:
  build_container.add_theme_constant_override("h_separation",6)
  build_container.add_theme_constant_override("v_separation",6)
  column.add_child(build_container)
- for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
+ for id in ["power","refinery","barracks","factory","depot","turret"] + ArmyRules.roster_ids(army_choices[0]):
   var button=Button.new()
   button.text=id
   button.custom_minimum_size=Vector2(0,76)
@@ -1216,7 +1302,7 @@ func _create_hud() -> void:
   icon.position=Vector2(-24,2)
   icon.size=Vector2(48,35)
   button.add_child(icon)
-  icon.configure(id)
+  icon.configure(id,0,faction_style(0))
   production_tile_icons[id]=icon
   action_buttons[id]=button
  var header=Label.new()
@@ -1352,7 +1438,7 @@ func _create_hud() -> void:
  hud_toolbar_scroll=toolbar_scroll
  var row=HBoxContainer.new()
  toolbar_scroll.add_child(row)
- for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Formation"],["DEPLOY","Deploy"],["RALLY","Rally"],["STAGING","Staging"],["PAUSE","Pause"],["RESET","Restart"]]:
+ for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["SCOUT","Scout (G)"],["FORMATION","Formation"],["DEPLOY","Deploy"],["RALLY","Rally"],["STAGING","Staging"],["PAUSE","Pause"],["RESET","Restart"]]:
   var button=Button.new()
   button.text=pair[1]
   button.custom_minimum_size=Vector2(82,34)
@@ -1392,6 +1478,11 @@ func _skin_hud() -> void:
 
 func _on_toolbar(action: String) -> void:
  match action:
+  "SCOUT":
+   if paused or battle_over: return
+   for unit in selected:
+    if is_instance_valid(unit) and unit.team == 0: scouting.start(self, unit)
+   hud_status="Scouting unexplored terrain. Move, attack or stop cancels."
   "DEPLOY": _on_deploy()
   "RALLY": _begin_rally()
   "STAGING":
@@ -1467,7 +1558,7 @@ func _on_build_button(id: String) -> void:
 func _lane_for(id: String) -> String:
  if id=="turret": return "defense"
  if id in ["power","refinery","barracks","factory","depot"]: return "build"
- if id in ["a_ranger","a_javelin","a_engineer","r_line","r_hunter","r_engineer"]: return "infantry"
+ if roster.has(id): return ArmyRules.lane(id,roster[id])
  return "vehicle"
 
 func _update_hud() -> void:
@@ -1525,7 +1616,10 @@ func _update_hud() -> void:
    "refinery":"ORE REFINERY","factory":"WAR FACTORY","depot":"SERVICE DEPOT",
    "a_ranger":"RANGER","a_javelin":"JAVELIN","a_engineer":"ENGINEER",
    "a_sentinel":"SENTINEL","a_sentinel_aa":"MOBILE AA",
-   "a_harvester":"HARVESTER","a_mcv":"MCV"
+   "a_harvester":"HARVESTER","a_mcv":"MCV",
+   "a_lance":"ARC LANCE","a_striker":"STRIKER",
+   "r_imperator":"IMPERATOR","r_mammoth":"MAMMOTH","r_siege_heli":"SIEGE HELI",
+   "g_rocket_truck":"MOBILE AA","g_volley":"VOLLEY","g_heli":"HELICOPTER","g_collector":"COLLECTOR"
   }.get(id,label.to_upper())
   var label_tail="$%d" % cost
   if ready: label_tail="READY"

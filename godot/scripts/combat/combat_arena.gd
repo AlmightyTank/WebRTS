@@ -297,12 +297,16 @@ func _spawn(unit_id: String, side: int, pos: Vector2):
  u.set_script(UnitScript)
  actors.add_child(u)
  u.configure(self, data, side, pos, WEAPONS[unit_id], str(data.get("armor", "")) == "AIR")
+ u.visible = entity_visible_to(0, u)
  u.connect("destroyed", Callable(self, "_on_destroyed"))
  units.append(u)
  invalidate_occupancy()
  return u
 
 func reset_battle() -> void:
+ if is_instance_valid(combat_feedback):
+  combat_feedback.effects.clear()
+  combat_feedback.queue_redraw()
  for u in units:
   if is_instance_valid(u):
    u.queue_free()
@@ -345,6 +349,20 @@ func reset_battle() -> void:
  _update_hud()
  queue_redraw()
 
+var combat_feedback
+
+func feedback_visible(_point: Vector2) -> bool:
+ return true
+
+func show_combat_feedback(point: Vector2, kind: String, weapon: String, size: float = 18.0) -> void:
+ if not is_instance_valid(actors): return
+ if not is_instance_valid(combat_feedback):
+  combat_feedback = preload("res://scripts/combat/combat_feedback.gd").new()
+  combat_feedback.arena = self
+  actors.add_child(combat_feedback)
+  combat_feedback.z_index = 80
+ combat_feedback.emit_effect(point, kind, weapon, size)
+
 func spawn_projectile(source, target, weapon: Dictionary) -> void:
  if not is_instance_valid(target):
   return
@@ -352,11 +370,16 @@ func spawn_projectile(source, target, weapon: Dictionary) -> void:
  p.set_script(ProjectileScript)
  actors.add_child(p)
  p.configure(self, source.position, source, target, weapon)
+ p.visible = entity_visible_to(0, source)
  projectiles.append(p)
  shots += 1
+ show_combat_feedback(source.position + source.position.direction_to(target.position) * source.radius, "muzzle", str(weapon.get("type", "SMALL_ARMS")))
 
 func register_hit(_source, _victim, _damage: float) -> void:
  hits += 1
+ var kind := "SMALL_ARMS"
+ if is_instance_valid(_source): kind = str(_source.weapon.get("type", "SMALL_ARMS"))
+ show_combat_feedback(_victim.position, "death" if _victim.hp <= 0 else "impact", kind, _victim.radius)
 
 func _on_destroyed(unit) -> void:
  kills[1 - unit.team] += 1
@@ -398,6 +421,9 @@ func find_target(seeker, search_radius: float):
    best_score = score
    best = u
  return best
+
+func entity_visible_to(_side: int, entity) -> bool:
+ return is_instance_valid(entity)
 
 func _ai_decide() -> void:
  if battle_over:
@@ -592,7 +618,7 @@ func _hit_unit(point: Vector2, side: int = -1):
  var best
  var best_d := INF
  for u in units:
-  if not is_instance_valid(u) or u.hp <= 0.0 or (side != -1 and u.team != side):
+  if not is_instance_valid(u) or u.hp <= 0.0 or (side != -1 and u.team != side) or not entity_visible_to(0, u):
    continue
   var d := point.distance_to(u.position)
   if d < u.radius + 10.0 and d < best_d:

@@ -9,6 +9,8 @@ var weapon_kind := "SMALL_ARMS"
 var speed := 520.0
 var expire := 3.0
 var anti_air := false
+var target_air := false
+var source_air := false
 var is_homing := false
 var destination := Vector2.ZERO
 var velocity := Vector2.ZERO
@@ -23,6 +25,8 @@ func configure(world: Node2D, origin: Vector2, source, enemy, profile: Dictionar
  weapon_kind = str(profile.get("type","SMALL_ARMS"))
  speed = float(profile.get("projectile_speed",520.0))
  anti_air = bool(profile.get("anti_air",false))
+ target_air = enemy.air
+ source_air = source.air
  is_homing = bool(profile.get("homing",false))
  destination = enemy.position
  velocity = (destination-position).normalized()*speed
@@ -34,12 +38,12 @@ func _physics_process(delta: float) -> void:
  if expire <= 0.0:
   queue_free()
   return
- if is_homing and is_instance_valid(target) and target.hp>0.0:
+ if is_homing and is_instance_valid(target) and target.hp>0.0 and target.team!=owner_team:
   destination = target.position
   var desired := (destination-position).normalized()*speed
   velocity = velocity.lerp(desired,minf(1.0,6.0*delta)).normalized()*speed
  var next_position := position+velocity*delta
- if not anti_air and not arena.clear_shot(position,next_position,false,false,target):
+ if not arena.clear_shot(position,next_position,source_air,target_air,target):
   queue_free()
   return
  var nearest
@@ -49,10 +53,8 @@ func _physics_process(delta: float) -> void:
  for unit in arena.projectile_targets() if arena.has_method("projectile_targets") else arena.units:
   if not is_instance_valid(unit) or unit.hp<=0.0 or unit.team==owner_team:
    continue
-  # Anti-air missiles cannot strike ground units; conventional projectiles cannot strike flying units.
-  if unit.air and not anti_air:
-   continue
-  if not unit.air and anti_air:
+  # A dual-purpose weapon's shot uses the layer it was actually fired at.
+  if unit.air != target_air:
    continue
   var t := clampf((unit.position-position).dot(path)/travel_squared,0.0,1.0)
   var closest := position+path*t
@@ -70,6 +72,10 @@ func _physics_process(delta: float) -> void:
  queue_redraw()
 
 func _draw() -> void:
- var tint := Color("#f3d49b") if not anti_air else Color("#8be2ff")
- draw_line(Vector2.ZERO,-velocity.normalized()*(10.0 if anti_air else 5.0),tint,3.0)
- draw_circle(Vector2.ZERO,3.3 if anti_air else 2.2,tint)
+ var missile := is_homing or weapon_kind in ["MISSILE", "ROCKET"]
+ var heavy := weapon_kind not in ["SMALL_ARMS", "SNIPER"]
+ var tint := Color("#8be2ff") if target_air else Color("#f3d49b")
+ var back := -velocity.normalized()
+ draw_line(Vector2.ZERO, back * (18.0 if missile else (10.0 if heavy else 6.0)), Color(tint, 0.45), 4.0 if heavy else 2.0)
+ draw_line(Vector2.ZERO, back * (8.0 if heavy else 4.0), tint, 2.0)
+ draw_circle(Vector2.ZERO, 3.0 if heavy else 1.6, Color("#fff0cd"))

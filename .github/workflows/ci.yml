@@ -27,6 +27,12 @@ jobs:
           set -o pipefail
           timeout 45s godot --headless --path godot --script res://tests/combat_smoke.gd 2>&1 | tee combat-smoke.log
           grep -q COMBAT_SMOKE_PASS combat-smoke.log
+      - name: Test combat pursuit, minimum range and projectile layers
+        run: timeout 45s godot --headless --path godot --script res://tests/combat_reliability_smoke.gd
+      - name: Test bounded combat feedback and fog safety
+        run: timeout 45s godot --headless --path godot --script res://tests/combat_feedback_smoke.gd
+      - name: Test shroud, exploration and visibility rules
+        run: timeout 45s godot --headless --path godot --script res://tests/fog_of_war_smoke.gd
       - name: Test construction, ore, power and production
         shell: bash
         run: |
@@ -57,6 +63,9 @@ jobs:
           set -o pipefail
           timeout 45s godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd 2>&1 | tee retro-ui-smoke.log
           grep -q RETRO_COMMAND_HUD_SMOKE_PASS retro-ui-smoke.log
+      - name: Test automatic scouting and cancellation
+        timeout-minutes: 2
+        run: godot --headless --path godot --script res://tests/scouting_smoke.gd
       - name: Test ground movement and order regressions
         timeout-minutes: 2
         run: godot --headless --path godot --script res://tests/movement_orders_smoke.gd
@@ -66,5 +75,8 @@ jobs:
       - name: Test shared artwork meshes for every unit
         timeout-minutes: 2
         run: godot --headless --path godot --script res://tests/unit_mesh_cache_smoke.gd
+      - name: Test playable armies and general rules
+        timeout-minutes: 2
+        run: godot --headless --path godot --script res://tests/army_rules_smoke.gd
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180

@@ -65,10 +65,17 @@ func configure(world: Node2D, unit_data: Dictionary, side: int, pos: Vector2, gu
 func can_hit(other) -> bool:
     if other == null or not is_instance_valid(other) or other.team == team or other.hp <= 0.0:
         return false
+    if not arena.entity_visible_to(team, other):
+        return false
     var factor = arena.armor_multiplier(str(weapon.get("type", "SMALL_ARMS")), other.armor)
     return factor > 0.0 and (bool(weapon.get("anti_air", false)) if other.air else bool(weapon.get("anti_ground", true)))
 
+var order_revision := 0
+var fire_feedback := 0.0
+var hit_feedback := 0.0
+
 func order_move(point: Vector2, attack_move: bool = false) -> void:
+    order_revision += 1
     pending_orders.clear()
     explicit_attack = false
     capture_target = null
@@ -84,6 +91,7 @@ func order_attack(enemy) -> void:
     if not can_hit(enemy):
         return
     explicit_attack = true
+    order_revision += 1
     pending_orders.clear()
     capture_target = null
     capture_progress = 0.0
@@ -97,6 +105,7 @@ func order_attack(enemy) -> void:
     aggressive = true
 
 func order_stop() -> void:
+    order_revision += 1
     pending_orders.clear()
     explicit_attack = false
     capture_target = null
@@ -108,9 +117,12 @@ func order_stop() -> void:
     route.clear()
 
 func order_capture(building) -> void:
-    if unit_id not in ["a_engineer", "r_engineer"] or not is_instance_valid(building) or building.team == team:
+    if unit_id not in ["a_engineer", "r_engineer", "g_tech"] or not is_instance_valid(building) or building.team == team:
+        return
+    if not arena.entity_visible_to(team, building):
         return
     capture_target = building
+    order_revision += 1
     pending_orders.clear()
     explicit_attack = false
     has_attack_move_goal = false
@@ -122,7 +134,7 @@ func order_capture(building) -> void:
     _begin_route(capture_approach_point)
 
 func _tick_capture(delta: float) -> bool:
-    if unit_id not in ["a_engineer", "r_engineer"] or capture_target == null:
+    if unit_id not in ["a_engineer", "r_engineer", "g_tech"] or capture_target == null:
         return false
     if not is_instance_valid(capture_target) or capture_target.hp <= 0.0 or capture_target.team == team:
         capture_target = null
@@ -160,6 +172,8 @@ func _begin_route(point: Vector2) -> void:
 func _physics_process(delta: float) -> void:
     if arena.paused or arena.battle_over or hp <= 0.0:
         return
+    fire_feedback = maxf(0.0, fire_feedback - delta)
+    hit_feedback = maxf(0.0, hit_feedback - delta)
     if _tick_capture(delta):
         queue_redraw()
         return
@@ -168,6 +182,10 @@ func _physics_process(delta: float) -> void:
     if target != null and not can_hit(target):
         target = null
         explicit_attack = false
+        moving = false
+        route.clear()
+        if has_attack_move_goal:
+            _begin_route(attack_move_goal)
     if scan_timer <= 0.0:
         scan_timer = 0.35 + float(unit_id.length() % 3) * 0.12
         if not explicit_attack and (aggressive or not moving):
@@ -182,11 +200,15 @@ func _physics_process(delta: float) -> void:
             moving = false
             if cooldown <= 0.0:
                 fire(target)
+        elif distance < float(weapon.get("min_range", 0.0)):
+            var retreat: Vector2 = position - target.position
+            if retreat.length_squared() < 0.01:
+                retreat = Vector2.RIGHT
+            if not moving or destination.distance_to(target.position) < float(weapon.get("min_range", 0.0)):
+                _begin_route(position + retreat.normalized() * (float(weapon.get("min_range", 0.0)) - distance + 30.0))
         elif distance > float(weapon.get("range", 0.0)) * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target):
             if not moving or destination.distance_to(target.position) > 60.0:
                 _begin_route(target.position)
-        elif distance < float(weapon.get("min_range", 0.0)):
-            _begin_route(position + (position - target.position).normalized() * 110.0)
     if moving:
         _step_movement(delta)
     if not moving and target == null and capture_target == null:
@@ -266,8 +288,13 @@ func _step_movement(delta: float) -> void:
                 route_index = 0
 
 func fire(enemy) -> void:
+    fire_feedback = 0.12
     cooldown = float(weapon.get("interval", 1.0))
-    arena.spawn_projectile(self, enemy, weapon)
+    var shot := weapon.duplicate(true)
+    if bool(weapon.get("grid_energy", false)):
+        if arena.power_ok(team): shot.damage *= 1.1
+        else: cooldown *= 2.0
+    arena.spawn_projectile(self, enemy, shot)
 
 func receive_damage(value: float, attacker) -> void:
     if hp <= 0.0:
@@ -276,6 +303,7 @@ func receive_damage(value: float, attacker) -> void:
         capture_progress = 0.0
         capture_pause = 1.0
     hp = maxf(0.0, hp - value)
+    if value > 0.0: hit_feedback = 0.16
     if team == 1 and not explicit_attack and not moving and attacker != null and is_instance_valid(attacker) and can_hit(attacker):
         target = attacker
     if hp <= 0.0:
@@ -289,7 +317,12 @@ func _draw() -> void:
     if selected:
         draw_arc(Vector2.ZERO,radius+8.0,0.0,TAU,36,Color("#e1f39e"),2.2)
     var artwork = unit_id if IndustrialArt.has_asset(unit_id) else ("gunship" if air else ("rifleman" if profile_name=="infantry" else "tank"))
+    # Recoil is visual only: collision, aim and navigation keep their exact transforms.
+    draw_set_transform(-Vector2.from_angle(turret_angle) * 3.0 * fire_feedback / 0.12)
     IndustrialArt.draw_asset(self,artwork,team,facing,turret_angle)
+    draw_set_transform(Vector2.ZERO)
+    if hit_feedback > 0.0:
+        draw_arc(Vector2.ZERO, radius + 3.0, 0, TAU, 20, Color(1.0, 0.65, 0.3, hit_feedback / 0.16), 2.0)
     if capture_target != null and is_instance_valid(capture_target):
         draw_rect(Rect2(-19,-radius-23,38,4),Color("#182c25"))
         draw_rect(Rect2(-19,-radius-23,38 * minf(1.0,capture_progress / (0.7 if capture_target.team==-1 else 3.0)),4),Color("#efcd76"))

@@ -118,15 +118,19 @@ static func box(c: CanvasItem, origin: Vector3, extent: Vector3, color: Color, h
  face(c,[a+up,b+up,e+up,d+up],color.lightened(0.14),heading)
 
 static func asset_kind(id: String) -> String:
+ var aliases={"g_mcv":"mcv","g_collector":"harvester","g_militia":"rifleman","g_rocket_cell":"missile_team","g_tech":"engineer","g_scavenger":"tank","g_rocket_truck":"aa","g_rocket_buggy":"flak","g_heli":"helicopter","r_mammoth":"heavy_tank","a_lance":"a_arc_lance"}
+ if aliases.has(id): return aliases[id]
  return {"a_mcv":"mcv","r_mcv":"mcv","a_harvester":"harvester","r_hauler":"harvester","a_ranger":"rifleman","r_line":"rifleman","a_javelin":"missile_team","r_hunter":"missile_team","a_engineer":"engineer","r_engineer":"engineer","a_sentinel":"tank","r_bastion":"heavy_tank","a_sentinel_aa":"aa","r_flak":"flak","a_striker":"gunship","r_siege_heli":"helicopter"}.get(id,id)
 
 static func has_asset(id: String) -> bool:
+ id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return true
  if id in ["a_tempest","r_stormrail","g_volley"]: return true
  if id in ["a_arc_lance","r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2"]: return true
  return asset_kind(id) in ["mcv","yard","power","refinery","barracks","factory","depot","relay","turret","harvester","rifleman","missile_team","engineer","tank","heavy_tank","aa","flak","gunship","helicopter"]
 
 static func asset_bounds(id: String) -> Rect2:
+ id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return Rect2(-82,-100,164,170)
  if id in ["a_tempest","r_stormrail","g_volley"]: return Rect2(-90,-110,180,180)
  if id in ["a_arc_lance","r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2"]: return Rect2(-82,-100,164,170)
@@ -140,6 +144,7 @@ static func asset_bounds(id: String) -> Rect2:
 static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: float = 0.0, aim: float = NAN, cargo: float = 0.0, animation: Dictionary = {}) -> void:
  kind = asset_kind(kind)
  var faction = Color("#389fda") if team == 0 else (Color("#d95c45") if team==1 else Color("#919b81"))
+ var style: int = int(animation.get("faction_style",team))
  if is_nan(aim): aim=heading
  var vehicle_key := ""
  if kind in UNIT_MESH_KINDS:
@@ -163,7 +168,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   # Share identical animation frames across instances; bound retained GPU memory.
   var frame = int(float(animation.get("time",0.0))*20.0)
   var door_frame = int(round(float(animation.get("door",0.0))*16.0))
-  building_key="%s:%d:%d:%d:%s" % [kind,team,frame,door_frame,animation.get("working",false)]
+  building_key="%s:%d:%d:%d:%s:%d" % [kind,team,frame,door_frame,animation.get("working",false),style]
   if _building_mesh_cache.has(building_key):
    c.draw_mesh(_building_mesh_cache[building_key],null)
    return
@@ -187,12 +192,12 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   "r_imperator": _imperator(c,faction,heading,aim)
   "g_junker","g_junker_salvage_1","g_junker_salvage_2":
    _junker(c,faction,heading,aim,2 if kind.ends_with("_2") else (1 if kind.ends_with("_1") else 0))
-  "yard": _faction_building(c,"yard",team,faction,animation)
-  "power": _faction_building(c,"power",team,faction,animation)
-  "refinery": _faction_industry(c,"refinery",team,faction,animation)
-  "barracks": _faction_building(c,"barracks",team,faction,animation)
-  "factory": _faction_industry(c,"factory",team,faction,animation)
-  "depot": _faction_industry(c,"depot",team,faction,animation)
+  "yard": _faction_building(c,"yard",style,faction,animation)
+  "power": _faction_building(c,"power",style,faction,animation)
+  "refinery": _faction_industry(c,"refinery",style,faction,animation)
+  "barracks": _faction_building(c,"barracks",style,faction,animation)
+  "factory": _faction_industry(c,"factory",style,faction,animation)
+  "depot": _faction_industry(c,"depot",style,faction,animation)
   "relay": _relay(c,faction)
   "turret":
    _slab(c,Vector2(27,25))

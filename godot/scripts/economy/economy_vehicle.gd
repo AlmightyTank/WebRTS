@@ -71,7 +71,7 @@ func order_move(point: Vector2, _attack_move: bool=false) -> void:
  _route_to(point)
 
 func order_rally(point: Vector2) -> void:
- var automatic=unit_id in ["a_harvester","r_hauler"]
+ var automatic=unit_id in ["a_harvester","r_hauler","g_collector"]
  order_move(point)
  resume_harvest_on_arrival=automatic
 

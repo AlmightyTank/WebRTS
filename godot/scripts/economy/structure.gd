@@ -5,6 +5,7 @@ signal destroyed(entity: Node2D)
 var arena
 var kind := ""
 var team := 0
+var art_style := 0
 var hp := 1600.0
 var max_hp := 1600.0
 var armor := "STRUCTURE"
@@ -30,6 +31,7 @@ func configure(world, building_kind: String, side: int, pos: Vector2, size: Vect
  arena=world
  kind=building_kind
  team=side
+ art_style=arena.faction_style(team) if arena.has_method("faction_style") else team
  position=pos
  footprint=size
  radius=maxf(26.0, minf(size.x,size.y)*0.43)
@@ -86,7 +88,7 @@ func receive_damage(amount: float, _attacker) -> void:
 
 func _draw() -> void:
  var size := footprint
- IndustrialArt.draw_asset(self,kind,team,0.0,NAN,0.0,{"time":art_time,"door":door_open,"working":art_working})
+ IndustrialArt.draw_asset(self,kind,team,0.0,NAN,0.0,{"time":art_time,"door":door_open,"working":art_working,"faction_style":art_style})
  if repairing:
   draw_arc(Vector2.ZERO,radius+10.0,0,TAU,28,Color("#67e7bf"),2.5)
  if selected: draw_rect(Rect2(-size*0.5-Vector2(5,5),size+Vector2(10,10)),Color("#e5e8b8"),false,2.0)

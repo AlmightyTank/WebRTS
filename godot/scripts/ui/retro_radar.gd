@@ -46,14 +46,16 @@ func _draw() -> void:
   var q=map_point(o.end)
   draw_rect(Rect2(p,q-p),Color("#435449"))
  for f in world.ore_fields:
-  if float(f.get("remaining",0.0))>0:
+  if float(f.get("remaining",0.0))>0 and (not world.fog_enabled or world.fog == null or world.fog.explored(0, f["position"])):
    draw_circle(map_point(f["position"]),3.2,ORE)
  for b in world.structures:
-  if is_instance_valid(b) and b.hp>0.0:
+  if is_instance_valid(b) and b.hp>0.0 and world.entity_visible_to(0, b):
    draw_rect(Rect2(map_point(b.position)-Vector2.ONE*4.0,Vector2.ONE*8.0),ALLIED if b.team==0 else (FOE if b.team==1 else Color("#a2b3a9")))
  for u in world.units:
-  if is_instance_valid(u) and u.hp>0.0:
+  if is_instance_valid(u) and u.hp>0.0 and world.entity_visible_to(0, u):
    draw_circle(map_point(u.position),2.0,ALLIED if u.team==0 else FOE)
+ if world.fog_enabled and world.fog != null and world.fog.texture != null:
+  draw_texture_rect(world.fog.texture, Rect2(Vector2.ZERO, size), false)
  if is_instance_valid(world.camera):
   var visible=get_viewport_rect().size/maxf(0.25,world.camera.zoom.x)
   var top=world.camera.position-visible*0.5

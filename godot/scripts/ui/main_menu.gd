@@ -8,6 +8,21 @@ var overlay: Control
 var content: VBoxContainer
 var page := "home"
 var status: Label
+const ArmyRules = preload("res://scripts/economy/army_rules.gd")
+var army_choices: Array = ["alliance", "republic"]
+
+func _army_picker(side: int) -> void:
+ _text("YOUR ARMY" if side == 0 else "AI OPPONENT")
+ var picker := OptionButton.new()
+ picker.custom_minimum_size.y = 44
+ content.add_child(picker)
+ var ids: Array = ArmyRules.CHOICES.keys()
+ for id in ids: picker.add_item(ArmyRules.CHOICES[id].name)
+ picker.select(ids.find(army_choices[side]))
+ var detail := _text(ArmyRules.CHOICES[army_choices[side]].summary)
+ picker.item_selected.connect(func(index):
+  army_choices[side] = ids[index]
+  detail.text = ArmyRules.CHOICES[ids[index]].summary)
 
 func _ready() -> void:
  process_mode = Node.PROCESS_MODE_ALWAYS
@@ -76,6 +91,9 @@ func _button(title: String, action: Callable, enabled: bool = true) -> Button:
  button.pressed.connect(action)
  return button
 
+func _focus_if_active(control: Control) -> void:
+ if is_instance_valid(control) and control.is_inside_tree() and control.is_visible_in_tree(): control.grab_focus()
+
 func _show_page(next_page: String) -> void:
  page = next_page
  for child in content.get_children():
@@ -96,7 +114,9 @@ func _show_page(next_page: String) -> void:
    _button("QUIT", _show_page.bind("quit"))
   "skirmish":
    _text("OFFLINE SKIRMISH", true)
-   _text("One battlefield • You vs AI • Standard starting credits: 10,000\nDeploy your MCV, build a power plant and refinery, then produce an army. Eliminate the opposing base to win.\nMap, faction and difficulty selection are not yet implemented.")
+   _text("One battlefield • You vs AI • Starting credits: 10,000\nChoose standard armies or a supported general. Mirror matches are supported. Advanced powers, stealth, tunnels and salvage are not implemented.")
+   _army_picker(0)
+   _army_picker(1)
    first = _button("DEPLOY TO BATTLEFIELD", _start_game)
   "pause":
    _text("OPERATIONS PAUSED", true)
@@ -122,7 +142,7 @@ func _show_page(next_page: String) -> void:
    content.add_child(fullscreen)
    fullscreen.toggled.connect(_set_fullscreen)
    status = _text("Settings are saved automatically.")
-   volume.grab_focus.call_deferred()
+   _focus_if_active.call_deferred(volume)
   "controls":
    _text("FIELD MANUAL", true)
    _text("Select: left click / drag selection box\nOrders: right click\nCamera: WASD / arrows; right or middle drag\nZoom: mouse wheel\nDeploy selected MCV: H\nTactical pause: Space\nOpen / close pause menu: F10\nCancel current command: Escape\nTouch camera: drag / pinch (device validation pending)")
@@ -139,7 +159,7 @@ func _show_page(next_page: String) -> void:
  if page not in ["home", "pause", "leave", "quit"]:
   var back := _button("BACK", _show_page.bind("pause" if is_instance_valid(game) else "home"))
   if first == null and page != "settings": first = back
- if first != null: first.grab_focus.call_deferred()
+ if first != null: _focus_if_active.call_deferred(first)
 
 func _start_game() -> void:
  var scene := load("res://scenes/skirmish.tscn") as PackedScene
@@ -147,6 +167,7 @@ func _start_game() -> void:
   _text("Unable to load the battlefield.")
   return
  game = scene.instantiate()
+ game.army_choices = army_choices.duplicate()
  # The front-end runs while paused; the battlefield must not inherit that mode.
  game.process_mode = Node.PROCESS_MODE_PAUSABLE
  add_child(game)

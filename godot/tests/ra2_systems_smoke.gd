@@ -21,6 +21,8 @@ func build(id: String, point: Vector2) -> void:
 
 func run_checks() -> void:
  world=load("res://scenes/skirmish.tscn").instantiate()
+ # These fixtures exercise remote capture/sale directly; sight has its own suite.
+ world.fog_enabled=false
  root.add_child(world)
  await process_frame
  expect(world._deploy_mcv(0),"Player can deploy starting MCV")

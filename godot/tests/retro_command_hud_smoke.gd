@@ -24,7 +24,7 @@ func run_checks() -> void:
  expect(world.build_container is GridContainer,"Production rack uses a tile grid")
  expect(world.build_container.columns==2,"Production rack has two RA2-inspired icon columns")
  expect(world.production_tile_icons.size()==world.action_buttons.size(),"Each build entry has its own original procedural icon")
- expect(world.action_palette_buttons.size()==10,"Ten real tactical buttons including Rally and Staging")
+ expect(world.action_palette_buttons.size()==11,"Eleven real tactical buttons including Scout, Rally and Staging")
  expect(world.queue_preview_labels.size()==4,"Production status has four visible slots")
  expect(world.hud_dock.get_theme_stylebox("panel") is StyleBoxFlat,"Sidebar receives beveled steel style")
  expect(world.hud_toolbar.get_theme_stylebox("panel") is StyleBoxFlat,"Command bar receives beveled steel style")

@@ -78,6 +78,20 @@ The Godot GUI now uses an **original code-drawn industrial RTS aesthetic** inspi
 
 ## Current limits / intentionally not implemented
 
+### Fog of war
+
+Skirmishes start with unexplored black shroud. Living units reveal a 336-pixel
+radius and owned structures reveal 360 pixels, shared by their team. Explored
+terrain remains dimly visible when sight is lost; enemy units and structures do
+not. The minimap follows the same visibility rules. Hidden enemies cannot be
+clicked, captured by a new order, or acquired as combat targets. Both teams obey
+sight; AI units can scout toward the opposing deployment area without querying
+hidden targets. Combat labs remain fully visible.
+
+Sight refreshes every 0.15 seconds and currently uses radial grid-based vision,
+not terrain-occluded line of sight or remembered enemy-building silhouettes.
+Restart clears exploration. Test with `res://tests/fog_of_war_smoke.gd`.
+
 - This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. No upgrades, general-specific trees, naval, aircraft factories, saving, networking, or refined audio yet.
 - Building production time/health and some structure silhouettes are provisional. Full battle balancing requires interactive device testing. The core v0.4 combat stats remain loaded from `res://data/unit_balance_v0.4.json`.
 - AI is a budget-constrained scripted opponent, not a full tactical strategic planner; its building sites are selected from predefined viable locations.
@@ -97,3 +111,37 @@ godot --headless --path godot --quit-after 180
 ```
 
 The Combat Lab smoke assertions remain active; the new Skirmish smoke checks MCV deployment, production lanes, finite ore delivery, construction, power, factory unit creation and blocking.
+# Scouting
+
+Select combat units and press **G** or **Scout (G)** to explore reachable unknown
+terrain automatically. Move, attack, capture and Stop replace scouting. Harvesters
+and MCVs retain their economy roles. Exploration stops when no reachable unknown
+cells remain. Idle AI combat units use the same team-specific exploration rules;
+hidden enemy positions are not scouting inputs.
+
+## Combat feedback
+
+Weapons now have brief muzzle flashes and visual recoil, with distinct light/heavy
+projectile trails, hit pulses, impact sparks and larger lethal-hit bursts. These
+effects do not move collision bodies or pause combat. Feedback respects current
+player sight and is capped at 96 simultaneous effects; restart clears it.
+# Playable army slice
+
+Skirmish setup now selects **your army and the AI army independently**, including mirror matches. Player ownership remains blue/red; faction building geometry is independent of ownership and is retained when a building is captured. Both armies still use the shared power, ore, construction, capture and production systems.
+
+Supported choices (initial tuning, not balance-certified):
+
+| Army | Implemented differences |
+| --- | --- |
+| Alliance | Ranger, Javelin, Engineer, Sentinel, mobile AA, Striker; flexible combined arms |
+| Vale / Lattice | Arc Lance replaces Sentinel; +10% energy hit damage with adequate power, twice the firing interval without power |
+| Republic | Line Infantry, Tank Hunter, Engineer, Bastion, Flak, Mammoth, Siege Helicopter; heavier, slower armor |
+| Korda / Steel Vanguard | Imperator replaces Mammoth in the same depot-gated slot; Bastion/Imperator +10% HP, aircraft +20% purchase price |
+| GIA | Militia, Rocket Cell, Technician, Scavenger, AA Truck, Rocket Buggy, improvised helicopter; cheaper, mobile, fragile forces |
+| Sayegh / Saturation | Volley replaces Rocket Buggy; Volley firing interval ×0.9 and movement speed ×0.9 |
+
+Each army has its own MCV and collector. Aircraft temporarily use the vehicle queue and require a factory and power plant; there is no airfield/rearm simulation yet. New weapon translations are explicit provisional profiles in `scripts/economy/army_rules.gd`, not automatic parsing of proposal text. GIA standard units currently reuse existing vehicle/infantry art; the three signature units use their original specialist silhouettes.
+
+The supported roster resolves before displaying production tiles. Removed and foreign units are rejected by queue and completion APIs; the AI uses the same rules and prices. Match choices are fixed until returning to setup. This is **six choices**, not completion of the 12-army proposal: the other six generals, full roster replacements, special infrastructure, research, commander powers, stealth, tunnels and salvage remain unimplemented and are not offered as functioning controls.
+
+Regression: `godot --headless --path godot --script res://tests/army_rules_smoke.gd` covers all six choices on both ownership sides, mirror-match deployment, collector grants, queue/spawn legality, signature stats, power penalties and setup transfer. Running without `--headless` also saves `user://army_selection.png` and `user://army_battlefield.png` for visual review. Human counterplay/balance testing remains necessary.
