@@ -1,0 +1,182 @@
+﻿army_id,faction,unit_id,unit_name,tier,producer,credits,build_seconds,hp,armor,speed,is_general_exclusive,upgrades
+alliance_standard,alliance,a_ranger,Ranger,T0,Barracks,150,5,105,PERSONNEL,85,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_standard,alliance,a_javelin,Javelin Missile Team,T0,Barracks,320,9,90,PERSONNEL,68,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_standard,alliance,a_engineer,Field Engineer,T0,Barracks,450,10,85,PERSONNEL,78,False,INF_ARMOR
+alliance_standard,alliance,a_lynx,Lynx IFV,T1,War Factory,750,14,360,LIGHT,120,False,TRACK_DRIVE;TARGETING;A_DATALINK
+alliance_standard,alliance,a_sentinel,Sentinel MBT,T1,War Factory,1200,22,740,HEAVY,80,False,ARMOR_PLATING;TARGETING;TRACK_DRIVE
+alliance_standard,alliance,a_specter,Specter Scout Drone,T1,War Factory,480,10,180,LIGHT,145,False,AA_TRACKING;A_SENSOR_NET
+alliance_standard,alliance,a_sentinel_aa,Sentinel AA Vehicle,T1,War Factory,900,17,380,LIGHT,115,False,AA_TRACKING;TRACK_DRIVE;A_DATALINK
+alliance_standard,alliance,a_howitzer,Precision Howitzer,T1,War Factory,1400,25,420,MEDIUM,67,False,ARTY_COMPUTER;TARGETING
+alliance_standard,alliance,a_arc_beam,Arc Beam Tank,T2,War Factory,1900,31,590,HEAVY,77,False,ARMOR_PLATING;TARGETING;A_DATALINK
+alliance_standard,alliance,a_striker,Striker Gunship,T2,Airfield,1250,23,400,AIR,175,False,AIRFRAMES;ECM_PODS;A_DATALINK
+alliance_standard,alliance,a_vortex,Vortex Fighter,T2,Airfield,1450,29,330,AIR,250,False,AIRFRAMES;ECM_PODS;A_DATALINK
+alliance_standard,alliance,a_harvester,Ore Harvester,T0,War Factory,1200,25,850,HEAVY,66,False,HARVEST_EFF;ARMOR_PLATING
+alliance_standard,alliance,a_mcv,Alliance MCV,T2,War Factory,3000,45,1150,HEAVY,60,False,ARMOR_PLATING;MCV_DEPLOY
+alliance_standard,alliance,a_patrol,Patrol Corvette,NAVAL,Naval Dock,1100,25,600,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+alliance_standard,alliance,a_dart,Dart Missile Frigate,NAVAL,Naval Dock,2400,45,950,NAVAL,85,False,NAVAL_FIRE;A_DATALINK
+alliance_air,alliance,a_patrol,Patrol Corvette,NAVAL,Naval Dock,1100,25,600,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+alliance_air,alliance,a_dart,Dart Missile Frigate,NAVAL,Naval Dock,2400,45,950,NAVAL,85,False,NAVAL_FIRE;A_DATALINK
+alliance_air,alliance,a_ranger,Ranger,T0,Barracks,150,5,105,PERSONNEL,85,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_air,alliance,a_javelin,Javelin Missile Team,T0,Barracks,320,9,90,PERSONNEL,68,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_air,alliance,a_engineer,Field Engineer,T0,Barracks,450,10,85,PERSONNEL,78,False,INF_ARMOR
+alliance_air,alliance,a_harvester,Ore Harvester,T0,War Factory,1200,25,850,HEAVY,66,False,HARVEST_EFF;ARMOR_PLATING
+alliance_air,alliance,a_specter,Specter Scout Drone,T1,War Factory,480,10,180,LIGHT,145,False,AA_TRACKING;A_SENSOR_NET
+alliance_air,alliance,a_missile_escort,Lynx Missile Escort,T1,War Factory,850,16,350,LIGHT,125,True,TRACK_DRIVE;AA_TRACKING
+alliance_air,alliance,a_sentinel_aa,Sentinel AA Vehicle,T1,War Factory,900,17,380,LIGHT,115,False,AA_TRACKING;TRACK_DRIVE;A_DATALINK
+alliance_air,alliance,a_howitzer,Precision Howitzer,T1,War Factory,1400,25,420,MEDIUM,67,False,ARTY_COMPUTER;TARGETING
+alliance_air,alliance,a_skywatch,Skywatch Recon Craft,T2,Airfield,900,20,280,AIR,220,True,AIRFRAMES;AS_COUNTERMEASURES
+alliance_air,alliance,a_tempest,Tempest Assault VTOL,T2,Airfield,1650,29,460,AIR,177,True,AIRFRAMES;ECM_PODS;AS_HANGARS
+alliance_air,alliance,a_ace,Vortex Ace Interceptor,T2,Airfield,1800,34,430,AIR,270,True,AIRFRAMES;ECM_PODS;AS_COUNTERMEASURES
+alliance_air,alliance,a_mcv,Alliance MCV,T2,War Factory,3000,45,1150,HEAVY,60,False,ARMOR_PLATING;MCV_DEPLOY
+alliance_energy,alliance,a_patrol,Patrol Corvette,NAVAL,Naval Dock,1100,25,600,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+alliance_energy,alliance,a_dart,Dart Missile Frigate,NAVAL,Naval Dock,2400,45,950,NAVAL,85,False,NAVAL_FIRE;A_DATALINK
+alliance_energy,alliance,a_ranger,Ranger,T0,Barracks,150,5,105,PERSONNEL,85,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_energy,alliance,a_javelin,Javelin Missile Team,T0,Barracks,320,9,90,PERSONNEL,68,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_energy,alliance,a_engineer,Field Engineer,T0,Barracks,450,10,85,PERSONNEL,78,False,INF_ARMOR
+alliance_energy,alliance,a_harvester,Ore Harvester,T0,War Factory,1200,25,850,HEAVY,66,False,HARVEST_EFF;ARMOR_PLATING
+alliance_energy,alliance,a_arc_sapper,Arc Sapper,T1,Barracks,450,11,95,PERSONNEL,80,True,INF_ARMOR;DE_CAPACITORS
+alliance_energy,alliance,a_specter,Specter Scout Drone,T1,War Factory,480,10,180,LIGHT,145,False,AA_TRACKING;A_SENSOR_NET
+alliance_energy,alliance,a_lynx,Lynx IFV,T1,War Factory,750,14,360,LIGHT,120,False,TRACK_DRIVE;TARGETING;A_DATALINK
+alliance_energy,alliance,a_lattice,Lattice Interceptor,T1,War Factory,1150,22,370,LIGHT,118,True,AA_TRACKING;DE_GRID
+alliance_energy,alliance,a_lance,Arc Lance Tank,T1,War Factory,1450,26,670,HEAVY,76,True,ARMOR_PLATING;DE_CAPACITORS;DE_GRID
+alliance_energy,alliance,a_striker,Striker Gunship,T2,Airfield,1250,23,400,AIR,175,False,AIRFRAMES;ECM_PODS;A_DATALINK
+alliance_energy,alliance,a_vortex,Vortex Fighter,T2,Airfield,1450,29,330,AIR,250,False,AIRFRAMES;ECM_PODS;A_DATALINK
+alliance_energy,alliance,a_arc_beam,Arc Beam Tank,T2,War Factory,1900,31,590,HEAVY,77,False,ARMOR_PLATING;TARGETING;A_DATALINK
+alliance_energy,alliance,a_mcv,Alliance MCV,T2,War Factory,3000,45,1150,HEAVY,60,False,ARMOR_PLATING;MCV_DEPLOY
+alliance_ops,alliance,a_patrol,Patrol Corvette,NAVAL,Naval Dock,1100,25,600,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+alliance_ops,alliance,a_dart,Dart Missile Frigate,NAVAL,Naval Dock,2400,45,950,NAVAL,85,False,NAVAL_FIRE;A_DATALINK
+alliance_ops,alliance,a_pathfinder,Pathfinder Team,T0,Barracks,260,8,90,PERSONNEL,83,True,INF_OPTICS;SO_DESIGNATION
+alliance_ops,alliance,a_javelin,Javelin Missile Team,T0,Barracks,320,9,90,PERSONNEL,68,False,INF_ARMOR;INF_OPTICS;A_DATALINK
+alliance_ops,alliance,a_engineer,Field Engineer,T0,Barracks,450,10,85,PERSONNEL,78,False,INF_ARMOR
+alliance_ops,alliance,a_harvester,Ore Harvester,T0,War Factory,1200,25,850,HEAVY,66,False,HARVEST_EFF;ARMOR_PLATING
+alliance_ops,alliance,a_phantom_drone,Phantom Sensor Drone,T1,War Factory,650,13,155,LIGHT,150,True,A_SENSOR_NET;SO_DESIGNATION
+alliance_ops,alliance,a_sentinel_aa,Sentinel AA Vehicle,T1,War Factory,900,17,380,LIGHT,115,False,AA_TRACKING;TRACK_DRIVE;A_DATALINK
+alliance_ops,alliance,a_ghost_carrier,Ghost Recon Carrier,T1,War Factory,950,18,295,LIGHT,130,True,TRACK_DRIVE;SO_SILENT
+alliance_ops,alliance,a_sentinel,Sentinel MBT,T1,War Factory,1200,22,740,HEAVY,80,False,ARMOR_PLATING;TARGETING;TRACK_DRIVE
+alliance_ops,alliance,a_howitzer,Precision Howitzer,T1,War Factory,1400,25,420,MEDIUM,67,False,TARGETING
+alliance_ops,alliance,a_striker,Striker Gunship,T2,Airfield,1250,23,400,AIR,175,False,AIRFRAMES;ECM_PODS;A_DATALINK
+alliance_ops,alliance,a_vortex,Vortex Fighter,T2,Airfield,1450,29,330,AIR,250,False,AIRFRAMES;ECM_PODS;A_DATALINK
+alliance_ops,alliance,a_ghost_sniper,Ghost Sniper,T2,Barracks,650,16,95,PERSONNEL,76,True,INF_OPTICS;SO_SILENT;SO_DESIGNATION
+alliance_ops,alliance,a_mcv,Alliance MCV,T2,War Factory,3000,45,1150,HEAVY,60,False,ARMOR_PLATING;MCV_DEPLOY
+republic_standard,republic,r_line,Line Infantry,T0,Garrison Barracks,140,5,120,PERSONNEL,78,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_standard,republic,r_hunter,Tank Hunter,T0,Garrison Barracks,290,9,110,PERSONNEL,65,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_standard,republic,r_engineer,Combat Engineer,T0,Garrison Barracks,450,10,105,PERSONNEL,77,False,INF_ARMOR
+republic_standard,republic,r_ironclad,Ironclad APC,T1,Armor Works,850,17,540,MEDIUM,97,False,ARMOR_PLATING;TRACK_DRIVE;R_REACTIVE
+republic_standard,republic,r_bastion,Bastion MBT,T1,Armor Works,1350,25,900,HEAVY,70,False,ARMOR_PLATING;TARGETING;R_REACTIVE
+republic_standard,republic,r_recon,Recon APC,T1,Armor Works,600,12,340,LIGHT,140,False,TRACK_DRIVE;AA_TRACKING
+republic_standard,republic,r_flak,Flak Carrier,T1,Armor Works,850,18,500,MEDIUM,95,False,AA_TRACKING;ARMOR_PLATING
+republic_standard,republic,r_thunder,Thunderbolt Artillery,T1,Armor Works,1450,27,475,MEDIUM,60,False,ARTY_COMPUTER;R_SHELLS
+republic_standard,republic,r_mammoth,Mammoth Siege Tank,T2,Armor Works,2450,43,1700,HEAVY,47,False,ARMOR_PLATING;TARGETING;R_REACTIVE
+republic_standard,republic,r_siege_heli,Siege Helicopter,T2,Strike Airbase,1550,26,470,AIR,165,False,AIRFRAMES;ECM_PODS
+republic_standard,republic,r_bomber,Heavy Bomber,T2,Strike Airbase,2300,43,580,AIR,205,False,AIRFRAMES;ECM_PODS
+republic_standard,republic,r_hauler,Industrial Hauler,T0,Armor Works,1250,27,1000,HEAVY,59,False,HARVEST_EFF;ARMOR_PLATING
+republic_standard,republic,r_mcv,Republic MCV,T2,Armor Works,3100,48,1300,HEAVY,52,False,ARMOR_PLATING;MCV_DEPLOY
+republic_standard,republic,r_patrol,Armored River Monitor,NAVAL,Armored Shipyard,1300,29,850,NAVAL,85,False,NAVAL_FIRE;R_SHELLS
+republic_standard,republic,r_dread,Bastion Missile Cruiser,NAVAL,Armored Shipyard,2750,50,1450,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+republic_armor,republic,r_patrol,Armored River Monitor,NAVAL,Armored Shipyard,1300,29,850,NAVAL,85,False,NAVAL_FIRE
+republic_armor,republic,r_dread,Bastion Missile Cruiser,NAVAL,Armored Shipyard,2750,50,1450,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+republic_armor,republic,r_hauler,Industrial Hauler,T0,Armor Works,1250,27,1000,HEAVY,59,False,HARVEST_EFF;ARMOR_PLATING
+republic_armor,republic,r_line,Line Infantry,T0,Garrison Barracks,140,5,120,PERSONNEL,78,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_armor,republic,r_hunter,Tank Hunter,T0,Garrison Barracks,290,9,110,PERSONNEL,65,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_armor,republic,r_engineer,Combat Engineer,T0,Garrison Barracks,450,10,105,PERSONNEL,77,False,INF_ARMOR
+republic_armor,republic,r_ironclad,Ironclad APC,T1,Armor Works,850,17,540,MEDIUM,97,False,ARMOR_PLATING;TRACK_DRIVE;R_REACTIVE
+republic_armor,republic,r_flak,Flak Carrier,T1,Armor Works,850,18,500,MEDIUM,95,False,AA_TRACKING;ARMOR_PLATING
+republic_armor,republic,r_armored_scout,Armored Scout Carrier,T1,Armor Works,850,18,550,MEDIUM,105,True,TRACK_DRIVE;R_REACTIVE
+republic_armor,republic,r_jugger,Juggernaut Battle Tank,T1,Armor Works,1700,30,1100,HEAVY,57,True,ARMOR_PLATING;HA_AUTOLOAD;HA_VETERANS
+republic_armor,republic,r_breacher,Assault Breacher,T1,Garrison Barracks,400,11,170,PERSONNEL,74,True,INF_ARMOR;R_DISCIPLINE
+republic_armor,republic,r_imperator,Imperator Heavy Tank,T2,Armor Works,3050,52,2150,HEAVY,43,True,ARMOR_PLATING;HA_AUTOLOAD;HA_VETERANS
+republic_armor,republic,r_mcv,Republic MCV,T2,Armor Works,3100,48,1300,HEAVY,52,False,ARMOR_PLATING;MCV_DEPLOY
+republic_armor,republic,r_siege_heli,Siege Helicopter,T2,Strike Airbase,1800,26,470,AIR,165,False,AIRFRAMES;ECM_PODS
+republic_armor,republic,r_bomber,Heavy Bomber,T2,Strike Airbase,2650,43,580,AIR,205,False,AIRFRAMES;ECM_PODS
+republic_artillery,republic,r_patrol,Armored River Monitor,NAVAL,Armored Shipyard,1300,29,850,NAVAL,85,False,NAVAL_FIRE;R_SHELLS
+republic_artillery,republic,r_dread,Bastion Missile Cruiser,NAVAL,Armored Shipyard,2750,50,1450,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+republic_artillery,republic,r_hauler,Industrial Hauler,T0,Armor Works,1250,27,1000,HEAVY,59,False,HARVEST_EFF;ARMOR_PLATING
+republic_artillery,republic,r_line,Line Infantry,T0,Garrison Barracks,140,5,120,PERSONNEL,78,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_artillery,republic,r_hunter,Tank Hunter,T0,Garrison Barracks,290,9,110,PERSONNEL,65,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_artillery,republic,r_engineer,Combat Engineer,T0,Garrison Barracks,450,10,105,PERSONNEL,77,False,INF_ARMOR
+republic_artillery,republic,r_survey,Survey Spotter Drone,T1,Armor Works,520,12,165,LIGHT,141,True,AR_OBSERVERS;AA_TRACKING
+republic_artillery,republic,r_recon,Recon APC,T1,Armor Works,600,12,340,LIGHT,140,False,TRACK_DRIVE;AA_TRACKING
+republic_artillery,republic,r_ironclad,Ironclad APC,T1,Armor Works,850,17,540,MEDIUM,97,False,ARMOR_PLATING;TRACK_DRIVE
+republic_artillery,republic,r_flak,Flak Carrier,T1,Armor Works,850,18,500,MEDIUM,95,False,AA_TRACKING;ARMOR_PLATING
+republic_artillery,republic,r_escort,Escort Battle Tank,T1,Armor Works,1050,20,680,MEDIUM,100,True,ARMOR_PLATING;TRACK_DRIVE
+republic_artillery,republic,r_stormrail,Stormrail Howitzer,T1,Armor Works,1850,33,440,MEDIUM,54,True,ARTY_COMPUTER;AR_OBSERVERS;AR_RAPID
+republic_artillery,republic,r_mcv,Republic MCV,T2,Armor Works,3100,48,1300,HEAVY,52,False,ARMOR_PLATING;MCV_DEPLOY
+republic_artillery,republic,r_siege_heli,Siege Helicopter,T2,Strike Airbase,1550,26,470,AIR,165,False,AIRFRAMES;ECM_PODS
+republic_artillery,republic,r_bomber,Heavy Bomber,T2,Strike Airbase,2300,43,580,AIR,205,False,AIRFRAMES;ECM_PODS
+republic_fortress,republic,r_patrol,Armored River Monitor,NAVAL,Armored Shipyard,1300,29,850,NAVAL,85,False,NAVAL_FIRE;R_SHELLS
+republic_fortress,republic,r_dread,Bastion Missile Cruiser,NAVAL,Armored Shipyard,2750,50,1450,NAVAL,85,False,NAVAL_FIRE;AA_TRACKING
+republic_fortress,republic,r_hauler,Industrial Hauler,T0,Armor Works,1250,27,1000,HEAVY,54.3,False,HARVEST_EFF;ARMOR_PLATING
+republic_fortress,republic,r_garrison,Garrison Guard,T0,Garrison Barracks,200,6,140,PERSONNEL,66,True,INF_ARMOR;FD_FORTS;R_DISCIPLINE
+republic_fortress,republic,r_hunter,Tank Hunter,T0,Garrison Barracks,290,9,110,PERSONNEL,65,False,INF_ARMOR;INF_OPTICS;R_DISCIPLINE
+republic_fortress,republic,r_engineer,Combat Engineer,T0,Garrison Barracks,450,10,105,PERSONNEL,77,False,INF_ARMOR
+republic_fortress,republic,r_flak,Flak Carrier,T1,Armor Works,850,18,500,MEDIUM,87.4,False,AA_TRACKING;ARMOR_PLATING
+republic_fortress,republic,r_siege_carrier,Siege Carrier,T1,Armor Works,1300,25,780,HEAVY,77,True,ARMOR_PLATING;FD_FIELDWORKS;R_REACTIVE
+republic_fortress,republic,r_bastion,Bastion MBT,T1,Armor Works,1350,25,900,HEAVY,64.4,False,ARMOR_PLATING;TARGETING;R_REACTIVE
+republic_fortress,republic,r_thunder,Thunderbolt Artillery,T1,Armor Works,1450,27,475,MEDIUM,55.2,False,ARTY_COMPUTER;R_SHELLS
+republic_fortress,republic,r_field_engineer,Fortification Engineer,T1,Garrison Barracks,480,12,110,PERSONNEL,79,True,INF_ARMOR;FD_FIELDWORKS
+republic_fortress,republic,r_mammoth,Mammoth Siege Tank,T2,Armor Works,2450,43,1700,HEAVY,43.2,False,ARMOR_PLATING;TARGETING;R_REACTIVE
+republic_fortress,republic,r_mcv,Republic MCV,T2,Armor Works,3100,48,1300,HEAVY,47.8,False,ARMOR_PLATING;MCV_DEPLOY
+republic_fortress,republic,r_siege_heli,Siege Helicopter,T2,Strike Airbase,1550,26,470,AIR,165,False,AIRFRAMES;ECM_PODS
+gia_standard,gia,g_militia,Militia Fighter,T0,Militia Camp,100,4,90,PERSONNEL,92,False,INF_ARMOR;INF_OPTICS;G_CAMO
+gia_standard,gia,g_rocket_cell,Rocket Cell,T0,Militia Camp,260,8,85,PERSONNEL,72,False,INF_ARMOR;INF_OPTICS;G_CAMO
+gia_standard,gia,g_tech,Salvage Technician,T0,Militia Camp,400,9,80,PERSONNEL,90,False,INF_ARMOR
+gia_standard,gia,g_technical,Raider Technical,T1,Salvage Garage,550,12,290,LIGHT,145,False,TRACK_DRIVE;G_SCAVENGE
+gia_standard,gia,g_scavenger,Scavenger Tank,T1,Salvage Garage,950,19,630,MEDIUM,87,False,ARMOR_PLATING;TARGETING;G_SCAVENGE
+gia_standard,gia,g_bike,Raider Bike,T1,Salvage Garage,320,7,165,LIGHT,165,False,TRACK_DRIVE;G_CAMO
+gia_standard,gia,g_rocket_truck,Rocket Truck,T1,Salvage Garage,730,15,330,LIGHT,130,False,AA_TRACKING;TRACK_DRIVE
+gia_standard,gia,g_rocket_buggy,Rocket Buggy,T1,Salvage Garage,800,17,250,LIGHT,144,False,ARTY_COMPUTER;TRACK_DRIVE;G_SCAVENGE
+gia_standard,gia,g_reclaimed,Reclaimed Assault Tank,T2,Salvage Garage,1650,31,980,HEAVY,72,False,ARMOR_PLATING;TARGETING;G_SCAVENGE
+gia_standard,gia,g_heli,Improvised Attack Helicopter,T2,Hidden Airstrip,1050,20,330,AIR,178,False,AIRFRAMES;G_CAMO
+gia_standard,gia,g_drone_wing,Missile Drone Wing,T2,Hidden Airstrip,1550,29,240,AIR,218,False,AIRFRAMES;ECM_PODS
+gia_standard,gia,g_collector,Salvage Collector,T0,Salvage Garage,1000,22,650,HEAVY,82,False,HARVEST_EFF
+gia_standard,gia,g_mcv,GIA MCV,T2,Salvage Garage,2600,42,850,HEAVY,68,False,MCV_DEPLOY;ARMOR_PLATING
+gia_standard,gia,g_shadow,Shadow Operative,T2,Militia Camp,850,18,105,PERSONNEL,97,False,INF_ARMOR;G_CAMO
+gia_standard,gia,g_river,Raider Riverboat,NAVAL,Riverboat Yard,850,21,510,NAVAL,85,False,NAVAL_FIRE;G_SCAVENGE
+gia_standard,gia,g_missile_boat,Improvised Missile Barge,NAVAL,Riverboat Yard,1900,36,850,NAVAL,85,False,NAVAL_FIRE;ARTY_COMPUTER
+gia_guerrilla,gia,g_river,Raider Riverboat,NAVAL,Riverboat Yard,850,21,510,NAVAL,85,False,NAVAL_FIRE;G_SCAVENGE
+gia_guerrilla,gia,g_missile_boat,Improvised Missile Barge,NAVAL,Riverboat Yard,1900,36,850,NAVAL,85,False,NAVAL_FIRE;ARTY_COMPUTER
+gia_guerrilla,gia,g_shade,Shade Cell,T0,Militia Camp,175,6,80,PERSONNEL,95,True,INF_OPTICS;GW_CAMO
+gia_guerrilla,gia,g_rocket_cell,Rocket Cell,T0,Militia Camp,260,8,85,PERSONNEL,72,False,INF_ARMOR;INF_OPTICS;G_CAMO
+gia_guerrilla,gia,g_tech,Salvage Technician,T0,Militia Camp,400,9,80,PERSONNEL,90,False,INF_ARMOR
+gia_guerrilla,gia,g_collector,Salvage Collector,T0,Salvage Garage,1000,22,650,HEAVY,82,False,HARVEST_EFF
+gia_guerrilla,gia,g_bike,Raider Bike,T1,Salvage Garage,320,7,165,LIGHT,165,False,TRACK_DRIVE;G_CAMO
+gia_guerrilla,gia,g_ghost_technical,Ghost Technical,T1,Salvage Garage,700,14,260,LIGHT,155,True,TRACK_DRIVE;GW_CAMO;GW_PASSAGE
+gia_guerrilla,gia,g_rocket_truck,Rocket Truck,T1,Salvage Garage,730,15,330,LIGHT,130,False,AA_TRACKING;TRACK_DRIVE
+gia_guerrilla,gia,g_rocket_buggy,Rocket Buggy,T1,Salvage Garage,800,17,250,LIGHT,144,False,ARTY_COMPUTER;TRACK_DRIVE;G_SCAVENGE
+gia_guerrilla,gia,g_heli,Improvised Attack Helicopter,T2,Hidden Airstrip,1050,20,330,AIR,178,False,AIRFRAMES;G_CAMO
+gia_guerrilla,gia,g_drone_wing,Missile Drone Wing,T2,Hidden Airstrip,1550,29,240,AIR,218,False,AIRFRAMES;ECM_PODS
+gia_guerrilla,gia,g_saboteur,Hideout Saboteur,T2,Militia Camp,700,16,95,PERSONNEL,105,True,INF_ARMOR;GW_CAMO;GW_PASSAGE
+gia_guerrilla,gia,g_shadow,Shadow Operative,T2,Militia Camp,850,18,105,PERSONNEL,97,False,INF_ARMOR;G_CAMO
+gia_guerrilla,gia,g_mcv,GIA MCV,T2,Salvage Garage,2600,42,850,HEAVY,68,False,MCV_DEPLOY;ARMOR_PLATING
+gia_missile,gia,g_river,Raider Riverboat,NAVAL,Riverboat Yard,850,21,510,NAVAL,85,False,NAVAL_FIRE;G_SCAVENGE
+gia_missile,gia,g_missile_boat,Improvised Missile Barge,NAVAL,Riverboat Yard,1900,36,850,NAVAL,85,False,NAVAL_FIRE;ARTY_COMPUTER
+gia_missile,gia,g_militia,Militia Fighter,T0,Militia Camp,100,4,90,PERSONNEL,92,False,INF_ARMOR;INF_OPTICS
+gia_missile,gia,g_siege_rocket,Siege Rocket Squad,T0,Militia Camp,360,11,90,PERSONNEL,65,True,INF_ARMOR;MW_GUIDANCE;MW_RELOAD
+gia_missile,gia,g_tech,Salvage Technician,T0,Militia Camp,400,9,80,PERSONNEL,90,False,INF_ARMOR
+gia_missile,gia,g_collector,Salvage Collector,T0,Salvage Garage,1000,22,650,HEAVY,82,False,HARVEST_EFF
+gia_missile,gia,g_bike,Raider Bike,T1,Salvage Garage,320,7,165,LIGHT,165,False,TRACK_DRIVE
+gia_missile,gia,g_technical,Raider Technical,T1,Salvage Garage,550,12,290,LIGHT,145,False,TRACK_DRIVE;G_SCAVENGE
+gia_missile,gia,g_spotter,Missile Guidance Van,T1,Salvage Garage,700,16,270,LIGHT,122,True,TRACK_DRIVE;MW_GUIDANCE
+gia_missile,gia,g_rocket_truck,Rocket Truck,T1,Salvage Garage,730,15,330,LIGHT,130,False,AA_TRACKING;TRACK_DRIVE
+gia_missile,gia,g_scavenger,Scavenger Tank,T1,Salvage Garage,950,19,630,MEDIUM,87,False,ARMOR_PLATING;TARGETING;G_SCAVENGE
+gia_missile,gia,g_volley,Volley Launcher,T1,Salvage Garage,1150,24,300,LIGHT,95,True,ARTY_COMPUTER;MW_GUIDANCE;MW_RELOAD
+gia_missile,gia,g_heli,Improvised Attack Helicopter,T2,Hidden Airstrip,1050,20,330,AIR,178,False,AIRFRAMES
+gia_missile,gia,g_drone_wing,Missile Drone Wing,T2,Hidden Airstrip,1550,29,240,AIR,218,False,AIRFRAMES;ECM_PODS
+gia_missile,gia,g_reclaimed,Reclaimed Assault Tank,T2,Salvage Garage,1650,31,980,HEAVY,72,False,ARMOR_PLATING;TARGETING;G_SCAVENGE
+gia_missile,gia,g_mcv,GIA MCV,T2,Salvage Garage,2600,42,850,HEAVY,68,False,MCV_DEPLOY;ARMOR_PLATING
+gia_salvage,gia,g_river,Raider Riverboat,NAVAL,Riverboat Yard,850,21,510,NAVAL,85,False,NAVAL_FIRE;G_SCAVENGE
+gia_salvage,gia,g_missile_boat,Improvised Missile Barge,NAVAL,Riverboat Yard,1900,36,850,NAVAL,85,False,NAVAL_FIRE;ARTY_COMPUTER
+gia_salvage,gia,g_militia,Militia Fighter,T0,Militia Camp,100,4,90,PERSONNEL,92,False,INF_ARMOR;INF_OPTICS;G_CAMO
+gia_salvage,gia,g_rocket_cell,Rocket Cell,T0,Militia Camp,260,8,85,PERSONNEL,72,False,INF_ARMOR;INF_OPTICS;G_CAMO
+gia_salvage,gia,g_tech,Salvage Technician,T0,Militia Camp,400,9,80,PERSONNEL,90,False,INF_ARMOR
+gia_salvage,gia,g_collector,Salvage Collector,T0,Salvage Garage,1000,22,650,HEAVY,82,False,HARVEST_EFF
+gia_salvage,gia,g_scraprunner,Scrap Runner,T1,Salvage Garage,350,8,145,LIGHT,185,True,TRACK_DRIVE;SM_RECOVERY
+gia_salvage,gia,g_ripper,Ripper Technical,T1,Salvage Garage,625,12,230,LIGHT,177,True,TRACK_DRIVE;SM_RECOVERY;SM_IMPROV
+gia_salvage,gia,g_rocket_truck,Rocket Truck,T1,Salvage Garage,730,15,330,LIGHT,130,False,AA_TRACKING;TRACK_DRIVE
+gia_salvage,gia,g_rocket_buggy,Rocket Buggy,T1,Salvage Garage,800,17,250,LIGHT,144,False,ARTY_COMPUTER;TRACK_DRIVE;G_SCAVENGE
+gia_salvage,gia,g_recovery,Wreck Recovery Truck,T1,Salvage Garage,850,17,320,LIGHT,115,True,SM_RECOVERY;SM_IMPROV
+gia_salvage,gia,g_junker,Junker Assault Tank,T1,Salvage Garage,1000,20,560,MEDIUM,95,True,ARMOR_PLATING;SM_RECOVERY;SM_IMPROV
+gia_salvage,gia,g_heli,Improvised Attack Helicopter,T2,Hidden Airstrip,1050,20,330,AIR,178,False,AIRFRAMES;G_CAMO
+gia_salvage,gia,g_shadow,Shadow Operative,T2,Militia Camp,850,18,105,PERSONNEL,97,False,INF_ARMOR;G_CAMO
+gia_salvage,gia,g_reclaimed,Reclaimed Assault Tank,T2,Salvage Garage,1650,31,980,HEAVY,72,False,ARMOR_PLATING;TARGETING;G_SCAVENGE
+gia_salvage,gia,g_mcv,GIA MCV,T2,Salvage Garage,2600,42,850,HEAVY,68,False,MCV_DEPLOY;ARMOR_PLATING

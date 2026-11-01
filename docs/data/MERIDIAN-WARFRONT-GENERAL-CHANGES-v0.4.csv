@@ -1,0 +1,96 @@
+﻿general_id,faction,change_type,baseline_id_or_name,replacement_id_or_name,change_description
+alliance_air,alliance,REPLACE,a_vortex,a_ace,Replaces same production slot; baseline item unavailable
+alliance_air,alliance,REPLACE,a_striker,a_tempest,Replaces same production slot; baseline item unavailable
+alliance_air,alliance,REPLACE,a_lynx,a_missile_escort,Replaces same production slot; baseline item unavailable
+alliance_air,alliance,REMOVE,a_sentinel,,Unavailable
+alliance_air,alliance,REMOVE,a_arc_beam,,Unavailable
+alliance_air,alliance,ADD,,a_skywatch,Exclusive added unit
+alliance_air,alliance,UPGRADE_ADD,,AS_HANGARS,Airfield pad capacity 2→3; Air Superiority gunships rearm 12% faster
+alliance_air,alliance,UPGRADE_ADD,,AS_COUNTERMEASURES,"Ace aircraft and Skywatch chance of guided missile hit −18%, nonstacking with ECM; takes better value"
+alliance_air,alliance,MODIFIER,,,Airfield capacity 3 aircraft rather than 2 with Reinforced Hangars
+alliance_air,alliance,MODIFIER,,,Striker/Vortex standard slots unavailable; no standard or advanced tanks
+alliance_energy,alliance,REPLACE,a_sentinel,a_lance,Replaces same production slot; baseline item unavailable
+alliance_energy,alliance,REPLACE,a_sentinel_aa,a_lattice,Replaces same production slot; baseline item unavailable
+alliance_energy,alliance,REMOVE,a_howitzer,,Unavailable
+alliance_energy,alliance,ADD,,a_arc_sapper,Exclusive added unit
+alliance_energy,alliance,BUILDING_REPLACE,Sentry Turret,Beam Bastion,Baseline building replaced
+alliance_energy,alliance,UPGRADE_ADD,,DE_CAPACITORS,Arc Lance/Arc Sapper +12% beam damage; Beam Bastion +12% damage
+alliance_energy,alliance,UPGRADE_ADD,,DE_GRID,Lance and Lattice low-power firing penalty 2.0×→1.35×; Beam Bastion stays offline at brownout
+alliance_energy,alliance,UPGRADE_REMOVE,ARTY_COMPUTER,,Upgrade unavailable
+alliance_energy,alliance,MODIFIER,,,"Beam Bastion 800 credits/14s/−45 power, replaces Sentry Turret 550/9s/−10"
+alliance_energy,alliance,MODIFIER,,,Arc Lance and Lattice lose effectiveness during base-wide brownout
+alliance_ops,alliance,REPLACE,a_ranger,a_pathfinder,Replaces same production slot; baseline item unavailable
+alliance_ops,alliance,REPLACE,a_lynx,a_ghost_carrier,Replaces same production slot; baseline item unavailable
+alliance_ops,alliance,REPLACE,a_specter,a_phantom_drone,Replaces same production slot; baseline item unavailable
+alliance_ops,alliance,REMOVE,a_arc_beam,,Unavailable
+alliance_ops,alliance,ADD,,a_ghost_sniper,Exclusive added unit
+alliance_ops,alliance,UPGRADE_ADD,,SO_SILENT,Ghost Carrier and Ghost Sniper recloak after 2s instead of 3s
+alliance_ops,alliance,UPGRADE_ADD,,SO_DESIGNATION,Pathfinder/Phantom marks target 8s: allied guided weapons +10% damage to marked target
+alliance_ops,alliance,UPGRADE_REMOVE,ARTY_COMPUTER,,Upgrade unavailable
+alliance_ops,alliance,MODIFIER,,,Lose the heaviest artillery computer optimization on Precision Howitzer
+alliance_ops,alliance,MODIFIER,,,"Stealth ends on firing, taking damage or being detected; +3s recloak"
+republic_armor,republic,REPLACE,r_bastion,r_jugger,Replaces same production slot; baseline item unavailable
+republic_armor,republic,REPLACE,r_mammoth,r_imperator,Replaces same production slot; baseline item unavailable
+republic_armor,republic,REPLACE,r_recon,r_armored_scout,Replaces same production slot; baseline item unavailable
+republic_armor,republic,REMOVE,r_thunder,,Unavailable
+republic_armor,republic,ADD,,r_breacher,Exclusive added unit
+republic_armor,republic,UPGRADE_ADD,,HA_AUTOLOAD,Juggernaut/Imperator weapon reload interval −12%
+republic_armor,republic,UPGRADE_ADD,,HA_VETERANS,"New Juggernaut, Imperator tanks spawn at 1st veterancy; not retroactive"
+republic_armor,republic,UPGRADE_REMOVE,ARTY_COMPUTER,,Upgrade unavailable
+republic_armor,republic,UPGRADE_REMOVE,R_SHELLS,,Upgrade unavailable
+republic_armor,republic,MODIFIER,,,Siege Helicopter cost 1550→1800; Heavy Bomber cost 2300→2650
+republic_armor,republic,MODIFIER,,,Only tanks from this general gain Veteran Crews initial veterancy
+republic_armor,republic,UNIT_OVERRIDE,r_siege_heli,,{'credits': 1800}
+republic_armor,republic,UNIT_OVERRIDE,r_bomber,,{'credits': 2650}
+republic_artillery,republic,REPLACE,r_thunder,r_stormrail,Replaces same production slot; baseline item unavailable
+republic_artillery,republic,REPLACE,r_bastion,r_escort,Replaces same production slot; baseline item unavailable
+republic_artillery,republic,REMOVE,r_mammoth,,Unavailable
+republic_artillery,republic,ADD,,r_survey,Exclusive added unit
+republic_artillery,republic,BUILDING_REPLACE,Heavy Anti-Tank Emplacement,Counterbattery Station,Baseline building replaced
+republic_artillery,republic,UPGRADE_ADD,,AR_OBSERVERS,Stormrail near line-of-sight spotter −18% scatter; Survey Drone detect +20
+republic_artillery,republic,UPGRADE_ADD,,AR_RAPID,Stormrail deployment 3.5→2.5s and reload −10%
+republic_artillery,republic,UPGRADE_REMOVE,R_REACTIVE,,Upgrade unavailable
+republic_artillery,republic,MODIFIER,,,"Counterbattery Station 2000 credits/24s/−105 power, minimum range 160"
+republic_artillery,republic,MODIFIER,,,Escort Tank is faster and less armored; cannot research Reactive Armor
+republic_fortress,republic,REPLACE,r_line,r_garrison,Replaces same production slot; baseline item unavailable
+republic_fortress,republic,REPLACE,r_ironclad,r_siege_carrier,Replaces same production slot; baseline item unavailable
+republic_fortress,republic,REMOVE,r_recon,,Unavailable
+republic_fortress,republic,REMOVE,r_bomber,,Unavailable
+republic_fortress,republic,ADD,,r_field_engineer,Exclusive added unit
+republic_fortress,republic,BUILDING_REPLACE,Machine-Gun Bunker,Steel Pillbox,Baseline building replaced
+republic_fortress,republic,BUILDING_REPLACE,Fortified Outpost,Forward Bastion,Baseline building replaced
+republic_fortress,republic,UPGRADE_ADD,,FD_FORTS,Steel Pillbox and Forward Bastion +20% max HP; Garrison Guard +10% while garrisoned
+republic_fortress,republic,UPGRADE_ADD,,FD_FIELDWORKS,Siege Carrier deploy 3→2s; Fortification Engineer barriers 60→85s
+republic_fortress,republic,MODIFIER,,,Steel Pillbox 800 credits/15s/−5 power; Forward Bastion 1600/25s/−35
+republic_fortress,republic,MODIFIER,,,Land vehicle move speed −8% except siege carriers; no Heavy Bomber or Recon APC
+gia_guerrilla,gia,REPLACE,g_militia,g_shade,Replaces same production slot; baseline item unavailable
+gia_guerrilla,gia,REPLACE,g_technical,g_ghost_technical,Replaces same production slot; baseline item unavailable
+gia_guerrilla,gia,REMOVE,g_scavenger,,Unavailable
+gia_guerrilla,gia,REMOVE,g_reclaimed,,Unavailable
+gia_guerrilla,gia,ADD,,g_saboteur,Exclusive added unit
+gia_guerrilla,gia,BUILDING_REPLACE,Gun Nest,Concealed Gun Nest,Baseline building replaced
+gia_guerrilla,gia,UPGRADE_ADD,,GW_CAMO,Shade/Ghost Technical/Saboteur recloak 0.8s sooner; valid GIA structures gain concealed silhouette
+gia_guerrilla,gia,UPGRADE_ADD,,GW_PASSAGE,Ghost Technical and Saboteur tunnel exit protection +30% damage reduction for 3s
+gia_guerrilla,gia,MODIFIER,,,Concealed Gun Nest 650 credits/11s/−5 power; lower sustained DPS than standard Gun Nest
+gia_guerrilla,gia,MODIFIER,,,"Stealth cannot persist through attack, detection or sustained fast movement"
+gia_missile,gia,REPLACE,g_rocket_cell,g_siege_rocket,Replaces same production slot; baseline item unavailable
+gia_missile,gia,REPLACE,g_rocket_buggy,g_volley,Replaces same production slot; baseline item unavailable
+gia_missile,gia,REMOVE,g_shadow,,Unavailable
+gia_missile,gia,ADD,,g_spotter,Exclusive added unit
+gia_missile,gia,BUILDING_REPLACE,Salvaged AA Platform,Missile Defense Nest,Baseline building replaced
+gia_missile,gia,UPGRADE_ADD,,MW_GUIDANCE,Siege Rocket/Volley/Guidance Van missile scatter −15%; no flat extra damage
+gia_missile,gia,UPGRADE_ADD,,MW_RELOAD,Siege Rocket Squad/Volley Launcher firing intervals −12%
+gia_missile,gia,UPGRADE_REMOVE,G_CAMO,,Upgrade unavailable
+gia_missile,gia,MODIFIER,,,Missile Defense Nest 1100 credits/16s/−55 power; improved AA but limited ground fire
+gia_missile,gia,MODIFIER,,,Ballistic Missile Silo can buy 1100-credit Warhead Saturation package to widen AoE but reduce center damage 25%
+gia_salvage,gia,REPLACE,g_technical,g_ripper,Replaces same production slot; baseline item unavailable
+gia_salvage,gia,REPLACE,g_scavenger,g_junker,Replaces same production slot; baseline item unavailable
+gia_salvage,gia,REPLACE,g_bike,g_scraprunner,Replaces same production slot; baseline item unavailable
+gia_salvage,gia,REMOVE,g_drone_wing,,Unavailable
+gia_salvage,gia,ADD,,g_recovery,Exclusive added unit
+gia_salvage,gia,BUILDING_REPLACE,Field Workshop,Mobile Salvage Yard,Baseline building replaced
+gia_salvage,gia,UPGRADE_ADD,,SM_RECOVERY,Ripper/Junker/Scrap Runner recover wrecks 25% faster; no same-wreck repeat
+gia_salvage,gia,UPGRADE_ADD,,SM_IMPROV,Junker wreck tiers max +12% each instead of +10%; Recovery Truck heals 24 HP/s at same credit cost
+gia_salvage,gia,UPGRADE_REMOVE,G_HEAVY_DEF,,Upgrade unavailable
+gia_salvage,gia,MODIFIER,,,Mobile Salvage Yard 1050 credits/18s/−30 power; replaces Field Workshop 850/14s/−25
+gia_salvage,gia,MODIFIER,,,Cannot research Heavy Static Fortification upgrade; retains baseline anti-armor defense
