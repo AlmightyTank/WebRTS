@@ -183,6 +183,17 @@ func _check_elevation() -> void:
 	expect(bay.terrain_at(Vector2i(32, 24)) == MAP_DOCUMENT.TERRAIN_GEM or bay.elevation_at(Vector2i(32, 24)) == 2, "Mercy Bay highland missing")
 	var island = _spawn_battlefield("res://maps/mercy-bay.map.json")
 	expect(island.is_cell_blocked(Vector2i(0, 0)), "water should block movement")
+	expect(island.terrain.get_cell_atlas_coords(Vector2i(0, 0)) == Vector2i(0, 2), "open water used the shallows tile")
+	var shelf := Vector2i(-1, -1)
+	for y in range(island.map_data.height):
+		for x in range(island.map_data.width):
+			var cell := Vector2i(x, y)
+			if island.map_data.terrain_at(cell) == MAP_DOCUMENT.TERRAIN_WATER and island._coastal_water(cell):
+				shelf = cell
+				break
+		if shelf.x >= 0:
+			break
+	expect(shelf.x >= 0 and island.terrain.get_cell_atlas_coords(shelf) == Vector2i(1, 3), "coastal water stayed deep")
 	expect(island.extra_spawns.size() == 5, "extra landing bases were not spawned")
 	expect(island.camera.position.distance_to(island.tile_to_world(bay.focus_cell())) < 2.0, "camera did not frame the island")
 

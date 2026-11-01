@@ -32,7 +32,7 @@ The terrain array below is abbreviated. The full sample is `godot/maps/editor-sa
 | 3 | Dirt | Grass base with a feathered dirt edge |
 | 4 | Road | Grass base with a feathered concrete edge |
 | 5 | Grass C | Grass C, no overlay |
-| 6 | Water | Open water, blocked |
+| 6 | Water | Open water, blocked. Cells within two tiles of land draw as shallows |
 | 7 | Sand | Beach |
 | 8 | Ore | Yellow resource patch, not harvestable yet |
 | 9 | Gem | Teal resource patch, not harvestable yet |

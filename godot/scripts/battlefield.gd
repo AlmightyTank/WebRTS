@@ -19,6 +19,9 @@ const TILE_COLORS := [
 	Color("#806c4d"), Color("#858583"), Color("#596d4d"),
 	Color("#2e86b5"), Color("#d2bc84"), Color("#c6a04a"), Color("#3fbfa8")
 ]
+const ATLAS_TILE_COUNT := 12
+const ATLAS_SHALLOWS := 10
+const ATLAS_WATER_ALT := 11
 
 @export var map_path := "res://maps/mercy-bay.map.json"
 var camera: Camera2D
@@ -187,25 +190,67 @@ func _make_ground_tileset() -> TileSet:
 	var source := TileSetAtlasSource.new()
 	source.texture = ImageTexture.create_from_image(_make_atlas_image())
 	source.texture_region_size = Vector2i(TILE_W, TILE_H)
-	for index in range(TILE_COLORS.size()):
+	for index in range(ATLAS_TILE_COUNT):
 		source.create_tile(Vector2i(index % 3, floori(float(index) / 3.0)))
 	tileset.add_source(source, 0)
 	return tileset
 
 
 func _make_atlas_image() -> Image:
-	var rows := int(ceil(float(TILE_COLORS.size()) / 3.0))
+	var rows := int(ceil(float(ATLAS_TILE_COUNT) / 3.0))
 	var atlas := Image.create(TILE_W * 3, TILE_H * rows, false, Image.FORMAT_RGBA8)
 	atlas.fill(Color.TRANSPARENT)
-	for index in range(TILE_COLORS.size()):
-		var ox: int = (index % 3) * TILE_W
-		var oy: int = floori(float(index) / 3.0) * TILE_H
-		for y in range(TILE_H):
-			for x in range(TILE_W):
-				var normalized: float = absf(float(x) - TILE_W * 0.5) / (TILE_W * 0.5) + absf(float(y) - TILE_H * 0.5) / (TILE_H * 0.5)
-				if normalized <= 1.0:
-					atlas.set_pixel(ox + x, oy + y, TILE_COLORS[index])
+	for index in range(ATLAS_TILE_COUNT):
+		_paint_diamond(atlas, index)
 	return atlas
+
+
+func _paint_diamond(atlas: Image, index: int) -> void:
+	var origin_x := (index % 3) * TILE_W
+	var origin_y := floori(float(index) / 3.0) * TILE_H
+	for y in range(TILE_H):
+		for x in range(TILE_W):
+			var nx := (float(x) + 0.5) / (float(TILE_W) * 0.5) - 1.0
+			var ny := (float(y) + 0.5) / (float(TILE_H) * 0.5) - 1.0
+			if absf(nx) + absf(ny) > 1.0:
+				continue
+			atlas.set_pixel(origin_x + x, origin_y + y, _atlas_color(index, nx, ny, x, y))
+
+
+func _atlas_color(index: int, nx: float, ny: float, x: int, y: int) -> Color:
+	if index == MAP_DOCUMENT.TERRAIN_WATER or index == ATLAS_WATER_ALT:
+		var color := Color("#2e86b5").lerp(Color("#1c6794"), clampf(-ny, 0.0, 1.0) * 0.65)
+		var phase := 0.0 if index == MAP_DOCUMENT.TERRAIN_WATER else 0.55
+		if absf(sin(ny * 7.0 + phase + nx * 1.4)) < 0.22:
+			color = color.lightened(0.1)
+		return color
+	if index == ATLAS_SHALLOWS:
+		var shallows := Color("#67b7d6")
+		var rim := 1.0 - (absf(nx) + absf(ny))
+		if rim < 0.18:
+			return Color("#e4f3f1").lerp(shallows, rim / 0.18)
+		return shallows
+	if index == MAP_DOCUMENT.TERRAIN_SAND:
+		var sand := Color("#d2bc84")
+		if ny > 0.0:
+			sand = sand.darkened(0.06 * ny)
+		if (x * 13 + y * 7) % 19 == 0:
+			sand = sand.darkened(0.1)
+		return sand
+	if index == MAP_DOCUMENT.TERRAIN_ORE:
+		var nugget := (x * 17 + y * 13) % 11
+		if nugget == 0:
+			return Color("#f2d48a")
+		if nugget == 1:
+			return Color("#6d4e1c")
+		return Color("#c6a04a")
+	if index == MAP_DOCUMENT.TERRAIN_GEM:
+		if nx * nx + ny * ny < 0.1:
+			return Color("#e8fff8")
+		if absf(nx) + absf(ny) < 0.42:
+			return Color("#5fd4c4")
+		return Color("#1f8f86")
+	return TILE_COLORS[index]
 
 
 ## Overlay tiles are feathered along exposed diamond edges. A 4-bit neighbor
@@ -248,7 +293,14 @@ func _apply_cell(cell: Vector2i) -> void:
 	var kind: int = map_data.terrain_at(cell)
 	var level: int = map_data.elevation_at(cell)
 	var base_index := kind
-	if kind == 2 or kind == 3 or kind == 4:
+	if kind == MAP_DOCUMENT.TERRAIN_WATER:
+		if _coastal_water(cell):
+			base_index = ATLAS_SHALLOWS
+		elif (cell.x + cell.y) % 2 == 0:
+			base_index = MAP_DOCUMENT.TERRAIN_WATER
+		else:
+			base_index = ATLAS_WATER_ALT
+	elif kind == 2 or kind == 3 or kind == 4:
 		base_index = posmod(cell.x * 3 + cell.y * 5, 2)
 	var atlas := Vector2i(base_index % 3, floori(float(base_index) / 3.0))
 	var overlay_kind := -1
@@ -319,12 +371,23 @@ func _draw_cliff_face(layer: Node2D, center: Vector2, edge_a: Vector2, edge_b: V
 		layer.draw_line(center + edge_a + Vector2(0, top), center + edge_b + Vector2(0, top), color.lightened(0.18), 2.0)
 
 
+func _coastal_water(cell: Vector2i) -> bool:
+	for y in range(cell.y - 2, cell.y + 3):
+		for x in range(cell.x - 2, cell.x + 3):
+			var neighbor := Vector2i(x, y)
+			if neighbor == cell or not map_data.in_bounds(neighbor):
+				continue
+			if map_data.terrain_at(neighbor) != MAP_DOCUMENT.TERRAIN_WATER:
+				return true
+	return false
+
+
 func _refresh_cell_and_neighbors(cell: Vector2i) -> void:
-	_apply_cell(cell)
-	for offset in NEIGHBORS:
-		var adjacent: Vector2i = cell + offset
-		if map_data.in_bounds(adjacent):
-			_apply_cell(adjacent)
+	for y in range(cell.y - 2, cell.y + 3):
+		for x in range(cell.x - 2, cell.x + 3):
+			var adjacent := Vector2i(x, y)
+			if map_data.in_bounds(adjacent):
+				_apply_cell(adjacent)
 
 
 func _rebuild_obstacles() -> void:
