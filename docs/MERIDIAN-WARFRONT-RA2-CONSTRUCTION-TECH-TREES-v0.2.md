@@ -327,4 +327,4 @@ The five previously agreed foundations stay fixed. The following are **strong re
 - [Red Alert 2 multi-factory production behavior, ModEnc](https://modenc.renegadeprojects.com/MultipleFactory)
 - [Red Alert 2 Short Game, ModEnc](https://modenc.renegadeprojects.com/ShortGame)
 - [WebRTS three-faction building catalog](https://github.com/AlmightyTank/WebRTS/blob/main/docs/FACTION-BUILDING-ROSTER-1.0.md)
-- [Current WebRTS isometric roadmap (to be superseded after sign-off)](https://github.com/AlmightyTank/WebRTS/blob/main/docs/ROADMAP-GODOT-ISOMETRIC-1.0.md)
+- [Archived ideas from the former WebRTS isometric roadmap](https://github.com/AlmightyTank/WebRTS/blob/main/docs/IDEAS.md)

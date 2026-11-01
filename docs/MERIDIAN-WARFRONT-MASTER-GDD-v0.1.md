@@ -26,7 +26,7 @@
 ### 0.2 Existing project facts and integration
 
 - `AlmightyTank/WebRTS` is the active *Meridian Warfront* Godot project: `godot/project.godot`, `godot/scripts/battlefield.gd`, `godot/scripts/rts_camera.gd`, `godot/scripts/terrain_obstacle.gd`, and a static Command Center scene exist as prototype source. The root README specifies Godot 4.4.1; **verify runtime/tooling version before edits**. Its current main scene is a procedural isometric battlefield, not a complete RTS.
-- `docs/ROADMAP-GODOT-ISOMETRIC-1.0.md` is the **old rendering/production roadmap**; its 128×64 diamond tiles, fixed isometric sprites, directional sprite sheets and two-faction milestone are superseded by this design direction **once the new plan is reviewed**.
+- `docs/IDEAS.md` preserves selected ideas from the **old rendering/production roadmap**; its 128×64 diamond tiles, fixed isometric sprites, directional sprite sheets and two-faction milestone are explicitly superseded by this design direction.
 - `docs/FACTION-BUILDING-ROSTER-1.0.md` defines **Alliance, Republic and Global Insurgency Alliance (GIA)** and 19 strategic building roles. Preserve its gameplay intent, faction identities and names; rewrite the sprite/image contracts as procedural geometry contracts.
 - The separate `AlmightyTank/WebRTS-Native` repo contains an older *Poly Warfront* low-poly 3D Godot project. **This document does not authorize merging, deleting or editing that repository.** Keep its history distinct.
 - Do not destroy the current working isometric implementation to start this design. When implementation is authorized, preserve a branch/tag, profile code reuse, build the new renderer behind a switch/scene, and replace the active entry point only after tests and hands-on validation pass.
@@ -613,7 +613,7 @@ Design rule referenced -> implementation integrated -> deterministic/unit test o
 ### Reference documents in existing repository
 
 - [WebRTS README](https://github.com/AlmightyTank/WebRTS/blob/main/README.md)
-- [Current isometric roadmap (to be superseded)](https://github.com/AlmightyTank/WebRTS/blob/main/docs/ROADMAP-GODOT-ISOMETRIC-1.0.md)
+- [Archived ideas from the former isometric roadmap](https://github.com/AlmightyTank/WebRTS/blob/main/docs/IDEAS.md)
 - [Three-faction building roster](https://github.com/AlmightyTank/WebRTS/blob/main/docs/FACTION-BUILDING-ROSTER-1.0.md)
 - [Sprite inventory (legacy art strategy)](https://github.com/AlmightyTank/WebRTS/blob/main/docs/SPRITE-ASSET-INVENTORY.md)
 

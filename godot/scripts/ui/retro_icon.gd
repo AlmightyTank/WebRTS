@@ -116,9 +116,9 @@ func _draw() -> void:
    draw_line(Vector2(-10,0),Vector2(10,0),shadow,3)
 
 func draw_ellipse_shadow(shadow: Color) -> void:
- draw_ellipse(Vector2(0,23),Vector2(32,5),shadow)
+  draw_custom_ellipse(Vector2(0,23),Vector2(32,5),shadow)
 
-func draw_ellipse(center: Vector2,radii: Vector2,color: Color) -> void:
+func draw_custom_ellipse(center: Vector2,radii: Vector2,color: Color) -> void:
  var pts=PackedVector2Array()
  for i in range(24):
   var a=TAU*float(i)/24.0

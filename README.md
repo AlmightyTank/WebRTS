@@ -8,7 +8,7 @@ A native **Godot 4**, 2D isometric real-time strategy game, inspired by classic 
 2. Open Godot Project Manager and import `godot/project.godot`.
 3. Run the project with **F5**.
 
-The Godot project is the primary implementation. Source code and artwork live in [`godot/`](godot/). The complete development plan is in [`docs/ROADMAP-GODOT-ISOMETRIC-1.0.md`](docs/ROADMAP-GODOT-ISOMETRIC-1.0.md).
+The Godot project is the primary implementation. Source code and artwork live in [`godot/`](godot/). The active status board is [`ROADMAP.md`](ROADMAP.md); retained ideas from the former isometric plan are in [`docs/IDEAS.md`](docs/IDEAS.md).
 
 ## Status
 
