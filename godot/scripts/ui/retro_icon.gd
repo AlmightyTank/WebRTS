@@ -3,6 +3,13 @@ extends Control
 var icon_name := "power"
 var tint := Color("#86ceee")
 
+func _icon_body() -> Color:
+ if icon_name.begins_with("r_"):
+  return Color("#c87559")
+ if icon_name.begins_with("a_"):
+  return Color("#62b6d7")
+ return tint
+
 func configure(id: String) -> void:
  icon_name=id
  queue_redraw()
@@ -16,7 +23,7 @@ func _draw() -> void:
  draw_set_transform(size*0.5,0.0,Vector2.ONE*factor)
  var shadow=Color("#0b1117")
  var edge=Color("#92a0ad")
- var body=tint
+ var body=_icon_body()
  draw_ellipse_shadow(shadow)
  match icon_name:
   "EMBLEM":
@@ -51,30 +58,39 @@ func _draw() -> void:
    if icon_name=="a_sentinel_aa":
     draw_rect(Rect2(-17,-19,8,24),edge)
     draw_rect(Rect2(9,-19,8,24),edge)
-  "a_ranger","a_javelin","a_engineer":
+  "a_ranger","a_javelin","a_engineer","r_line","r_hunter","r_engineer":
    draw_circle(Vector2(0,-16),9,edge)
    draw_rect(Rect2(-10,-6,20,26),body)
    draw_line(Vector2(-9,1),Vector2(-25,19),edge,4)
    draw_line(Vector2(10,1),Vector2(24,18),edge,4)
-   if icon_name=="a_javelin":
+   if icon_name in ["a_javelin","r_hunter"]:
     draw_line(Vector2(-19,-8),Vector2(27,-18),Color("#e0ba61"),6)
-   elif icon_name=="a_engineer":
+   elif icon_name in ["a_engineer","r_engineer"]:
     draw_line(Vector2(16,-8),Vector2(25,-27),Color("#e0ba61"),4)
     draw_circle(Vector2(25,-27),5,Color("#e0ba61"))
    else:
     draw_line(Vector2(-15,5),Vector2(26,-5),shadow,5)
-  "a_sentinel","a_harvester","a_mcv":
+  "a_sentinel","a_harvester","a_mcv","r_bastion","r_hauler","r_mcv":
    draw_rect(Rect2(-32,-7,64,25),body)
    draw_rect(Rect2(-24,-17,47,20),Color("#8195a7"))
    draw_rect(Rect2(-32,16,64,5),shadow)
-   if icon_name=="a_sentinel":
+   if icon_name in ["a_sentinel","r_bastion"]:
     draw_circle(Vector2(0,-10),10,Color("#a5b9ca"))
     draw_line(Vector2(0,-12),Vector2(34,-29),edge,7)
-   elif icon_name=="a_harvester":
+   elif icon_name in ["a_harvester","r_hauler"]:
     draw_rect(Rect2(11,-24,22,19),Color("#e0b05d"))
    else:
     draw_line(Vector2(-16,-19),Vector2(4,-34),edge,3)
     draw_circle(Vector2(4,-34),5,edge)
+  "a_striker","r_flak":
+   draw_rect(Rect2(-30,-12,60,24),body)
+   draw_rect(Rect2(-20,-7,35,14),Color("#1d343b"))
+   draw_line(Vector2(3,-5),Vector2(30,-18),edge,3)
+   draw_line(Vector2(3,5),Vector2(30,18),edge,3)
+  "r_siege_heli":
+   draw_colored_polygon(PackedVector2Array([Vector2(26,0),Vector2(-12,-16),Vector2(-20,-5),Vector2(-20,5),Vector2(-12,16)]),body)
+   draw_line(Vector2(-12,-11),Vector2(14,-11),edge,3)
+   draw_line(Vector2(0,-11),Vector2(0,-22),edge,2)
   "MOVE":
    draw_line(Vector2(-27,13),Vector2(12,-13),body,5)
    draw_colored_polygon(PackedVector2Array([Vector2(12,-24),Vector2(32,-13),Vector2(12,-2)]),body)

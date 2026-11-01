@@ -56,50 +56,80 @@ func receive_damage(amount: float, _attacker) -> void:
   destroyed.emit(self)
   queue_free()
 
+func _faction_colors() -> Dictionary:
+ if team == 0:
+  return {"main": Color("#4b9fc2"), "dark": Color("#173d52"), "accent": Color("#bfe8e7"), "signal": Color("#75e0c0")}
+ if team == 1:
+  return {"main": Color("#b9654d"), "dark": Color("#4d2929"), "accent": Color("#f1c28f"), "signal": Color("#f09b68")}
+ return {"main": Color("#8d9188"), "dark": Color("#343b3a"), "accent": Color("#d3d8c6"), "signal": Color("#e2d276")}
+
+func _draw_flat_shell(size: Vector2, colors: Dictionary) -> void:
+ var frame := Rect2(-size * 0.5, size)
+ draw_rect(Rect2(frame.position + Vector2(6, 8), frame.size), Color(0.03, 0.06, 0.07, 0.32))
+ draw_rect(frame, colors["dark"])
+ draw_rect(frame.grow(-5.0), colors["main"])
+ draw_line(Vector2(-size.x * 0.5 + 8.0, -size.y * 0.5 + 8.0), Vector2(size.x * 0.5 - 8.0, -size.y * 0.5 + 8.0), colors["accent"], 3.0)
+
 func _draw() -> void:
- var main=Color("#6795aa") if team==0 else (Color("#ab785e") if team==1 else Color("#999780"))
- var top=main.lightened(0.22)
- var edge=main.darkened(0.45)
- var size=footprint
- draw_rect(Rect2(-size*0.5+Vector2(7,9),size),Color(0.05,0.08,0.07,0.28))
- draw_rect(Rect2(-size*0.5,size),edge)
- draw_rect(Rect2(-size*0.5+Vector2(4,4),size-Vector2(8,8)),main)
- draw_colored_polygon(PackedVector2Array([Vector2(-size.x/2,-size.y/2),Vector2(-size.x/2+9,-size.y/2-18),Vector2(size.x/2+9,-size.y/2-18),Vector2(size.x/2,-size.y/2)]),top)
- draw_colored_polygon(PackedVector2Array([Vector2(size.x/2,-size.y/2),Vector2(size.x/2+9,-size.y/2-18),Vector2(size.x/2+9,size.y/2-18),Vector2(size.x/2,size.y/2)]),edge)
+ var colors := _faction_colors()
+ var main: Color = colors["main"]
+ var dark: Color = colors["dark"]
+ var accent: Color = colors["accent"]
+ var signal_color: Color = colors["signal"]
+ var size := footprint
+ _draw_flat_shell(size, colors)
  match kind:
   "yard":
-   draw_rect(Rect2(-27,-26,54,43),edge)
-   draw_rect(Rect2(-18,-34,36,26),top)
-   draw_line(Vector2(15,-30),Vector2(43,-55),Color("#dee6ce"),4)
-   draw_arc(Vector2(44,-56),15,0,TAU,20,Color("#dfe8e0"),3)
+   draw_colored_polygon(PackedVector2Array([Vector2(-34, 13), Vector2(-22, -22), Vector2(0, -36), Vector2(22, -22), Vector2(34, 13), Vector2(0, 28)]), dark)
+   draw_colored_polygon(PackedVector2Array([Vector2(-22, 10), Vector2(-13, -16), Vector2(0, -26), Vector2(13, -16), Vector2(22, 10), Vector2(0, 20)]), main)
+   draw_line(Vector2(0, -25), Vector2(0, 18), accent, 3.0)
+   draw_line(Vector2(-17, -3), Vector2(17, -3), accent, 3.0)
+   draw_arc(Vector2(43, -48), 13, 0.0, TAU, 20, signal_color, 3.0)
+   draw_line(Vector2(15, -25), Vector2(42, -47), accent, 3.0)
   "power":
    for i in range(3):
-    draw_rect(Rect2(-37+i*27,-28,18,56),edge)
-    draw_circle(Vector2(-28+i*27,-28),9,top)
+    var x := -36.0 + i * 27.0
+    draw_rect(Rect2(x, -28, 18, 55), dark)
+    draw_rect(Rect2(x + 4, -23, 10, 45), main)
+    draw_circle(Vector2(x + 9, -28), 7.0, accent)
+    draw_line(Vector2(x + 3, 27), Vector2(x + 15, 27), signal_color, 2.0)
   "refinery":
-   draw_rect(Rect2(-38,-25,38,40),edge)
-   draw_rect(Rect2(6,-24,37,42),top)
-   draw_circle(Vector2(15,0),13,edge)
+   draw_rect(Rect2(-40, -24, 34, 42), dark)
+   draw_rect(Rect2(-34, -19, 22, 32), main)
+   for x in [-2.0, 18.0, 34.0]:
+    draw_circle(Vector2(x, -9), 11.0, dark)
+    draw_circle(Vector2(x, -9), 7.0, accent)
+   draw_line(Vector2(-36, 20), Vector2(40, 20), signal_color, 3.0)
   "barracks":
-   draw_rect(Rect2(-32,-18,64,36),edge)
-   draw_rect(Rect2(-10,3,20,16),top)
+   draw_colored_polygon(PackedVector2Array([Vector2(-34, -3), Vector2(0, -29), Vector2(34, -3), Vector2(34, 19), Vector2(-34, 19)]), dark)
+   draw_colored_polygon(PackedVector2Array([Vector2(-25, -4), Vector2(0, -22), Vector2(25, -4)]), main)
+   draw_rect(Rect2(-10, 4, 20, 15), accent)
+   draw_rect(Rect2(-6, 8, 12, 11), dark)
+   draw_line(Vector2(-28, 0), Vector2(28, 0), signal_color, 2.0)
   "factory":
-   draw_rect(Rect2(-44,-22,88,44),edge)
-   draw_rect(Rect2(-28,-16,57,28),Color("#1d343b"))
-   for i in range(3): draw_line(Vector2(-37+i*25,-21),Vector2(-37+i*25,19),top,2)
+   draw_rect(Rect2(-46, -22, 92, 43), dark)
+   draw_rect(Rect2(-38, -14, 76, 27), main)
+   draw_rect(Rect2(-24, -8, 48, 21), Color("#162b36"))
+   for x in [-35.0, -12.0, 12.0, 35.0]:
+    draw_line(Vector2(x, -20), Vector2(x, 20), accent, 2.0)
+   draw_line(Vector2(-32, 16), Vector2(32, 16), signal_color, 3.0)
   "depot":
-   draw_rect(Rect2(-30,-24,60,42),edge)
-   draw_rect(Rect2(-18,-26,36,28),top)
-   for i in range(3): draw_line(Vector2(-36+i*34,26),Vector2(-24+i*34,8),top,3)
+   draw_colored_polygon(PackedVector2Array([Vector2(-35, -20), Vector2(26, -20), Vector2(38, -8), Vector2(30, 19), Vector2(-31, 19), Vector2(-40, 7)]), dark)
+   draw_rect(Rect2(-28, -14, 57, 28), main)
+   for x in [-20.0, 0.0, 20.0]:
+    draw_line(Vector2(x - 8, -12), Vector2(x + 8, 12), accent, 3.0)
   "relay":
-   draw_rect(Rect2(-29,-24,58,42),edge)
-   draw_line(Vector2(0,-26),Vector2(0,-70),top,5)
-   draw_arc(Vector2(0,-70),16,0,TAU,25,top,3)
-   draw_circle(Vector2(0,-70),5,Color("#f1dd95"))
+   draw_rect(Rect2(-28, -25, 56, 43), dark)
+   draw_rect(Rect2(-20, -18, 40, 31), main)
+   draw_line(Vector2(0, -22), Vector2(0, -69), accent, 4.0)
+   draw_arc(Vector2(0, -69), 16.0, 0.0, TAU, 24, signal_color, 3.0)
+   draw_circle(Vector2(0, -69), 4.0, signal_color)
   "turret":
-   draw_circle(Vector2.ZERO,21,edge)
-   draw_circle(Vector2.ZERO,14,main)
-   draw_line(Vector2.ZERO,Vector2(32,-4),top,7)
+   draw_circle(Vector2.ZERO, 25.0, dark)
+   draw_circle(Vector2.ZERO, 18.0, main)
+   draw_circle(Vector2.ZERO, 8.0, accent)
+   draw_line(Vector2(0, 0), Vector2(36, -5), accent, 7.0)
+   draw_line(Vector2(27, -5), Vector2(39, -5), signal_color, 3.0)
  if repairing:
   draw_arc(Vector2.ZERO,radius+10.0,0,TAU,28,Color("#67e7bf"),2.5)
  if selected: draw_rect(Rect2(-size*0.5-Vector2(5,5),size+Vector2(10,10)),Color("#e5e8b8"),false,2.0)

@@ -146,21 +146,38 @@ func receive_damage(value: float, _attacker) -> void:
   queue_free()
  queue_redraw()
 
+func _faction_colors() -> Dictionary:
+ if team == 0:
+  return {"main": Color("#4b9fc2"), "dark": Color("#173d52"), "accent": Color("#bfe8e7"), "signal": Color("#75e0c0")}
+ return {"main": Color("#b9654d"), "dark": Color("#4d2929"), "accent": Color("#f1c28f"), "signal": Color("#f09b68")}
+
 func _draw() -> void:
- var base=Color("#6e9bb4") if team==0 else Color("#b08962")
- var edge=base.darkened(0.5)
- if selected: draw_arc(Vector2.ZERO,29,0,TAU,36,Color("#eef3b1"),2.2)
- draw_set_transform(Vector2.ZERO,facing)
- draw_rect(Rect2(-24,-18,48,36),edge)
- draw_rect(Rect2(-18,-20,36,40),base)
- draw_rect(Rect2(-12,-11,24,18),edge)
- if working:
-  draw_rect(Rect2(-12,11,24,9),Color("#b5a27a"))
-  draw_circle(Vector2(-13,-5),5,Color("#c7d2b8"))
+ var colors := _faction_colors()
+ var main: Color = colors["main"]
+ var dark: Color = colors["dark"]
+ var accent: Color = colors["accent"]
+ var signal_color: Color = colors["signal"]
+ if selected:
+  draw_arc(Vector2.ZERO, 29.0, 0.0, TAU, 36, Color("#eef3b1"), 2.2)
+ draw_set_transform(Vector2.ZERO, facing)
+ draw_rect(Rect2(-25, -18, 50, 36), dark)
+ if unit_id in ["a_mcv", "r_mcv"]:
+  draw_colored_polygon(PackedVector2Array([Vector2(-18, -15), Vector2(12, -15), Vector2(21, -5), Vector2(16, 15), Vector2(-20, 15), Vector2(-24, 5)]), main)
+  draw_rect(Rect2(-10, -10, 21, 18), accent)
+  draw_line(Vector2(-16, 11), Vector2(15, 11), signal_color, 3.0)
+  draw_line(Vector2(7, -12), Vector2(22, -27), accent, 3.0)
+  draw_circle(Vector2(23, -28), 5.0, signal_color)
  else:
-  draw_rect(Rect2(-17,-13,34,12),Color("#d6d6c4"))
-  draw_line(Vector2(-18,18),Vector2(18,18),Color("#d6d6c4"),4)
- draw_set_transform(Vector2.ZERO,0.0)
+  draw_colored_polygon(PackedVector2Array([Vector2(-20, -13), Vector2(13, -13), Vector2(22, -4), Vector2(22, 14), Vector2(-21, 14)]), main)
+  draw_rect(Rect2(-14, -9, 24, 17), dark)
+  draw_rect(Rect2(-11, -7, 18, 8), accent)
+  if working:
+   draw_rect(Rect2(-12, 9, 26, 7), signal_color)
+   draw_circle(Vector2(-15, -4), 5.0, accent)
+  else:
+   draw_line(Vector2(-18, 14), Vector2(18, 14), accent, 4.0)
+   draw_line(Vector2(11, -10), Vector2(20, -19), signal_color, 3.0)
+ draw_set_transform(Vector2.ZERO, 0.0)
  if working and cargo>0.0:
   draw_rect(Rect2(-23,-33,46,4),Color("#1b2927"))
   draw_rect(Rect2(-23,-33,46*cargo/capacity,4),Color("#f3c276"))
