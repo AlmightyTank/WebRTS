@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/core/animated_core_building.gd" id="1"]
+
+[node name="WarFactory" type="Node2D"]
+script = ExtResource("1")
+faction = "alliance"
+building_id = "war_factory"
+
+[node name="Visual" type="AnimatedSprite2D" parent="."]

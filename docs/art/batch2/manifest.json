@@ -1,0 +1,66 @@
+{
+  "branch": "2d-isometric",
+  "pack": "meridian-warfront-batch2",
+  "terrain_tile_size": [
+    128,
+    64
+  ],
+  "building_frame_size": [
+    384,
+    384
+  ],
+  "footprint": [
+    3,
+    3
+  ],
+  "heads": [
+    "alliance",
+    "republic",
+    "gia"
+  ],
+  "power": {
+    "factions": [
+      "alliance",
+      "republic",
+      "gia"
+    ],
+    "states": [
+      "idle",
+      "working",
+      "damaged",
+      "offline"
+    ],
+    "frames_per_loop": 8,
+    "fps": 8
+  },
+  "other_buildings": {
+    "factions": {
+      "alliance": [
+        "fusion_plant",
+        "ore_refinery",
+        "barracks",
+        "war_factory"
+      ],
+      "republic": [
+        "thermal_power_station",
+        "industrial_ore_works",
+        "garrison_barracks",
+        "armor_works"
+      ],
+      "gia": [
+        "diesel_generator_yard",
+        "scrapyard_refinery",
+        "militia_training_camp",
+        "salvage_garage"
+      ]
+    },
+    "states": [
+      "idle",
+      "working",
+      "peak"
+    ],
+    "source_frames_per_building": 3,
+    "fps": 2
+  },
+  "note": "Visual assets only; core building sequences are three stage stills; gameplay/production not yet wired."
+}

@@ -41,3 +41,20 @@ jobs:
           name: placement-browser-screenshots
           path: test-results/
           if-no-files-found: ignore
+
+  godot-isometric-smoke:
+    if: github.ref == 'refs/heads/2d-isometric' || github.base_ref == '2d-isometric'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4 (headless)
+        uses: chickensoft-games/setup-godot@v2.4.3
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: false
+      - name: Import Godot project and SVG sprites
+        run: godot --headless --path godot --editor --quit
+      - name: Smoke-test battlefield startup
+        run: godot --headless --path godot --quit-after 10
