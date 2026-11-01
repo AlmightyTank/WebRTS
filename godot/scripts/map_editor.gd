@@ -35,6 +35,8 @@ func apply_brush_at(cell: Vector2i) -> bool:
 		painted = battlefield.paint_obstacle(cell, brush_kind)
 	elif brush_mode == "headquarters":
 		painted = battlefield.place_headquarters(cell)
+	elif brush_mode == "elevation":
+		painted = battlefield.paint_elevation(cell, brush_kind)
 	if painted:
 		_set_status("Updated %s at %d, %d." % [brush_mode, cell.x, cell.y])
 	else:
@@ -159,6 +161,28 @@ func _handle_shortcut(event: InputEventKey) -> bool:
 			_select_obstacle(-1)
 		KEY_H:
 			_select_headquarters()
+		KEY_Q:
+			_select_elevation(0)
+		KEY_E:
+			_select_elevation(1)
+		KEY_R:
+			_select_elevation(2)
+		KEY_T:
+			_select_elevation(3)
+		KEY_Y:
+			_select_terrain(MAP_DOCUMENT.TERRAIN_WATER)
+		KEY_U:
+			_select_terrain(MAP_DOCUMENT.TERRAIN_SAND)
+		KEY_I:
+			_select_terrain(MAP_DOCUMENT.TERRAIN_ORE)
+		KEY_O:
+			_select_terrain(MAP_DOCUMENT.TERRAIN_GEM)
+		KEY_P:
+			_select_obstacle(3)
+		KEY_BRACKETRIGHT:
+			cycle_showcase(1)
+		KEY_BRACKETLEFT:
+			cycle_showcase(-1)
 		_:
 			return false
 	return true
@@ -181,14 +205,14 @@ func _select_terrain(kind: int) -> void:
 	brush_mode = "terrain"
 	brush_kind = kind
 	_refresh_tool_buttons()
-	_set_status("Tool: %s." % ["Grass", "Grass B", "Blend", "Dirt", "Road", "Grass C"][kind])
+	_set_status("Tool: %s." % ["Grass", "Grass B", "Blend", "Dirt", "Road", "Grass C", "Water", "Sand", "Ore", "Gem"][kind])
 
 
 func _select_obstacle(kind: int) -> void:
 	brush_mode = "obstacle"
 	brush_kind = kind
 	_refresh_tool_buttons()
-	_set_status("Tool: %s." % ("Erase obstacle" if kind < 0 else ["Tree", "Rock", "Debris"][kind]))
+	_set_status("Tool: %s." % ("Erase obstacle" if kind < 0 else ["Tree", "Rock", "Debris", "Derrick"][kind]))
 
 
 func _select_headquarters() -> void:
@@ -196,6 +220,18 @@ func _select_headquarters() -> void:
 	brush_kind = 0
 	_refresh_tool_buttons()
 	_set_status("Tool: Headquarters. Click the new center cell.")
+
+
+func _select_elevation(level: int) -> void:
+	brush_mode = "elevation"
+	brush_kind = level
+	_refresh_tool_buttons()
+	_set_status("Tool: elevation %d. Click a tile to raise or lower it." % level)
+
+
+func cycle_showcase(step: int) -> void:
+	battlefield._cycle_showcase(step)
+	_set_status("Loaded %s (%d×%d)." % [battlefield.map_data.map_name, battlefield.map_data.width, battlefield.map_data.height])
 
 
 func _refresh_tool_buttons() -> void:
@@ -207,6 +243,8 @@ func _refresh_tool_buttons() -> void:
 		elif brush_mode == "obstacle" and key == "obstacle-%d" % brush_kind:
 			active = true
 		elif brush_mode == "headquarters" and key == "headquarters":
+			active = true
+		elif brush_mode == "elevation" and key == "elevation-%d" % brush_kind:
 			active = true
 		button.modulate = Color(0.75, 0.95, 0.75) if active else Color.WHITE
 
@@ -238,11 +276,30 @@ func _build_hud() -> void:
 		["Grass C", "terrain-5", _select_terrain.bind(5)],
 	]))
 	box.add_child(_tool_row([
+		["Water", "terrain-6", _select_terrain.bind(MAP_DOCUMENT.TERRAIN_WATER)],
+		["Sand", "terrain-7", _select_terrain.bind(MAP_DOCUMENT.TERRAIN_SAND)],
+		["Ore", "terrain-8", _select_terrain.bind(MAP_DOCUMENT.TERRAIN_ORE)],
+		["Gem", "terrain-9", _select_terrain.bind(MAP_DOCUMENT.TERRAIN_GEM)],
+	]))
+	box.add_child(_tool_row([
 		["Tree", "obstacle-0", _select_obstacle.bind(0)],
 		["Rock", "obstacle-1", _select_obstacle.bind(1)],
 		["Debris", "obstacle-2", _select_obstacle.bind(2)],
+		["Derrick", "obstacle-3", _select_obstacle.bind(3)],
 		["Erase", "obstacle--1", _select_obstacle.bind(-1)],
 		["HQ", "headquarters", _select_headquarters],
+	]))
+	box.add_child(_tool_row([
+		["Flat", "elevation-0", _select_elevation.bind(0)],
+		["Low", "elevation-1", _select_elevation.bind(1)],
+		["High", "elevation-2", _select_elevation.bind(2)],
+		["Peak", "elevation-3", _select_elevation.bind(3)],
+	]))
+	box.add_child(_tool_row([
+		["Escarpment", "show-escarpment", func() -> void: load_from("res://maps/elevation-escarpment.map.json")],
+		["Basin", "show-basin", func() -> void: load_from("res://maps/elevation-basin.map.json")],
+		["Hill", "show-hill", func() -> void: load_from("res://maps/elevation-hill.map.json")],
+		["Mercy Bay", "show-mercy", func() -> void: load_from("res://maps/mercy-bay.map.json")],
 	]))
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 6)

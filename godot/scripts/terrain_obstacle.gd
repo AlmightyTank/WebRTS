@@ -3,6 +3,7 @@ extends Node2D
 const TREE := 0
 const ROCK := 1
 const DEBRIS := 2
+const DERRICK := 3
 var kind: int = TREE
 var cell := Vector2i.ZERO
 
@@ -25,3 +26,8 @@ func _draw() -> void:
 			draw_rect(Rect2(-22, -13, 27, 12), Color("#705d4c"))
 			draw_rect(Rect2(2, -19, 20, 14), Color("#8b8377"))
 			draw_line(Vector2(-26, -5), Vector2(24, -22), Color("#4a4945"), 3.0)
+		DERRICK:
+			draw_rect(Rect2(-4, -46, 8, 46), Color("#3e4744"))
+			draw_rect(Rect2(-18, -50, 28, 7), Color("#6d776c"))
+			draw_line(Vector2(-14, -22), Vector2(18, -8), Color("#2c312e"), 3.0)
+			draw_rect(Rect2(-14, -6, 28, 8), Color("#5c5144"))

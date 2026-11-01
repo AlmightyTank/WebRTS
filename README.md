@@ -12,7 +12,7 @@ The Godot project is the primary implementation. Source code and artwork live in
 
 ## Status
 
-The battlefield loads a versioned JSON map. A desktop map editor can paint terrain, decorations, and the headquarters cell; see [`docs/MAP-FORMAT.md`](docs/MAP-FORMAT.md). Many visuals remain placeholders. GitHub Actions imports the project, runs the map round-trip check, and launches a headless smoke test.
+F5 opens Mercy Bay, an original six-start island with a southern bay, beaches, cliffs, ore, gems, and derricks. It follows the shape of a Red Alert 2 skirmish island and does not reproduce a commercial map. `[` and `]` cycle the other showcase maps. Details are in [`docs/MAP-FORMAT.md`](docs/MAP-FORMAT.md). GitHub Actions imports the project, runs the map round-trip check, and launches a headless smoke test.
 
 ## Previous WebRTS prototype
 
@@ -24,3 +24,4 @@ The previous Phaser/browser prototype is preserved on the **`legacy-web-phaser`*
 - Right or middle mouse drag: pan.
 - Mouse wheel: zoom.
 - Touch: drag or pinch to navigate (pending device validation).
+- `[` / `]`: cycle the flat skirmish, escarpment, basin, and hill maps.

@@ -3,7 +3,7 @@ extends Camera2D
 @export var pan_speed := 950.0
 @export var edge_margin := 18.0
 @export var smoothing := 12.0
-@export var min_zoom := 0.45
+@export var min_zoom := 0.15
 @export var max_zoom := 1.8
 @export var allow_edge_scroll := true
 var world_bounds := Rect2(-4096, 0, 8192, 4096)
@@ -16,9 +16,9 @@ var pinch_distance := 0.0
 func configure(bounds: Rect2, initial_position: Vector2) -> void:
 	world_bounds = bounds
 	target_position = initial_position
-	position = initial_position
 	zoom = Vector2.ONE * target_zoom
 	_clamp_target()
+	position = target_position
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:

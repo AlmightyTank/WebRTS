@@ -4,19 +4,29 @@ const FORMAT := "meridian-warfront-map"
 const VERSION := 1
 const TILE_W := 128
 const TILE_H := 64
-const TERRAIN_KIND_COUNT := 6
+const TERRAIN_KIND_COUNT := 10
+const TERRAIN_WATER := 6
+const TERRAIN_SAND := 7
+const TERRAIN_ORE := 8
+const TERRAIN_GEM := 9
+const ELEVATION_LEVELS := 4
+const ELEVATION_RISE := 24
 const MIN_SIZE := 3
 const MAX_SIZE := 256
-const OBSTACLE_NAMES: PackedStringArray = ["tree", "rock", "debris"]
-const ROOT_KEYS: PackedStringArray = [
+const OBSTACLE_NAMES: PackedStringArray = ["tree", "rock", "debris", "derrick"]
+const REQUIRED_KEYS: PackedStringArray = [
 	"format", "version", "name", "width", "height", "tile_size", "terrain", "obstacles", "headquarters"
 ]
+const OPTIONAL_KEYS: PackedStringArray = ["elevation", "starts", "camera"]
 
 var map_name := "untitled"
 var width := 64
 var height := 64
 var terrain := PackedInt32Array()
+var elevation := PackedInt32Array()
 var headquarters := Vector2i(32, 32)
+var starts: Array = []
+var camera_focus := Vector2i(-1, -1)
 var last_error := ""
 var _obstacles: Dictionary = {}
 
@@ -28,8 +38,13 @@ func setup(map_width: int, map_height: int, next_name: String, fill: int = 0) ->
 	terrain = PackedInt32Array()
 	terrain.resize(width * height)
 	terrain.fill(fill)
+	elevation = PackedInt32Array()
+	elevation.resize(width * height)
+	elevation.fill(0)
 	_obstacles = {}
 	headquarters = Vector2i(width / 2, height / 2)
+	starts = []
+	camera_focus = Vector2i(-1, -1)
 	last_error = ""
 
 
@@ -47,9 +62,25 @@ func set_terrain(cell: Vector2i, kind: int) -> bool:
 		last_error = "Cell is outside the map."
 		return false
 	if kind < 0 or kind >= TERRAIN_KIND_COUNT:
-		last_error = "Terrain kind must be 0 through 5."
+		last_error = "Terrain kind must be 0 through %d." % [TERRAIN_KIND_COUNT - 1]
 		return false
 	terrain[cell.y * width + cell.x] = kind
+	return true
+
+
+func elevation_at(cell: Vector2i) -> int:
+	return elevation[cell.y * width + cell.x]
+
+
+func set_elevation(cell: Vector2i, level: int) -> bool:
+	last_error = ""
+	if not in_bounds(cell):
+		last_error = "Cell is outside the map."
+		return false
+	if level < 0 or level >= ELEVATION_LEVELS:
+		last_error = "Elevation must be 0 through 3."
+		return false
+	elevation[cell.y * width + cell.x] = level
 	return true
 
 
@@ -67,6 +98,9 @@ func set_obstacle(cell: Vector2i, kind: int) -> bool:
 	if headquarters_covers(cell):
 		last_error = "That cell is inside the headquarters footprint."
 		return false
+	if spawn_covers(cell):
+		last_error = "That cell is inside a starting footprint."
+		return false
 	if kind == -1:
 		_obstacles.erase(cell)
 		return true
@@ -78,7 +112,37 @@ func set_obstacle(cell: Vector2i, kind: int) -> bool:
 
 
 func headquarters_covers(cell: Vector2i) -> bool:
-	return absi(cell.x - headquarters.x) <= 1 and absi(cell.y - headquarters.y) <= 1
+	return _footprint_covers(headquarters, cell)
+
+
+func all_spawns() -> Array:
+	var cells: Array = [headquarters]
+	for start in starts:
+		var cell := start as Vector2i
+		if cell != headquarters:
+			cells.append(cell)
+	return cells
+
+
+func spawn_covers(cell: Vector2i) -> bool:
+	for start in all_spawns():
+		if _footprint_covers(start as Vector2i, cell):
+			return true
+	return false
+
+
+func focus_cell() -> Vector2i:
+	if camera_focus.x >= 0:
+		return camera_focus
+	return headquarters
+
+
+func _footprint_covers(center: Vector2i, cell: Vector2i) -> bool:
+	return absi(cell.x - center.x) <= 1 and absi(cell.y - center.y) <= 1
+
+
+func _footprints_overlap(a: Vector2i, b: Vector2i) -> bool:
+	return absi(a.x - b.x) <= 2 and absi(a.y - b.y) <= 2
 
 
 func headquarters_fits(cell: Vector2i) -> bool:
@@ -107,11 +171,19 @@ func obstacle_records() -> Array:
 
 
 func terrain_rows() -> PackedStringArray:
+	return _digit_rows(terrain)
+
+
+func elevation_rows() -> PackedStringArray:
+	return _digit_rows(elevation)
+
+
+func _digit_rows(values: PackedInt32Array) -> PackedStringArray:
 	var rows := PackedStringArray()
 	for y in range(height):
 		var row := ""
 		for x in range(width):
-			row += str(terrain[y * width + x])
+			row += str(values[y * width + x])
 		rows.append(row)
 	return rows
 
@@ -119,7 +191,11 @@ func terrain_rows() -> PackedStringArray:
 func matches(other) -> bool:
 	if map_name != other.map_name or width != other.width or height != other.height:
 		return false
-	if headquarters != other.headquarters or terrain != other.terrain:
+	if headquarters != other.headquarters or camera_focus != other.camera_focus:
+		return false
+	if terrain != other.terrain or elevation != other.elevation:
+		return false
+	if all_spawns() != other.all_spawns():
 		return false
 	return obstacle_records() == other.obstacle_records()
 
@@ -135,7 +211,10 @@ func to_dictionary() -> Dictionary:
 	var rows: Array = []
 	for row in terrain_rows():
 		rows.append(row)
-	return {
+	var heights: Array = []
+	for row in elevation_rows():
+		heights.append(row)
+	var payload := {
 		"format": FORMAT,
 		"version": VERSION,
 		"name": map_name,
@@ -143,9 +222,19 @@ func to_dictionary() -> Dictionary:
 		"height": height,
 		"tile_size": [TILE_W, TILE_H],
 		"terrain": rows,
+		"elevation": heights,
 		"obstacles": exported_obstacles,
 		"headquarters": {"x": headquarters.x, "y": headquarters.y},
 	}
+	if not starts.is_empty():
+		var exported_starts: Array = []
+		for start in starts:
+			var cell := start as Vector2i
+			exported_starts.append({"x": cell.x, "y": cell.y})
+		payload["starts"] = exported_starts
+	if camera_focus.x >= 0:
+		payload["camera"] = {"x": camera_focus.x, "y": camera_focus.y}
+	return payload
 
 
 func save_to_file(path: String) -> Error:
@@ -188,9 +277,10 @@ static func from_dictionary(data: Variant) -> Dictionary:
 		return _invalid("Map root must be an object.")
 	var root: Dictionary = data
 	for key in root.keys():
-		if not ROOT_KEYS.has(String(key)):
-			return _invalid("Unknown map field '%s'." % String(key))
-	for key in ROOT_KEYS:
+		var field_name := String(key)
+		if not REQUIRED_KEYS.has(field_name) and not OPTIONAL_KEYS.has(field_name):
+			return _invalid("Unknown map field '%s'." % field_name)
+	for key in REQUIRED_KEYS:
 		if not root.has(key):
 			return _invalid("Map is missing '%s'." % key)
 	if str(root.format) != FORMAT:
@@ -229,6 +319,10 @@ static func from_dictionary(data: Variant) -> Dictionary:
 	if not document.headquarters_fits(Vector2i(int(hq_x), int(hq_y))):
 		return _invalid("Headquarters footprint must stay inside the map.")
 	document.headquarters = Vector2i(int(hq_x), int(hq_y))
+	if root.has("starts"):
+		var starts_error := _read_starts(document, root.starts)
+		if starts_error != "":
+			return _invalid(starts_error)
 	var terrain_count := _sequence_size(root.terrain)
 	if terrain_count != document.height:
 		return _invalid("Terrain must have one row string per map row.")
@@ -239,8 +333,8 @@ static func from_dictionary(data: Variant) -> Dictionary:
 		var digits := str(row)
 		for x in range(document.width):
 			var code := digits.unicode_at(x)
-			if code < 48 or code > 53:
-				return _invalid("Terrain row %d column %d must be a digit 0-5." % [y, x])
+			if code < 48 or code > 48 + TERRAIN_KIND_COUNT - 1:
+				return _invalid("Terrain row %d column %d must be a digit 0-%d." % [y, x, TERRAIN_KIND_COUNT - 1])
 			document.terrain[y * document.width + x] = code - 48
 	if typeof(root.obstacles) != TYPE_ARRAY:
 		return _invalid("Obstacles must be an array.")
@@ -260,20 +354,103 @@ static func from_dictionary(data: Variant) -> Dictionary:
 		if cell_x == null or cell_y == null:
 			return _invalid("Obstacle %d coordinates must be whole numbers." % index)
 		if typeof(obstacle.kind) != TYPE_STRING or OBSTACLE_NAMES.find(str(obstacle.kind)) == -1:
-			return _invalid("Obstacle %d kind must be tree, rock, or debris." % index)
+			return _invalid("Obstacle %d kind must be tree, rock, debris, or derrick." % index)
 		var cell := Vector2i(int(cell_x), int(cell_y))
 		if not document.in_bounds(cell):
 			return _invalid("Obstacle %d is outside the map." % index)
 		if document.headquarters_covers(cell):
 			return _invalid("Obstacle %d overlaps the headquarters footprint." % index)
+		if document.spawn_covers(cell):
+			return _invalid("Obstacle %d overlaps a starting footprint." % index)
 		if document._obstacles.has(cell):
 			return _invalid("Obstacle %d duplicates another obstacle cell." % index)
 		document._obstacles[cell] = OBSTACLE_NAMES.find(str(obstacle.kind))
+	if root.has("camera"):
+		var camera_error := _read_camera(document, root.camera)
+		if camera_error != "":
+			return _invalid(camera_error)
+	if root.has("elevation"):
+		var elevation_error := _read_digit_rows(document, root.elevation, 0, ELEVATION_LEVELS - 1, "Elevation")
+		if elevation_error != "":
+			return _invalid(elevation_error)
 	return {"ok": true, "error": "", "document": document}
 
 
 static func _invalid(message: String) -> Dictionary:
 	return {"ok": false, "error": message, "document": null}
+
+
+static func _read_starts(document, value: Variant) -> String:
+	if typeof(value) != TYPE_ARRAY:
+		return "Starts must be an array."
+	var seen: Array = []
+	for index in range(value.size()):
+		var entry: Variant = value[index]
+		if typeof(entry) != TYPE_DICTIONARY:
+			return "Start %d must be an object." % index
+		var start: Dictionary = entry
+		for key in start.keys():
+			var field := String(key)
+			if field != "x" and field != "y" and field != "team":
+				return "Start %d has unknown field '%s'." % [index, field]
+		if not start.has("x") or not start.has("y"):
+			return "Start %d must include x and y." % index
+		var cell_x = _whole_number(start.x)
+		var cell_y = _whole_number(start.y)
+		if cell_x == null or cell_y == null:
+			return "Start %d coordinates must be whole numbers." % index
+		var cell := Vector2i(int(cell_x), int(cell_y))
+		if not document.headquarters_fits(cell):
+			return "Start %d footprint must stay inside the map." % index
+		if document._footprints_overlap(document.headquarters, cell) or _seen_overlap(document, seen, cell):
+			return "Start %d overlaps another starting footprint." % index
+		seen.append(cell)
+		document.starts.append(cell)
+	return ""
+
+
+static func _seen_overlap(document, seen: Array, cell: Vector2i) -> bool:
+	for prior in seen:
+		if document._footprints_overlap(prior as Vector2i, cell):
+			return true
+	return false
+
+
+static func _read_camera(document, value: Variant) -> String:
+	if typeof(value) != TYPE_DICTIONARY:
+		return "Camera must be an object with x and y."
+	var camera: Dictionary = value
+	for key in camera.keys():
+		if String(key) != "x" and String(key) != "y":
+			return "Unknown camera field '%s'." % String(key)
+	if not camera.has("x") or not camera.has("y"):
+		return "Camera must include x and y."
+	var cell_x = _whole_number(camera.x)
+	var cell_y = _whole_number(camera.y)
+	if cell_x == null or cell_y == null:
+		return "Camera coordinates must be whole numbers."
+	var cell := Vector2i(int(cell_x), int(cell_y))
+	if not document.in_bounds(cell):
+		return "Camera target is outside the map."
+	document.camera_focus = cell
+	return ""
+
+
+static func _read_digit_rows(document, rows_value: Variant, min_digit: int, max_digit: int, label: String) -> String:
+	var row_count := _sequence_size(rows_value)
+	if row_count != document.height:
+		return "%s must have one row string per map row." % label
+	for y in range(document.height):
+		var row: Variant = rows_value[y]
+		if typeof(row) != TYPE_STRING or str(row).length() != document.width:
+			return "%s row %d must be a %d-character digit string." % [label, y, document.width]
+		var digits := str(row)
+		for x in range(document.width):
+			var code := digits.unicode_at(x)
+			if code < 48 + min_digit or code > 48 + max_digit:
+				return "%s row %d column %d must be a digit %d-%d." % [label, y, x, min_digit, max_digit]
+			document.elevation[y * document.width + x] = code - 48
+	return ""
 
 
 static func _sequence_size(value: Variant) -> int:

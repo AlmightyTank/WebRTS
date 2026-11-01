@@ -3,6 +3,7 @@ extends SceneTree
 
 const MAP_DOCUMENT := preload("res://scripts/map_document.gd")
 const MAP_GENERATOR := preload("res://scripts/map_generator.gd")
+const MAP_SHOWCASE := preload("res://scripts/map_showcase.gd")
 const BASELINE := "res://maps/procedural-skirmish.map.json"
 const SAMPLE := "res://maps/editor-sample.map.json"
 
@@ -19,6 +20,7 @@ func _run() -> void:
 	_check_rejections()
 	_check_procedural_baseline()
 	_check_sample_battlefield()
+	_check_elevation()
 	_check_editor()
 	var elapsed := Time.get_ticks_msec() - started
 	if failures.is_empty():
@@ -68,10 +70,10 @@ func _check_rejections() -> void:
 	expect_error(_sample_json().replace('"meridian-warfront-map"', '"other-map"'), "format")
 	expect_error(_sample_json().replace('"editor-sample"', '""'), "name")
 	expect_error(_sample_json().replace("[128, 64]", "[64, 32]"), "Tile size")
-	expect_error(_sample_json().replace('"00000005"', '"00000007"'), "digit")
+	expect_error(_sample_json().replace('"00000005"', '"0000000x"'), "digit")
 	expect_error(_sample_json().replace('"00000005"', '"0000000"'), "8-character")
 	expect_error(_sample_json().replace('"x": 4, "y": 4', '"x": 0, "y": 0'), "footprint")
-	expect_error(_sample_json().replace('"kind": "tree"', '"kind": "bush"'), "tree, rock, or debris")
+	expect_error(_sample_json().replace('"kind": "tree"', '"kind": "bush"'), "tree, rock, debris, or derrick")
 	expect_error(_sample_json().replace('{"kind": "rock", "x": 6, "y": 1},', '{"kind": "rock", "x": 1, "y": 1},'), "duplicates")
 	expect_error(_sample_json().replace('"x": 1, "y": 1', '"x": 4, "y": 4'), "headquarters")
 	expect_error(_sample_json().replace("\n}", ',\n\t"seed": 1\n}'), "Unknown map field")
@@ -131,6 +133,60 @@ func _check_sample_battlefield() -> void:
 			expect(_signature(battlefield, cell) == _signature(reloaded, cell), "reload drifted at %d,%d" % [x, y])
 
 
+func _check_elevation() -> void:
+	var generated = MAP_GENERATOR.procedural_skirmish()
+	var without_heights: Dictionary = generated.to_dictionary()
+	without_heights.erase("elevation")
+	var flattened: Dictionary = MAP_DOCUMENT.from_dictionary(without_heights)
+	expect(bool(flattened.ok) and flattened.document.elevation_at(Vector2i(0, 0)) == 0, "maps without elevation should stay flat")
+	var corrupt: Dictionary = MAP_SHOWCASE.hill().to_dictionary()
+	corrupt.elevation[0] = "4" + "0".repeat(23)
+	var rejected: Dictionary = MAP_DOCUMENT.from_dictionary(corrupt)
+	expect(not bool(rejected.ok) and str(rejected.error).contains("0-3"), "bad elevation digit was accepted: %s" % rejected.error)
+	for pair in [["res://maps/elevation-escarpment.map.json", MAP_SHOWCASE.escarpment()], ["res://maps/elevation-basin.map.json", MAP_SHOWCASE.basin()], ["res://maps/elevation-hill.map.json", MAP_SHOWCASE.hill()]]:
+		var loaded: Dictionary = MAP_DOCUMENT.load_from_file(pair[0])
+		expect(bool(loaded.ok) and pair[1].matches(loaded.document), "showcase drifted: %s" % pair[0])
+	var hill = _spawn_battlefield("res://maps/elevation-hill.map.json")
+	var peak := Vector2i(12, 12)
+	expect(hill.map_data.elevation_at(peak) == 3, "hill peak is not elevation 3")
+	expect(hill.map_data.elevation_at(Vector2i(0, 0)) == 0, "hill corner should be flat")
+	var flat_center: Vector2 = hill.terrain.map_to_local(peak)
+	expect(is_equal_approx(hill.tile_to_world(peak).y, flat_center.y - 3 * MAP_DOCUMENT.ELEVATION_RISE), "peak tile was not lifted")
+	expect(hill.world_to_tile(hill.tile_to_world(peak)) == peak, "picking missed the raised peak")
+	expect(hill.world_to_tile(hill.tile_to_world(Vector2i(0, 0))) == Vector2i(0, 0), "picking missed a flat corner")
+	expect(hill.level_terrain[3].get_cell_source_id(peak) == 0, "peak was not drawn on the top layer")
+	expect(hill.level_terrain[0].get_cell_source_id(peak) == -1, "peak was also drawn on the ground layer")
+	expect(hill.headquarters.position == hill.tile_to_world(hill.map_data.headquarters), "headquarters did not follow elevation")
+	expect(hill.paint_elevation(Vector2i(1, 1), 2), "elevation paint failed")
+	expect(hill.map_data.elevation_at(Vector2i(1, 1)) == 2, "elevation paint did not stick")
+	expect(hill.level_terrain[2].get_cell_source_id(Vector2i(1, 1)) == 0, "painted height used the wrong layer")
+	var escarpment = _spawn_battlefield("res://maps/elevation-escarpment.map.json")
+	expect(escarpment.map_data.elevation_at(Vector2i(12, 4)) == 2, "escarpment plateau is flat")
+	expect(escarpment.map_data.elevation_at(Vector2i(12, 18)) == 0, "escarpment foreground is raised")
+	expect(escarpment._cliff_drop(Vector2i(12, 7), Vector2i(0, 1)) == 1, "escarpment cliff does not face the camera")
+	var cycle := _key(KEY_BRACKETRIGHT)
+	escarpment._unhandled_input(cycle)
+	expect(escarpment.map_data.map_name == "elevation-basin", "bracket did not cycle to the basin")
+	var editor = load("res://scenes/map_editor.tscn").instantiate()
+	root.add_child(editor)
+	editor.load_from("res://maps/elevation-hill.map.json")
+	var high := _key(KEY_R)
+	editor._unhandled_input(high)
+	expect(editor.brush_mode == "elevation" and editor.brush_kind == 2, "elevation shortcut failed")
+	expect(editor.apply_brush_at(Vector2i(1, 20)), "editor elevation brush failed")
+	expect(editor.battlefield.map_data.elevation_at(Vector2i(1, 20)) == 2, "editor elevation paint missed")
+	var bay = MAP_SHOWCASE.mercy_bay()
+	var loaded_bay: Dictionary = MAP_DOCUMENT.load_from_file("res://maps/mercy-bay.map.json")
+	expect(bool(loaded_bay.ok) and bay.matches(loaded_bay.document), "Mercy Bay file drifted: %s" % loaded_bay.error)
+	expect(bay.all_spawns().size() == 6, "Mercy Bay should have six landing pads")
+	expect(bay.terrain_at(Vector2i(0, 0)) == MAP_DOCUMENT.TERRAIN_WATER, "Mercy Bay corner should be water")
+	expect(bay.terrain_at(Vector2i(32, 24)) == MAP_DOCUMENT.TERRAIN_GEM or bay.elevation_at(Vector2i(32, 24)) == 2, "Mercy Bay highland missing")
+	var island = _spawn_battlefield("res://maps/mercy-bay.map.json")
+	expect(island.is_cell_blocked(Vector2i(0, 0)), "water should block movement")
+	expect(island.extra_spawns.size() == 5, "extra landing bases were not spawned")
+	expect(island.camera.position.distance_to(island.tile_to_world(bay.focus_cell())) < 2.0, "camera did not frame the island")
+
+
 func _check_editor() -> void:
 	var editor = load("res://scenes/map_editor.tscn").instantiate()
 	root.add_child(editor)
@@ -174,6 +230,7 @@ func _spawn_battlefield(path: String):
 func _signature(battlefield, cell: Vector2i) -> Array:
 	return [
 		battlefield.map_data.terrain_at(cell),
+		battlefield.map_data.elevation_at(cell),
 		battlefield.map_data.obstacle_at(cell),
 		battlefield.is_cell_blocked(cell),
 		battlefield.terrain.get_cell_atlas_coords(cell),

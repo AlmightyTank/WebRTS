@@ -20,7 +20,9 @@ The terrain array below is abbreviated. The full sample is `godot/maps/editor-sa
 }
 ```
 
-`width` and `height` are 3–256. `tile_size` stays `[128, 64]`. `terrain` has one string per row, and each character is a digit `0`–`5`. Unknown fields, duplicate obstacles, and a headquarters footprint that leaves the map are rejected.
+`width` and `height` are 3–256. `tile_size` stays `[128, 64]`. `terrain` has one string per row, and each character is a digit `0`–`9`. Unknown fields, duplicate obstacles, and a headquarters footprint that leaves the map are rejected.
+
+`elevation` is optional. When it is omitted, every tile is ground level. When it is present, it uses the same row-string shape as terrain, with digits `0`–`3`. Each step lifts the tile by 24 pixels and draws a cliff on the camera-facing edges where the next tile is lower. Movement does not use elevation yet.
 
 | Digit | Editor tool | Rendering |
 | --- | --- | --- |
@@ -30,8 +32,30 @@ The terrain array below is abbreviated. The full sample is `godot/maps/editor-sa
 | 3 | Dirt | Grass base with a feathered dirt edge |
 | 4 | Road | Grass base with a feathered concrete edge |
 | 5 | Grass C | Grass C, no overlay |
+| 6 | Water | Open water, blocked |
+| 7 | Sand | Beach |
+| 8 | Ore | Yellow resource patch, not harvestable yet |
+| 9 | Gem | Teal resource patch, not harvestable yet |
 
-Obstacle `kind` is `tree`, `rock`, or `debris`. Only one obstacle occupies a cell. The headquarters cell owns a 3×3 footprint, the same footprint as `CommandCenter.FOOTPRINT`, and that footprint cannot contain obstacles.
+| Digit | Editor tool | Height |
+| --- | --- | --- |
+| 0 | Flat (Q) | Ground |
+| 1 | Low (E) | One step up |
+| 2 | High (R) | Two steps up |
+| 3 | Peak (T) | Three steps up |
+
+Showcase maps, also opened with `[` and `]` while the battlefield is running:
+
+| File | Layout |
+| --- | --- |
+| `godot/maps/elevation-escarpment.map.json` | Two steps rising toward the far edge, road on the near plain |
+| `godot/maps/elevation-basin.map.json` | Raised rim around a low headquarters floor |
+| `godot/maps/elevation-hill.map.json` | Concentric terraces with a peak in the middle |
+| `godot/maps/mercy-bay.map.json` | Original six-start island: southern bay, beach landings, cliff coasts, highlands, ore, gems, concrete strips, and derricks |
+
+Mercy Bay is the map F5 opens. It is an original skirmish island in the style of a Red Alert 2 tropical map such as Bay of Pigs. It is not that map, and the commercial layout is not reproduced tile for tile. `[` and `]` still cycle the other showcase maps. A `derrick` obstacle is a pumpjack marker. `starts` lists extra 3×3 landing pads, and `camera` is an optional overview cell.
+
+Obstacle `kind` is `tree`, `rock`, `debris`, or `derrick`. Only one obstacle occupies a cell. Every starting footprint, including the headquarters, owns a 3×3 area, the same footprint as `CommandCenter.FOOTPRINT`, and that footprint cannot contain obstacles.
 
 If the configured file is missing or invalid, the battlefield logs a warning and builds the procedural layout instead of starting empty.
 
@@ -46,8 +70,11 @@ If the configured file is missing or invalid, the battlefield logs a warning and
 | Input | Action |
 | --- | --- |
 | 1–6 | Grass, Grass B, Blend, Dirt, Road, Grass C |
-| 7, 8, 9, 0 | Tree, rock, debris, erase obstacle |
+| Y, U, I, O | Water, sand, ore, gem |
+| 7, 8, 9, P, 0 | Tree, rock, debris, derrick, erase obstacle |
 | H | Move headquarters |
+| Q, E, R, T | Flat, low, high, and peak elevation |
+| `[` / `]` | Previous or next showcase map |
 | Ctrl+S / Ctrl+L | Save or load the path field |
 | Ctrl+N | New procedural 64×64 map |
 | Ctrl+B | Reload the shipped baseline |
@@ -60,6 +87,7 @@ Regenerate the shipped baseline with:
 
 ```bash
 godot --headless --path godot --script res://scripts/dev/export_procedural_map.gd
+godot --headless --path godot --script res://scripts/dev/export_elevation_maps.gd
 ```
 
 The headless check expects that file to match the generator. Save custom maps under a new filename.

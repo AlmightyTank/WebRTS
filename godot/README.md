@@ -15,7 +15,9 @@
 ## Map editor
 - Open `res://scenes/map_editor.tscn` and run the current scene, or use **Project → Tools → Open Map Editor**.
 - F5 still runs the battlefield without the editor panel.
-- Paint terrain, trees, rocks, debris, and the headquarters cell, then save a `.map.json` file.
+- Paint terrain, water, sand, ore, gems, elevation, trees, rocks, debris, derricks, and the headquarters cell, then save a `.map.json` file.
+- F5 opens Mercy Bay, an original island with a southern bay, beach landings, cliff coasts, highlands, ore, gems, and derricks.
+- Escarpment, Basin, and Hill are smaller elevation studies. `[` and `]` cycle every showcase map.
 - The format, shortcuts, and mobile limits are documented in `docs/MAP-FORMAT.md`.
 
 ## Command Center early building prototype
