@@ -22,6 +22,10 @@ jobs:
       - name: Import and parse Godot scripts
         run: godot --headless --editor --path godot --import --quit
       - name: Execute combat behavior assertions
-        run: godot --headless --path godot --script res://tests/combat_smoke.gd
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path godot --script res://tests/combat_smoke.gd 2>&1 | tee combat-smoke.log
+          grep -q COMBAT_SMOKE_PASS combat-smoke.log
       - name: Launch the playable combat scene
         run: godot --headless --path godot --quit-after 180
