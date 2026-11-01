@@ -372,14 +372,13 @@ func _set_producer_destination(side: int, b, target: Vector2) -> bool:
 func _rally_destination(side: int, b) -> Vector2:
  var center=_producer_rally_point(side,b)
  if center==Vector2.ZERO: return center
- var index=0
- if b.rally_stage_id!="" and bool(staging_areas[side][b.rally_stage_id]["enabled"]):
-  var area: Dictionary=staging_areas[side][b.rally_stage_id]
-  index=int(area["next_slot"])
-  area["next_slot"]=index+1
- else:
-  index=b.rally_spawn_index
-  b.rally_spawn_index=index+1
+ # Personal rallies remain precise like Red Alert 2; only shared stage areas
+ # distribute arriving units into multiple distinct tactical slots.
+ if b.rally_stage_id=="": return center
+ var area: Dictionary=staging_areas[side][b.rally_stage_id]
+ if not bool(area["enabled"]): return center
+ var index=int(area["next_slot"])
+ area["next_slot"]=index+1
  # First unit uses exact rally; later arrivals spread into tactical staging slots.
  if index==0: return center
  var slot=(index-1)%35
