@@ -21,6 +21,9 @@ test('Godot battlefield spawns centered headquarters without affecting camera co
   const battlefield = read('../godot/scripts/battlefield.gd');
   assert.match(battlefield, /COMMAND_CENTER_SCENE\.instantiate\(\)/);
   assert.match(battlefield, /headquarters\.place_on_grid\(terrain, Vector2i\(WIDTH \/ 2, HEIGHT \/ 2\)\)/);
-  assert.match(battlefield, /func set_zoom\(/);
-  assert.match(battlefield, /func clamp_camera\(/);
+  // Slice D moved camera behavior into the shared RTS camera controller.
+  const camera = read('../godot/scripts/rts_camera.gd');
+  assert.match(battlefield, /rts_camera\.gd/);
+  assert.match(camera, /func _zoom_at\(/);
+  assert.match(camera, /func _clamp_target\(/);
 });
