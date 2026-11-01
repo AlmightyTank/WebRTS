@@ -2,6 +2,9 @@ extends "res://scripts/combat/combat_arena.gd"
 ## Economic vertical slice: shared C&C-style production lanes over the existing combat renderer.
 const StructureScript = preload("res://scripts/economy/structure.gd")
 const EconomyVehicleScript = preload("res://scripts/economy/economy_vehicle.gd")
+const RetroSkin = preload("res://scripts/ui/retro_skin.gd")
+const RetroIcon = preload("res://scripts/ui/retro_icon.gd")
+const RetroRadar = preload("res://scripts/ui/retro_radar.gd")
 const STRUCTURE_DATA := {
  "power":{"name":"Power Plant","cost":800.0,"time":10.0,"power":150,"demand":0,"size":Vector2(104,94),"hp":1350},
  "refinery":{"name":"Ore Refinery (+ Harvester)","cost":2000.0,"time":24.0,"power":0,"demand":50,"size":Vector2(142,116),"hp":1350},
@@ -21,7 +24,7 @@ var current_tab := 0
 var placement_lane := ""
 var preview_pos := Vector2.ZERO
 var action_buttons: Dictionary = {}
-var build_container: VBoxContainer
+var build_container: GridContainer
 var tab_buttons: Array = []
 var title_text: Label
 var details_text: Label
@@ -62,6 +65,13 @@ var stage_detail: Label
 var compact_hud := false
 var sidebar_open := true
 var hud_layout_revision := 0
+var radar_view: Control
+var retro_economy_label: Label
+var retro_powerbar: ProgressBar
+var queue_preview_labels: Array = []
+var queue_preview_caption: Label
+var production_tile_icons: Dictionary = {}
+var action_palette_buttons: Array = []
 
 func _ready() -> void:
  super._ready()
@@ -954,6 +964,7 @@ func _apply_hud_layout(view_size: Vector2) -> void:
  if is_instance_valid(hud_scroll):
   hud_scroll.visible=sidebar_open
   hud_scroll.custom_minimum_size=Vector2.ZERO
+ if is_instance_valid(radar_view): radar_view.custom_minimum_size=Vector2(260,92 if compact_hud else 135)
   if is_instance_valid(hud_build_column):
    hud_build_column.custom_minimum_size=Vector2.ZERO
  if is_instance_valid(rally_stage_selector):
@@ -1021,6 +1032,7 @@ func _refresh_producer_cards() -> void:
    button.toggle_mode=true
    button.custom_minimum_size=Vector2(240,52)
    button.pressed.connect(_on_producer_card_pressed.bind(b))
+   RetroSkin.button(button)
    producer_list.add_child(button)
    producer_buttons[b.get_instance_id()]=button
  for item in snapshot:
@@ -1035,6 +1047,7 @@ func _refresh_producer_cards() -> void:
   card.button_pressed=bool(item["active"])
   card.tooltip_text="Tap to use this building as the "+str(item["lane"])+" spawn exit. Stage and rally settings belong to this building."
   card.add_theme_color_override("font_color",Color("#c8f5dd") if item["active"] else Color("#ced5df"))
+  card.add_theme_stylebox_override("normal",RetroSkin.tile("active" if item["active"] else "normal"))
  if is_instance_valid(producer_summary):
   var infantry_summary="INF —"
   var vehicle_summary="VEH —"
@@ -1075,7 +1088,7 @@ func _create_hud() -> void:
  var stats=VBoxContainer.new()
  top.add_child(stats)
  title_text=Label.new()
- title_text.text="MERIDIAN WARFRONT  /  SKIRMISH v0.8.4"
+ title_text.text="MERIDIAN WARFRONT / RETRO COMMAND v0.9"
  title_text.add_theme_font_size_override("font_size",17)
  title_text.clip_text=true
  stats.add_child(title_text)
@@ -1113,6 +1126,72 @@ func _create_hud() -> void:
  column.custom_minimum_size=Vector2(270,0)
  scroll.add_child(column)
  hud_build_column=column
+ var badge=HBoxContainer.new()
+ column.add_child(badge)
+ var crest=Control.new()
+ crest.set_script(RetroIcon)
+ crest.custom_minimum_size=Vector2(43,43)
+ badge.add_child(crest)
+ crest.configure("EMBLEM")
+ var faction=Label.new()
+ faction.text="ALLIANCE  /  COMMAND"
+ badge.add_child(faction)
+ RetroSkin.label(faction,false,true)
+ radar_view=Control.new()
+ radar_view.set_script(RetroRadar)
+ radar_view.custom_minimum_size=Vector2(260,135)
+ column.add_child(radar_view)
+ radar_view.configure(self)
+ retro_economy_label=Label.new()
+ retro_economy_label.text="CREDITS 010000  ·  POWER 0 / 0"
+ column.add_child(retro_economy_label)
+ RetroSkin.label(retro_economy_label,false,true)
+ retro_powerbar=ProgressBar.new()
+ retro_powerbar.custom_minimum_size=Vector2(260,12)
+ retro_powerbar.show_percentage=false
+ retro_powerbar.max_value=100.0
+ retro_powerbar.value=100.0
+ retro_powerbar.add_theme_stylebox_override("background",RetroSkin.tile("disabled"))
+ retro_powerbar.add_theme_stylebox_override("fill",RetroSkin.tile("active"))
+ column.add_child(retro_powerbar)
+ var section=HSeparator.new()
+ column.add_child(section)
+ var tab_header=Label.new()
+ tab_header.text="PRODUCTION QUEUES"
+ column.add_child(tab_header)
+ var tabs=HBoxContainer.new()
+ column.add_child(tabs)
+ for i in range(4):
+  var tab=Button.new()
+  tab.text=["BUILD","DEF","INF","VEH"][i]
+  tab.toggle_mode=true
+  tab.custom_minimum_size=Vector2(60,48)
+  tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  tab.pressed.connect(_set_tab.bind(i))
+  RetroSkin.button(tab,i==0,true)
+  tabs.add_child(tab)
+  tab_buttons.append(tab)
+ build_container=GridContainer.new()
+ build_container.columns=2
+ build_container.add_theme_constant_override("h_separation",6)
+ build_container.add_theme_constant_override("v_separation",6)
+ column.add_child(build_container)
+ for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
+  var button=Button.new()
+  button.text=id
+  button.custom_minimum_size=Vector2(120,104)
+  button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  button.pressed.connect(_on_build_button.bind(id))
+  RetroSkin.button(button)
+  build_container.add_child(button)
+  var icon=Control.new()
+  icon.set_script(RetroIcon)
+  icon.position=Vector2(28,2)
+  icon.size=Vector2(63,43)
+  button.add_child(icon)
+  icon.configure(id)
+  production_tile_icons[id]=icon
+  action_buttons[id]=button
  var header=Label.new()
  header.text="SPAWN EXIT  ·  TAP TO ACTIVATE"
  header.add_theme_font_size_override("font_size",13)
@@ -1132,6 +1211,7 @@ func _create_hud() -> void:
   chip.custom_minimum_size=Vector2(60,48)
   chip.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   chip.pressed.connect(_on_stage_selected.bind(i))
+  RetroSkin.button(chip,false,true)
   stage_row.add_child(chip)
   stage_chips.append(chip)
  stage_detail=Label.new()
@@ -1173,31 +1253,26 @@ func _create_hud() -> void:
  column.add_child(activate)
  activate_producer_button=activate
 
- var section=HSeparator.new()
- column.add_child(section)
- var tab_header=Label.new()
- tab_header.text="PRODUCTION QUEUES"
- column.add_child(tab_header)
- var tabs=HBoxContainer.new()
- column.add_child(tabs)
- for i in range(4):
-  var tab=Button.new()
-  tab.text=["BUILD","DEF","INF","VEH"][i]
-  tab.toggle_mode=true
-  tab.custom_minimum_size=Vector2(60,48)
-  tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-  tab.pressed.connect(_set_tab.bind(i))
-  tabs.add_child(tab)
-  tab_buttons.append(tab)
- build_container=VBoxContainer.new()
- column.add_child(build_container)
- for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
-  var button=Button.new()
-  button.text=id
-  button.custom_minimum_size=Vector2(220,50)
-  button.pressed.connect(_on_build_button.bind(id))
-  build_container.add_child(button)
-  action_buttons[id]=button
+ var queue_header=Label.new()
+ queue_header.text="QUEUE / PRODUCTION STATUS"
+ RetroSkin.label(queue_header,true,true)
+ column.add_child(queue_header)
+ queue_preview_caption=Label.new()
+ queue_preview_caption.text="Select a production tab"
+ RetroSkin.label(queue_preview_caption,true)
+ column.add_child(queue_preview_caption)
+ var queue_row=HBoxContainer.new()
+ column.add_child(queue_row)
+ for q in range(4):
+  var slot=Label.new()
+  slot.custom_minimum_size=Vector2(59,38)
+  slot.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  slot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+  slot.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+  slot.add_theme_stylebox_override("normal",RetroSkin.tile("disabled"))
+  RetroSkin.label(slot,true)
+  queue_row.add_child(slot)
+  queue_preview_labels.append(slot)
  var divider=HSeparator.new()
  column.add_child(divider)
  var operations=Label.new()
@@ -1250,12 +1325,22 @@ func _create_hud() -> void:
  hud_toolbar_scroll=toolbar_scroll
  var row=HBoxContainer.new()
  toolbar_scroll.add_child(row)
- for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Formation"],["PAUSE","Pause"],["RESET","Restart"]]:
+ for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Formation"],["DEPLOY","Deploy"],["RALLY","Rally"],["STAGING","Staging"],["PAUSE","Pause"],["RESET","Restart"]]:
   var button=Button.new()
   button.text=pair[1]
-  button.custom_minimum_size=Vector2(100,48)
+  button.custom_minimum_size=Vector2(138,52)
+  button.text="       "+pair[1]
+  button.alignment=HORIZONTAL_ALIGNMENT_CENTER
   button.pressed.connect(_on_toolbar.bind(pair[0]))
+  RetroSkin.button(button,pair[0]=="ATTACK_MOVE",true)
   row.add_child(button)
+  var tool_icon=Control.new()
+  tool_icon.set_script(RetroIcon)
+  tool_icon.size=Vector2(42,42)
+  tool_icon.position=Vector2(4,5)
+  button.add_child(tool_icon)
+  tool_icon.configure(pair[0])
+  action_palette_buttons.append(button)
  result_text=Label.new()
  result_text.anchor_left=0.5
  result_text.anchor_right=0.5
@@ -1264,7 +1349,30 @@ func _create_hud() -> void:
  result_text.add_theme_font_size_override("font_size",24)
  result_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
  root.add_child(result_text)
+ _skin_hud()
  _on_hud_viewport_resized()
+
+func _skin_hud() -> void:
+ for p in [hud_top_panel,hud_dock,hud_toolbar]:
+  RetroSkin.panel(p)
+ for control in [sidebar_toggle,activate_producer_button,rally_button,rally_mode_button,refund_button,cancel_queue_button,repair_button,sell_button]:
+  if control!=null: RetroSkin.button(control)
+ RetroSkin.button(sidebar_toggle,true)
+ for l in [title_text,hud_text,info_text,producer_summary,stage_detail]:
+  RetroSkin.label(l,l==stage_detail or l==producer_summary,l==title_text)
+ for tab in tab_buttons: RetroSkin.button(tab)
+ for chip in stage_chips: RetroSkin.button(chip,false,true)
+
+func _on_toolbar(action: String) -> void:
+ match action:
+  "DEPLOY": _on_deploy()
+  "RALLY": _begin_rally()
+  "STAGING":
+   sidebar_open=true
+   _apply_hud_layout(get_viewport_rect().size)
+   if current_tab not in [2,3]: current_tab=2
+   _update_hud()
+  _: super._on_toolbar(action)
 
 func _on_deploy() -> void:
  if _deploy_mcv(0): _update_hud()
@@ -1359,6 +1467,22 @@ func _update_hud() -> void:
  info_text.text=hud_status if compact_hud else (" | ".join(details)+" | "+hud_status if not details.is_empty() else hud_status)
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
+ if is_instance_valid(retro_economy_label):
+  retro_economy_label.text="CREDITS  %06d   POWER  %d/%d" % [int(state["credits"]),int(state["power"]),int(state["demand"])]
+ if is_instance_valid(retro_powerbar):
+  retro_powerbar.value=100.0 if int(state["demand"])<=0 else clampf(100.0*float(state["power"])/float(state["demand"]),0.0,100.0)
+ if is_instance_valid(queue_preview_caption):
+  var queue_lane=["build","defense","infantry","vehicle"][current_tab]
+  var current_job: Dictionary=state["lanes"][queue_lane]
+  var in_line: Array=state["queued"].get(queue_lane,[])
+  queue_preview_caption.text=queue_lane.to_upper()+"  •  "+str(in_line.size())+" waiting"
+  for slot_i in range(queue_preview_labels.size()):
+   var slot: Label=queue_preview_labels[slot_i]
+   slot.text="—"
+   if slot_i==0 and not current_job.is_empty():
+    slot.text="READY" if bool(current_job.get("ready",false)) else ("%d%%" % int(100.0*float(current_job.get("paid",0.0))/maxf(1.0,float(_recipe(str(current_job["id"])).get("cost",1.0)))))
+   elif slot_i>0 and slot_i-1<in_line.size():
+    slot.text=str(in_line[slot_i-1]).trim_prefix("a_").to_upper().substr(0,7)
  for id in action_buttons.keys():
   var button: Button=action_buttons[id]
   var lane=_lane_for(id)
@@ -1369,7 +1493,18 @@ func _update_hud() -> void:
   var label=str(recipe.get("name",id))
   var cost=int(recipe.get("cost",0))
   var ready=not job.is_empty() and str(job["id"])==id and bool(job["ready"])
-  button.text="READY: PLACE "+label if ready else ("%s    $%d  %ds" % [label,cost,int(recipe.get("time",0))])
+  var short_label={
+   "refinery":"ORE REFINERY","factory":"WAR FACTORY","depot":"SERVICE DEPOT",
+   "a_ranger":"RANGER","a_javelin":"JAVELIN","a_engineer":"ENGINEER",
+   "a_sentinel":"SENTINEL","a_sentinel_aa":"MOBILE AA",
+   "a_harvester":"HARVESTER","a_mcv":"MCV"
+  }.get(id,label.to_upper())
+  var label_tail="$%d" % cost
+  if ready: label_tail="READY"
+  elif not job.is_empty() and str(job["id"])==id:
+   label_tail="%d%%" % int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1))))
+  button.text="\n\n"+str(short_label)+"\n"+label_tail
+  button.tooltip_text="%s | %d credits | %d seconds" % [label,cost,int(recipe.get("time",0))]
   button.disabled=not ready and (not _tech_ready(0,id) or not _has_producer(0,lane) or (not job.is_empty() and lane in ["build","defense"]))
  if is_instance_valid(refund_button): refund_button.disabled=state["lanes"][["build","defense","infantry","vehicle"][current_tab]].is_empty()
  if is_instance_valid(cancel_queue_button): cancel_queue_button.disabled=current_tab not in [2,3] or state["queued"][["infantry","vehicle"][maxi(0,current_tab-2)]].is_empty()

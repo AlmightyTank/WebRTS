@@ -61,7 +61,20 @@
 - **Direct staging choices:** touch-sized Personal/Alpha/Bravo/Charlie buttons show the current selection. **SET DESTINATION (G)** positions the selected producer's personal rally or its shared staging area; **MOVE / ATTACK (T)** chooses the production rally behavior. The full dropdown remains available on desktop.
 - **Responsive layouts:** a normal right sidebar on desktop becomes a bottom **collapsible production sheet** on narrow or short screens (including mobile portrait/landscape). Tapping its header opens/collapses the controls. The command toolbar supports horizontal touch scrolling. Primary controls use at least 44–48 logical pixel targets.
 - **Scope:** this is a UI/interaction update. Shared production queues, factory acceleration, per-building rally assignments and unit combat behavior stay unchanged. The old and new factory mechanics are regression-tested.
-- **Automated tests:** `godot --headless --path godot --script res://tests/production_hud_smoke.gd` verifies desktop/phone layout bounds, drawer states, touch targets, active cards, staging choices, movement toggles, and deletion/reset cleanup.
+- **Automated tests:** `godot --headless --path godot --script res://tests/production_hud_smoke.gd
+godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd` verifies desktop/phone layout bounds, drawer states, touch targets, active cards, staging choices, movement toggles, and deletion/reset cleanup.
+
+## Retro command sidebar & command strip (v0.9)
+
+The Godot GUI now uses an **original code-drawn industrial RTS aesthetic** inspired by early C&C interfaces. All chrome framing, insignia and production icons are new Godot primitives; no external RA2 artwork or proprietary sidebar assets are included.
+
+- **Right sidebar:** original Alliance command crest, interactive real-time minimap, credits/power readout, power capacity meter and two-column production tile rack with building/unit silhouettes. The four classic Build/Defense/Infantry/Vehicles tabs stay wired to the existing shared queues; tile captions show credits, readiness and active payment percent.
+- **Queue display:** four readout slots show the current production progress and up to three waiting unit jobs.
+- **Factory staging:** the existing active Barracks/War Factory cards and Personal/Alpha/Bravo/Charlie selection remain accessible below the production rack with their rally/attack-move controls.
+- **Bottom tactical bar:** original steel-framed icon buttons for Select All, Move, Attack-Move, Stop, Formation, Deploy, Rally, Staging, Pause and Restart. Rally and Staging work with the same producer UI and command logic as before.
+- **Radar:** renders terrain obstacles, ore fields, structures, units and the camera viewing rectangle. Click/tap to reposition the camera. The radar is a functional Control, not a static texture.
+- **Mobile:** the same responsive collapsible bottom production drawer and horizontally scrollable command bar are preserved. The radar is reduced in height for compact layouts; production tile buttons are large enough for touch.
+- **Verification:** `godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd` checks component creation, queue display, production tabs, minimap projection and phone/desktop layout geometry. Visual QA on an actual Android phone is still recommended.
 
 ## Current limits / intentionally not implemented
 

@@ -51,5 +51,11 @@ jobs:
           set -o pipefail
           timeout 45s godot --headless --path godot --script res://tests/production_hud_smoke.gd 2>&1 | tee production-hud.log
           grep -q PRODUCTION_HUD_SMOKE_PASS production-hud.log
+      - name: Test RA2-style sidebar radar, icon tiles and tactical bar
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd 2>&1 | tee retro-ui-smoke.log
+          grep -q RETRO_COMMAND_HUD_SMOKE_PASS retro-ui-smoke.log
       - name: Launch the playable skirmish
         run: godot --headless --path godot --quit-after 180
