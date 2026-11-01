@@ -154,10 +154,12 @@ func _nearby_open_cell(point: Vector2i) -> Vector2i:
      return cell
  return point
 
-func clear_shot(from: Vector2, to: Vector2, from_air: bool, to_air: bool) -> bool:
+func clear_shot(from: Vector2, to: Vector2, from_air: bool, to_air: bool, hit_target = null) -> bool:
  if from_air or to_air:
   return true
  for box in obstacles:
+  if hit_target != null and is_instance_valid(hit_target) and hit_target.has_method("ground_bounds") and hit_target.ground_bounds() == box:
+   continue
   if _segment_hits_rect(from, to, box):
    return false
  return true

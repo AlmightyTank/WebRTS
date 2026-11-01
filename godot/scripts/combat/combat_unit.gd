@@ -95,12 +95,12 @@ func _physics_process(delta: float) -> void:
 				target = new_target
 	if target != null:
 		var distance: float = position.distance_to(target.position)
-		if distance <= float(weapon.get("range", 0.0)) and distance >= float(weapon.get("min_range", 0.0)) and arena.clear_shot(position, target.position, air, target.air):
+		if distance <= float(weapon.get("range", 0.0)) and distance >= float(weapon.get("min_range", 0.0)) and arena.clear_shot(position, target.position, air, target.air, target):
 			moving = false
 			turret_angle = lerp_angle(turret_angle, (target.position - position).angle(), minf(1.0, 8.0 * delta))
 			if cooldown <= 0.0:
 				fire(target)
-		elif distance > float(weapon.get("range", 0.0)) * 0.87 or not arena.clear_shot(position, target.position, air, target.air):
+		elif distance > float(weapon.get("range", 0.0)) * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target):
 			if not moving or destination.distance_to(target.position) > 60.0:
 				_begin_route(target.position)
 		elif distance < float(weapon.get("min_range", 0.0)):

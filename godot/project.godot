@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 config/name="Meridian Warfront"
-run/main_scene="res://scenes/combat_lab.tscn"
+run/main_scene="res://scenes/skirmish.tscn"
 
 [display]
 window/size/viewport_width=1280

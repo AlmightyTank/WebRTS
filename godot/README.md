@@ -1,55 +1,52 @@
-# Meridian Warfront — Procedural Top-Down Combat Lab
+# Meridian Warfront — Procedural RTS Economy & Combat Vertical Slice
 
-**This is the primary Godot implementation**. The previous isometric PNG/SVG scene and asset pipeline were removed from `main` in the transition to v0.6; prior history remains available through Git. The primary goal is playable Red Alert 2-paced movement, unit combat and Zero Hour-style differentiated armies without hand-built models or frame animations.
+**Godot 4.4.1, pure code-drawn top-down battlefield.** `res://scenes/skirmish.tscn` is the primary entry point. The previous combat-only scenarios remain in `res://scenes/combat_lab.tscn` for regression tests. The old isometric renderer is NOT part of this project.
 
 ## Run
 
-1. Install **Godot 4.4.1** (standard build).
-2. Import `godot/project.godot` and press **F5**.
-3. The opening scene is `res://scenes/combat_lab.tscn`, a complete **combat sandbox**, *not* a finished economy/base-building skirmish.
+1. Open `godot/project.godot` in Godot 4.4.1.
+2. Press F5 to launch the main skirmish.
+3. Your selected Alliance MCV appears near the west edge. Press **H** or **DEPLOY SELECTED MCV**.
+4. Open **BUILD** and queue a **Power Plant**. Credits are deducted gradually. When the build button changes to **READY: PLACE**, click it and place the transparent preview near your base.
+5. Queue an **Ore Refinery** and place it near your Command Yard. It automatically spawns one free harvester; ore only becomes credits after physical refinery delivery.
+6. Build **Barracks**, then **War Factory**, while using the separate **DEF** tab for a sentry turret.
+7. Select combat units, right-click to move or attack, press **A** and click to attack-move. Fight the enemy Republic's AI army and destroy its significant structures.
 
 ## Controls
 
-| Action | Control |
-| --- | --- |
-| Select one | Left-click blue unit |
-| Select several | Drag left-button selection rectangle |
-| Add to selection | Shift + left-click / drag |
-| Move / focus fire | Right-click ground / enemy |
-| Attack-move | A then left-click destination, or use toolbar |
-| Line / wedge | F or toolbar |
-| Stop | S or toolbar |
-| Camera | Arrow keys or W/D/Q, middle-drag, mouse wheel zoom |
-| Pause / restart | Space / R |
-| Switch scenarios | Keys 1–4 or scenario sidebar |
-| Touch | Tap blue unit, tap destination; toolbar for attack-move, stop, select-all and reset; single-finger pan and two-finger pinch are experimental |
+- Left click: select one unit; drag: select several; right click: move, target, or attack.
+- Arrow keys / Q,W,D: camera movement; middle drag and mouse wheel: pan / zoom. Touch pan and pinch are supported through the existing camera input.
+- H: deploy an idle MCV. 1–4: Buildings, Defense, Infantry, Vehicles tabs.
+- A then click: attack move; M then click: move; S: stop; F: line/wedge formation.
+- Space: pause; R: restart skirmish; Esc or right click while placing: exit placement mode.
+- Bottom toolbar provides corresponding actions for touch. **AUTO-HARVEST SELECTED** reactivates a harvester after a manual move.
 
-## Scenarios
+## Systems currently in the playable slice
 
-1. **Combined Arms:** infantry, missile infantry, MBTs, AA vehicles and helicopters on both sides.
-2. **Infantry vs Tanks:** rifles/rocket infantry against armored vehicles.
-3. **Air Interception:** AA vehicles and rockets against approaching helicopters.
-4. **Formation Drill:** line and wedge formation movement under fire.
+- Starting MCV deploys into a procedural 2.5D Construction Yard. Structures are attackable and block pathfinding; destroying them removes the obstruction.
+- Buildings and defenses have separate shared READY-to-place queues. Barracks and War Factory run concurrent unit-production queues, with incremental credit payments and pause-on-insufficient-funds.
+- Construction placement validates map bounds, blockers, units, ore patches, and proximity to connected friendly buildings; structures cannot overlap.
+- Power plants produce 150 power; refinery, barracks, factory, and turret consume power. A deficit slows production to 50%, and unpowered defense turrets stop firing. Power production remains possible during brownouts.
+- Finite iron patches are mined in value units, carried by armored harvesters, and delivered to refineries exactly once. The initial harvester with a refinery is free, while additional harvesters are produced at factories.
+- Selectable infantry, rockets, tanks, AA vehicles, auto-harvesters and MCVs share the existing collision, A* ground navigation, damage, projectile and AI combat systems.
+- Republic AI deploys its Yard and follows its own paid building, defense and troop production. Both sides obey credit and prerequisite rules, not hidden grants.
+- Victory/defeat when one side loses all significant placed structures and all surviving MCVs. Combat Lab scenario keys are not active in the main skirmish.
 
-All terrain, unit shapes, health bars, projectiles, impact tracers and buildings/obstacles are drawn in code. GDScript uses exact v0.4 HP, movement speed and armor multipliers from `res://data/unit_balance_v0.4.json`; firing profiles are **explicit provisional mappings** because the registry describes weapons in prose rather than structured machine data. Initial target priorities are simplified AI tactics. The combat sandbox is not a real-time multiplayer or full skirmish implementation.
+## Current limits / intentionally not implemented
+
+- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. No upgrades, general-specific trees, naval, aircraft factories, engineers/capture, saving, networking, or refined audio yet.
+- Building production time/health and some structure silhouettes are provisional. Full battle balancing requires interactive device testing. The core v0.4 combat stats remain loaded from `res://data/unit_balance_v0.4.json`.
+- AI is a budget-constrained scripted opponent, not a full tactical strategic planner; its building sites are selected from predefined viable locations.
+- RTS mobile layout needs additional touch QA for differing aspect ratios and scaling.
 
 ## Automated checks
 
 ```sh
+python3 godot/tests/data_contract.py
 godot --headless --editor --path godot --import --quit
 godot --headless --path godot --script res://tests/combat_smoke.gd
-godot --headless --path godot --quit-after 10
+godot --headless --path godot --script res://tests/skirmish_smoke.gd
+godot --headless --path godot --quit-after 180
 ```
 
-CI must pass Godot import, headless smoke assertions and scene launch. Playtesting on Windows and Android devices remains required; CI checks cannot verify responsiveness or game feel.
-
-## Source of truth
-
-- `godot/scripts/combat/combat_arena.gd`: battlefield, A* routing, orders, HUD and AI
-- `godot/scripts/combat/combat_unit.gd`: movement, collision, target engagement and code-drawn units
-- `godot/scripts/combat/combat_projectile.gd`: moving projectiles with swept collision
-- `godot/scripts/combat/combat_camera.gd`: top-down camera
-- `godot/data/unit_balance_v0.4.json`: versioned immutable copy of the committed v0.4 design registry
-- `docs/data/MERIDIAN-WARFRONT-UNIT-BALANCE-v0.4.json`: canonical design registry
-
-Known next steps: improved stuck-unit recovery and path replanning, target lead/accuracy, true aircraft flight patterns and rearming, LOS/occlusion by elevation, formation persistence, cross-team difficulty tuning, audio, mobile ergonomics and full economy/construction gameplay.
+The Combat Lab smoke assertions remain active; the new Skirmish smoke checks MCV deployment, production lanes, finite ore delivery, construction, power, factory unit creation and blocking.

@@ -39,14 +39,14 @@ func _physics_process(delta: float) -> void:
   var desired := (destination-position).normalized()*speed
   velocity = velocity.lerp(desired,minf(1.0,6.0*delta)).normalized()*speed
  var next_position := position+velocity*delta
- if not anti_air and not arena.clear_shot(position,next_position,false,false):
+ if not anti_air and not arena.clear_shot(position,next_position,false,false,target):
   queue_free()
   return
  var nearest
  var nearest_t := INF
  var path := next_position-position
  var travel_squared := maxf(0.0001,path.length_squared())
- for unit in arena.units:
+ for unit in arena.projectile_targets() if arena.has_method("projectile_targets") else arena.units:
   if not is_instance_valid(unit) or unit.hp<=0.0 or unit.team==owner_team:
    continue
   # Anti-air missiles cannot strike ground units; conventional projectiles cannot strike flying units.
