@@ -29,6 +29,7 @@ func refresh() -> void:
   if not is_instance_valid(source) or source.hp <= 0 or source.team < 0 or source.team > 1:
    continue
   var sight := 360.0 if source in world.structures else 336.0
+  if source.get("unit_id") in ["r_recon","r_armored_scout"]: sight=420.0
   var center := Vector2i(floori(source.position.x / CELL), floori(source.position.y / CELL))
   var reach := ceili(sight / CELL)
   for y in range(maxi(0, center.y - reach), mini(world.ROWS, center.y + reach + 1)):
@@ -37,6 +38,14 @@ func refresh() -> void:
     if (Vector2(cell) * CELL + Vector2.ONE * CELL * 0.5).distance_to(source.position) <= sight:
      visible_cells[source.team][cell] = true
      explored_cells[source.team][cell] = true
+ if world.get("commander")!=null:
+  for area in world.commander.reveals:
+   for y in range(world.ROWS):
+    for x in range(world.COLS):
+     var cell:=Vector2i(x,y)
+     if (Vector2(cell)*CELL+Vector2.ONE*CELL*0.5).distance_to(area.point)<=area.radius:
+      visible_cells[area.side][cell]=true
+      explored_cells[area.side][cell]=true
  var image := Image.create(world.COLS, world.ROWS, false, Image.FORMAT_RGBA8)
  for y in range(world.ROWS):
   for x in range(world.COLS):

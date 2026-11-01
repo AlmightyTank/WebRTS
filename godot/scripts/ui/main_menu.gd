@@ -114,7 +114,7 @@ func _show_page(next_page: String) -> void:
    _button("QUIT", _show_page.bind("quit"))
   "skirmish":
    _text("OFFLINE SKIRMISH", true)
-   _text("One battlefield • You vs AI • Starting credits: 10,000\nChoose standard armies or a supported general. Mirror matches are supported. Advanced powers, stealth, tunnels and salvage are not implemented.")
+   _text("One battlefield • You vs AI • Starting credits: 10,000\nChoose a standard army or Vale, Korda or Sayegh with replacements, research and commander powers. Mirror matches supported. Stealth, tunnels and salvage remain future systems.")
    _army_picker(0)
    _army_picker(1)
    first = _button("DEPLOY TO BATTLEFIELD", _start_game)

@@ -38,6 +38,8 @@ func configure(world, building_kind: String, side: int, pos: Vector2, size: Vect
  max_hp=2600.0 if kind=="yard" else (1700.0 if kind=="factory" else 1350.0)
  hp=max_hp
  name=("Alliance" if team==0 else "Republic")+"_"+kind
+ if kind=="beam_bastion": weapon={"type":"ENERGY","damage":75.0,"interval":1.5,"range":225.0,"projectile_speed":850.0,"grid_energy":true}
+ if kind in ["sam","salvaged_aa","missile_nest"]: weapon={"type":"ROCKET","damage":90.0 if kind=="missile_nest" else 70.0,"interval":2.4,"range":300.0,"projectile_speed":400.0,"homing":true,"anti_air":true,"anti_ground":false}
  queue_redraw()
 
 func ground_bounds() -> Rect2:
@@ -47,7 +49,8 @@ func notify_unit_exit() -> void:
  exit_activity=2.0
 
 func _process(delta: float) -> void:
- if kind not in ["yard","power","barracks","refinery","factory","depot"] or arena==null: return
+ if kind not in ["yard","power","barracks","refinery","factory","depot","relay","vanguard_foundry"] or arena==null: return
+ if kind=="relay" and team<0: return
  if arena.paused or arena.battle_over: return
  var powered: bool = arena.power_ok(team)
  art_working=false
@@ -67,16 +70,22 @@ func _process(delta: float) -> void:
  queue_redraw()
 
 func _physics_process(delta: float) -> void:
- if arena.paused or arena.battle_over or hp<=0 or kind!="turret" or not arena.power_ok(team): return
+ if arena.paused or arena.battle_over or hp<=0 or kind not in ["turret","beam_bastion","sam","salvaged_aa","missile_nest"]: return
+ if not arena.power_ok(team) and kind!="beam_bastion": return
  timer-=delta
  if timer>0.0: return
  var victim=arena.find_target(self,float(weapon["range"]))
  if victim!=null and arena.clear_shot(position,victim.position,false,victim.air):
-  arena.spawn_projectile(self,victim,weapon)
-  timer=float(weapon["interval"])
+  var shot:=weapon.duplicate(true)
+  timer=float(weapon.interval)
+  if kind=="beam_bastion":
+   if arena.power_ok(team): shot.damage*=1.1
+   else: timer*=2.0
+  if arena.get("commander")!=null: timer=arena.commander.modify_shot(self,victim,shot,timer)
+  arena.spawn_projectile(self,victim,shot)
 
 func can_hit(other) -> bool:
- return other!=null and is_instance_valid(other) and other.team!=team and other.hp>0.0 and not other.air
+ return other!=null and is_instance_valid(other) and other.team!=team and other.hp>0.0 and (bool(weapon.get("anti_air",false)) if other.air else bool(weapon.get("anti_ground",true)))
 
 func receive_damage(amount: float, _attacker) -> void:
  if hp<=0.0: return

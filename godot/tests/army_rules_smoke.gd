@@ -38,7 +38,7 @@ func _run() -> void:
     expect(world._produce_unit(side,id), choice + ": team %d can spawn " % side + id)
    for mapping in Rules.REPLACEMENTS.values():
     for original in mapping:
-     if not original in Rules.roster_ids(choice):
+     if original not in Rules.roster_ids(choice) and original not in Rules.structure_ids(choice):
       expect(not world.queue_production(side,world._lane_for(original),original), "Removed/cross-faction slot rejected: " + original)
    var foreign := "r_line" if Rules.faction(choice)!="republic" else "a_ranger"
    expect(not world.queue_production(side,"infantry",foreign), "Cross-faction infantry rejected")

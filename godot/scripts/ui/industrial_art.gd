@@ -22,7 +22,8 @@ const UNIT_MESH_KINDS = [
  "tank","heavy_tank","aa","flak","gunship","helicopter",
  "a_arc_lance","a_tempest","r_stormrail","g_volley",
  "a_ghost_carrier","r_siege_carrier","g_ghost_technical",
- "r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2"
+  "r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2",
+  "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket"
 ]
 
 static func _polygon(c: CanvasItem, points: PackedVector2Array, color: Color) -> void:
@@ -123,6 +124,8 @@ static func asset_kind(id: String) -> String:
  return {"a_mcv":"mcv","r_mcv":"mcv","a_harvester":"harvester","r_hauler":"harvester","a_ranger":"rifleman","r_line":"rifleman","a_javelin":"missile_team","r_hunter":"missile_team","a_engineer":"engineer","r_engineer":"engineer","a_sentinel":"tank","r_bastion":"heavy_tank","a_sentinel_aa":"aa","r_flak":"flak","a_striker":"gunship","r_siege_heli":"helicopter"}.get(id,id)
 
 static func has_asset(id: String) -> bool:
+ if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo"]: return true
+ if id in ["sam","salvaged_aa"]: return true
  id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return true
  if id in ["a_tempest","r_stormrail","g_volley"]: return true
@@ -170,11 +173,18 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   if kind == "harvester": cargo = cargo_frame / 16.0
   _batch_building = true
  var building_key := ""
- if kind in ["yard","power","barracks","refinery","factory","depot"]:
+ if kind in ["yard","power","barracks","refinery","factory","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo"]:
   # Share identical animation frames across instances; bound retained GPU memory.
   var frame = int(float(animation.get("time",0.0))*20.0)
   var door_frame = int(round(float(animation.get("door",0.0))*16.0))
+  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest","silo"]:
+   frame=0
+   door_frame=0
   building_key="%s:%d:%d:%d:%s:%d" % [kind,team,frame,door_frame,animation.get("working",false),style]
+  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest"]:
+   var aim_frame := posmod(int(round(aim / TAU * 64.0)),64)
+   aim = aim_frame * TAU / 64.0
+   building_key += ":%d" % aim_frame
   if _building_mesh_cache.has(building_key):
    c.draw_mesh(_building_mesh_cache[building_key],null)
    return
@@ -188,6 +198,8 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   _collect_depth=false
  match kind:
   "mcv": _mcv(c,faction,heading)
+  "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket": _commander_unit(c,kind,faction,heading,aim)
+  "beam_bastion","missile_nest","foundry","vanguard_foundry","silo": _commander_structure(c,kind,faction,aim,animation)
   "a_arc_lance": _arc_lance(c,faction,heading,aim)
   "a_tempest": _tempest(c,faction,heading)
   "r_stormrail": _stormrail(c,faction,heading,aim)
@@ -204,11 +216,10 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   "barracks": _faction_building(c,"barracks",style,faction,animation)
   "factory": _faction_industry(c,"factory",style,faction,animation)
   "depot": _faction_industry(c,"depot",style,faction,animation)
-  "relay": _relay(c,faction)
-  "turret":
-   _slab(c,Vector2(27,25))
-   box(c,Vector3(-16,-14,5),Vector3(32,28,14),STEEL)
-   _turret(c,faction,aim,"tank",19)
+  "relay":
+   if team < 0: _relay(c,faction)
+   else: _faction_defense(c,"relay",style,faction,aim,animation)
+  "turret","sam","salvaged_aa": _faction_defense(c,"sam" if kind=="salvaged_aa" else kind,style,faction,aim,animation)
   "harvester": _harvester(c,faction,heading,cargo)
   "rifleman","missile_team","engineer": _infantry(c,faction,heading,aim,kind,style)
   "tank","heavy_tank","aa","flak": _tank(c,faction,heading,aim,kind)
@@ -216,6 +227,209 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
  if depth_sorted: _flush_depth(c)
  if not vehicle_key.is_empty(): _finish_building_batch(c,vehicle_key,true)
  if not building_key.is_empty(): _finish_building_batch(c,building_key)
+
+static func _commander_unit(c: CanvasItem, kind: String, color: Color, heading: float, aim: float) -> void:
+ _collect_depth=true
+ if kind=="g_siege_rocket":
+  _infantry(c,color,heading,aim,"missile_team")
+  box(c,Vector3(-9,-5,21),Vector3(24,10,8),STEEL,aim)
+  for y in [-3.0,3.0]: beam(c,Vector3(15,y,25),Vector3(19,y,25),YELLOW,3,aim)
+ else:
+  # Distinct silhouettes: deep skirted tank, low scout carrier, four-panel interceptor.
+  var heavy := kind=="r_jugger"
+  var length := 66.0 if heavy else 48.0
+  for y in [-20.0,13.0]:
+   box(c,Vector3(-length/2,y,1),Vector3(length,9,13 if heavy else 10),INK,heading)
+   for x in [-22.0,-11.0,0.0,11.0,22.0]:
+    beam(c,Vector3(x,y+1,5),Vector3(x,y+7,5),STEEL,3,heading)
+  box(c,Vector3(-length/2,-15,8),Vector3(length,30,14 if heavy else 9),color,heading)
+  if heavy:
+   box(c,Vector3(-20,-18,20),Vector3(36,36,14),color,aim)
+   box(c,Vector3(12,-15,22),Vector3(12,30,9),STEEL,aim)
+   beam(c,Vector3(18,0,28),Vector3(52,0,28),STEEL,7,aim)
+   for y in [-22.0,18.0]: box(c,Vector3(-29,y,7),Vector3(58,5,17),color.darkened(.2),heading)
+  elif kind=="a_lattice":
+   box(c,Vector3(-10,-10,17),Vector3(20,20,9),STEEL,aim)
+   for x in [-18.0,9.0]:
+    for y in [-17.0,8.0]:
+     box(c,Vector3(x,y,25),Vector3(9,9,14),color,aim)
+     beam(c,Vector3(x+1,y+9,29),Vector3(x+8,y+9,29),Color("#83eeff"),3,aim)
+  else:
+   box(c,Vector3(-16,-12,17),Vector3(32,24,8),color,heading)
+   box(c,Vector3(-1,-8,25),Vector3(16,16,6),STEEL,aim)
+   beam(c,Vector3(9,0,29),Vector3(30,0,29),STEEL,3,aim)
+   beam(c,Vector3(-15,8,25),Vector3(-15,8,49),STEEL,1.5,heading)
+   if kind=="r_armored_scout":
+    for y in [-17.0,13.0]: box(c,Vector3(-23,y,11),Vector3(44,4,15),STEEL,heading)
+ _flush_depth(c)
+
+static func _commander_structure(c: CanvasItem, kind: String, color: Color, aim: float, animation: Dictionary = {}) -> void:
+ _collect_depth=false
+ var phase := float(animation.get("time",0.0))
+ _slab(c,Vector2(59,46) if kind in ["foundry","vanguard_foundry","silo"] else Vector2(40,35))
+ if kind in ["foundry","vanguard_foundry"]:
+  # Rear furnace housings sit behind the rolling hall, never on its roof.
+  for x in [-35,-12]:
+   box(c,Vector3(x,-35,5),Vector3(17,17,46),STEEL.darkened(0.15))
+   box(c,Vector3(x+3,-32,51),Vector3(11,11,17),STEEL)
+   box(c,Vector3(x+1,-34,68),Vector3(15,15,3),INK)
+  box(c,Vector3(-48,-15,5),Vector3(68,49,32),CONCRETE.darkened(0.12))
+  box(c,Vector3(-51,-18,37),Vector3(74,55,5),color)
+  for x in [-42,-20,2]:
+   box(c,Vector3(x,-12,42),Vector3(13,37,3),STEEL)
+   for y in [-8,0,8,16]:
+    box(c,Vector3(x+2,y,45),Vector3(9,2,1),INK)
+  _building_door(c,Vector3(-38,34.1,5),45,26,float(animation.get("door",0.0)),color,1)
+  # Ingot pallets and the external roller bed read as heavy industry.
+  for y in [-15,3,21]:
+   box(c,Vector3(27,y,5),Vector3(24,12,4),INK)
+   box(c,Vector3(29,y+2,9),Vector3(20,8,7),STEEL.lightened(0.18))
+  if kind=="vanguard_foundry":
+   # Foreground portal crane, its hoist stays attached to the trolley.
+   for x in [-52,47]:
+    box(c,Vector3(x,26,5),Vector3(7,9,65),STEEL)
+   box(c,Vector3(-52,25,70),Vector3(106,12,8),YELLOW)
+   var trolley := -10.0+sin(phase*0.65)*28.0
+   box(c,Vector3(trolley-7,25,67),Vector3(14,12,5),color)
+   var hook_z := 46.0+sin(phase*0.9)*6.0
+   beam(c,Vector3(trolley,31,67),Vector3(trolley,31,hook_z),INK,2)
+   box(c,Vector3(trolley-4,28,hook_z-5),Vector3(8,6,5),YELLOW)
+ elif kind=="silo":
+  box(c,Vector3(-42,-34,5),Vector3(84,68,12),CONCRETE.darkened(0.13))
+  box(c,Vector3(-31,-26,17),Vector3(57,52,5),INK)
+  for x in [-30,-2]:
+   box(c,Vector3(x,-25,22),Vector3(27,50,4),color)
+   for y in [-19,-3,13]:
+    box(c,Vector3(x+2,y,26),Vector3(23,3,2),STEEL)
+  # Raised guide rails and locked hatch: not a decorative opening into the ground.
+  for y in [-30,27]:
+   box(c,Vector3(-35,y,17),Vector3(65,3,12),STEEL)
+  box(c,Vector3(32,-25,17),Vector3(17,28,23),STEEL)
+  box(c,Vector3(35,-21,40),Vector3(11,12,3),Color("#aa8c57"))
+  box(c,Vector3(31,3.1,26),Vector3(12,1,7),Color("#70c6a4"))
+  beam(c,Vector3(42,-17,43),Vector3(42,-17,67),STEEL,2)
+  for x in [-36,-19,-2,15]:
+   box(c,Vector3(x,31,17),Vector3(9,4,2),YELLOW)
+ else:
+  box(c,Vector3(-29,-25,5),Vector3(58,50,13),CONCRETE)
+  box(c,Vector3(-22,-19,18),Vector3(44,38,7),color)
+  if kind=="beam_bastion":
+   for x in [-32,24]:
+    box(c,Vector3(x,-17,5),Vector3(8,34,22),STEEL)
+    box(c,Vector3(x+2,-11,27),Vector3(4,22,2),Color("#8cf4ff"))
+  else:
+   for y in [-29,23]:
+    for x in [-32,-11,10]:
+     box(c,Vector3(x,y,5),Vector3(20,7,14),Color("#9b8c64"))
+   # Fixed radar mast does not orbit with the missile rack.
+   box(c,Vector3(-28,-22,18),Vector3(4,4,39),STEEL)
+   box(c,Vector3(-34,-25,57),Vector3(17,5,10),color)
+  _depth_faces.clear()
+  _collect_depth=true
+  box(c,Vector3(-14,-12,25),Vector3(28,24,10),STEEL,aim)
+  if kind=="beam_bastion":
+   box(c,Vector3(-19,-10,35),Vector3(25,20,9),color,aim)
+   # Split solid emitter rails keep the energy weapon visibly attached.
+   for y in [-14,8]:
+    box(c,Vector3(-5,y,34),Vector3(40,6,9),color,aim)
+    box(c,Vector3(29,y+1,36),Vector3(7,4,5),Color("#8cf4ff"),aim)
+   for x in [-16,-8,0]:
+    box(c,Vector3(x,-8,44),Vector3(4,16,4),STEEL,aim)
+  else:
+   for y in [-24,8]:
+    box(c,Vector3(-21,y,34),Vector3(43,16,17),color,aim)
+    for yy in [3,10]:
+     for z in [37,44]:
+      box(c,Vector3(-18,y+yy,z),Vector3(43,5,4),STEEL,aim)
+      face(c,[Vector3(25.1,y+yy,z),Vector3(25.1,y+yy+5,z),Vector3(25.1,y+yy+5,z+4),Vector3(25.1,y+yy,z+4)],INK,aim)
+  _flush_depth(c)
+
+static func _faction_defense(c: CanvasItem, role: String, team: int, color: Color, aim: float, animation: Dictionary) -> void:
+ # Fixed-camera architecture first; only the weapon assembly uses depth sorting.
+ _collect_depth=false
+ var phase := float(animation.get("time",0.0))
+ _slab(c,Vector2(39,33) if role!="relay" else Vector2(49,37))
+ if role=="relay":
+  if team==0:
+   box(c,Vector3(-34,-23,5),Vector3(58,44,26),CONCRETE)
+   box(c,Vector3(-37,-25,31),Vector3(64,48,4),color)
+   box(c,Vector3(-28,-17,35),Vector3(23,22,5),STEEL)
+   box(c,Vector3(12,-14,35),Vector3(5,5,44),STEEL)
+   box(c,Vector3(9,-17,76),Vector3(11,11,5),color)
+   _roof_fan(c,Vector3(-17,-6,40.2),phase,8)
+  elif team==1:
+   box(c,Vector3(-32,-25,5),Vector3(62,48,32),CONCRETE.darkened(0.1))
+   box(c,Vector3(-35,-27,37),Vector3(68,52,6),color.darkened(0.2))
+   for x in [-27,22]:
+    box(c,Vector3(x,16,5),Vector3(9,13,33),CONCRETE)
+   box(c,Vector3(1,-15,43),Vector3(9,9,36),STEEL)
+   beam(c,Vector3(-19,-13,43),Vector3(5,-11,77),STEEL,3)
+  else:
+   box(c,Vector3(-33,-23,5),Vector3(60,45,24),STEEL.darkened(0.2))
+   box(c,Vector3(-36,-26,29),Vector3(66,50,3),Color("#aa8c57"))
+   for x in [-29,-11,7,25]:
+    beam(c,Vector3(x,-25,33),Vector3(x,23,33),STEEL,2)
+   box(c,Vector3(15,-16,32),Vector3(4,4,50),STEEL)
+   beam(c,Vector3(-23,-13,32),Vector3(17,-14,78),STEEL,2)
+  # Rotating planar radar array, mounted above the roof with a visible stem.
+  var scan := phase*0.45
+  var pivot := Vector3(14,-12,82) if team==0 else (Vector3(5,-11,82) if team==1 else Vector3(17,-14,85))
+  var sideways := Vector3(cos(scan)*22,sin(scan)*22,0)
+  face(c,[pivot-sideways,pivot+sideways,pivot+sideways+Vector3(0,0,15),pivot-sideways+Vector3(0,0,15)],STEEL.lightened(0.22))
+  for t in [-0.7,0.0,0.7]:
+   beam(c,pivot+sideways*t,pivot+sideways*t+Vector3(0,0,15),color,2)
+  _building_door(c,Vector3(-19,23.1 if team==1 else 22.1,5),18,21,0.0,color,0 if team==0 else 1)
+  return
+ if team==0:
+  box(c,Vector3(-25,-22,5),Vector3(50,44,12),CONCRETE)
+  box(c,Vector3(-19,-17,17),Vector3(38,34,8),color)
+  for x in [-30,22]:
+   box(c,Vector3(x,-17,5),Vector3(8,34,15),STEEL)
+ elif team==1:
+  box(c,Vector3(-29,-25,5),Vector3(58,50,17),CONCRETE.darkened(0.15))
+  box(c,Vector3(-23,-20,22),Vector3(46,40,5),color.darkened(0.2))
+  for x in [-31,23]:
+   box(c,Vector3(x,8,5),Vector3(8,20,21),CONCRETE)
+ else:
+  box(c,Vector3(-26,-22,5),Vector3(52,44,10),STEEL.darkened(0.25))
+  for y in [-25,18]:
+   for x in [-29,-10,9]:
+    box(c,Vector3(x,y,5),Vector3(18,8,13),Color("#9b8c64"))
+  box(c,Vector3(-16,-14,15),Vector3(32,28,8),color)
+ _depth_faces.clear()
+ _collect_depth=true
+ var z := 27.0 if team==1 else 25.0
+ if role=="turret":
+  if team==0:
+   box(c,Vector3(-15,-11,z),Vector3(29,22,12),color,aim)
+   _gun_barrel(c,Vector3(10,0,z+7),29,4,aim)
+   box(c,Vector3(-12,-8,z+12),Vector3(10,16,3),STEEL,aim)
+  elif team==1:
+   box(c,Vector3(-17,-14,z),Vector3(32,28,15),color,aim)
+   for y in [-7,7]:
+    _gun_barrel(c,Vector3(11,y,z+8),29,3.5,aim)
+  else:
+   box(c,Vector3(-12,-10,z),Vector3(23,20,7),STEEL,aim)
+   box(c,Vector3(-9,-15,z+5),Vector3(18,4,15),color,aim)
+   for y in [-4,4]:
+    _gun_barrel(c,Vector3(3,y,z+11),25,2.4,aim)
+   box(c,Vector3(-12,8,z+6),Vector3(10,8,8),Color("#aa8c57"),aim)
+ else:
+  box(c,Vector3(-10,-10,z),Vector3(20,20,8),STEEL,aim)
+  if team==2:
+   # Salvaged anti-air: four exposed launch tubes on a patched open mount.
+   for y in [-5,5]:
+    for height in [9,16]:
+     _gun_barrel(c,Vector3(0,y,z+height),31,2.4,aim)
+   box(c,Vector3(-14,-16,z+7),Vector3(17,4,19),color,aim)
+  else:
+   # Alliance compact paired pods; Republic wider, heavier six-tube battery.
+   for y in [-19,7]:
+    box(c,Vector3(-19,y,z+8),Vector3(37,12,15 if team==0 else 21),color,aim)
+    for height in ([12,19] if team==0 else [12,19,26]):
+     box(c,Vector3(-16,y+3,z+height),Vector3(36,6,4),STEEL,aim)
+     face(c,[Vector3(20.1,y+3,z+height),Vector3(20.1,y+9,z+height),Vector3(20.1,y+9,z+height+4),Vector3(20.1,y+3,z+height+4)],INK,aim)
+ _flush_depth(c)
 
 static func _mcv(c: CanvasItem, color: Color, heading: float) -> void:
  # Six chunky tires, armored chassis, forward cab and folded yellow crane.

@@ -43,6 +43,9 @@ var explicit_attack := false
 var blocked_time := 0.0
 var traffic_wait := 0.0
 var column_move := false
+var unit_xp := 0.0
+var stationary_time := 0.0
+var last_combat_position := Vector2.ZERO
 
 func configure(world: Node2D, unit_data: Dictionary, side: int, pos: Vector2, gun: Dictionary, flying: bool = false) -> void:
     arena = world
@@ -178,6 +181,8 @@ func _physics_process(delta: float) -> void:
         queue_redraw()
         return
     cooldown = maxf(0.0, cooldown - delta)
+    stationary_time = stationary_time + delta if position.distance_to(last_combat_position) < 0.1 else 0.0
+    last_combat_position = position
     scan_timer -= delta
     if target != null and not can_hit(target):
         target = null
@@ -196,9 +201,10 @@ func _physics_process(delta: float) -> void:
         _begin_route(attack_move_goal)
     if target != null:
         var distance: float = position.distance_to(target.position)
-        if distance <= float(weapon.get("range", 0.0)) and distance >= float(weapon.get("min_range", 0.0)) and arena.clear_shot(position, target.position, air, target.air, target):
+        var effective_range: float = arena.commander.weapon_range(self,target) if arena.get("commander")!=null else float(weapon.get("range",0.0))
+        if distance <= effective_range and distance >= float(weapon.get("min_range", 0.0)) and arena.clear_shot(position, target.position, air, target.air, target):
             moving = false
-            if cooldown <= 0.0:
+            if cooldown <= 0.0 and stationary_time >= float(weapon.get("brace",0.0)):
                 fire(target)
         elif distance < float(weapon.get("min_range", 0.0)):
             var retreat: Vector2 = position - target.position
@@ -206,7 +212,7 @@ func _physics_process(delta: float) -> void:
                 retreat = Vector2.RIGHT
             if not moving or destination.distance_to(target.position) < float(weapon.get("min_range", 0.0)):
                 _begin_route(position + retreat.normalized() * (float(weapon.get("min_range", 0.0)) - distance + 30.0))
-        elif distance > float(weapon.get("range", 0.0)) * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target):
+        elif distance > effective_range * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target):
             if not moving or destination.distance_to(target.position) > 60.0:
                 _begin_route(target.position)
     if moving:
@@ -248,7 +254,8 @@ func _step_movement(delta: float) -> void:
     var steering := (direction + separation * 1.5).normalized()
     if steering.length_squared() < 0.01:
         steering = direction
-    var next_position := position + steering * minf(move_speed * delta, position.distance_to(waypoint))
+    var speed_factor := 1.2 if arena.get("commander")!=null and arena.commander.buff_at(team,"breakthrough_order",position) and armor=="HEAVY" else 1.0
+    var next_position := position + steering * minf(move_speed * speed_factor * delta, position.distance_to(waypoint))
     if arena.can_traverse(position, next_position, radius, air, self):
         position = next_position
         arena.update_unit_occupancy(self)
@@ -294,6 +301,7 @@ func fire(enemy) -> void:
     if bool(weapon.get("grid_energy", false)):
         if arena.power_ok(team): shot.damage *= 1.1
         else: cooldown *= 2.0
+    if arena.get("commander")!=null: cooldown=arena.commander.modify_shot(self,enemy,shot,cooldown)
     arena.spawn_projectile(self, enemy, shot)
 
 func receive_damage(value: float, attacker) -> void:
@@ -302,6 +310,8 @@ func receive_damage(value: float, attacker) -> void:
     if capture_target != null:
         capture_progress = 0.0
         capture_pause = 1.0
+    if arena.get("commander")!=null and armor=="HEAVY" and arena.commander.buff_at(team,"breakthrough_order",position): value*=0.8
+    if unit_id=="r_jugger" and is_instance_valid(attacker) and absf(angle_difference(facing,(attacker.position-position).angle()))<PI/3.0: value*=0.8
     hp = maxf(0.0, hp - value)
     if value > 0.0: hit_feedback = 0.16
     if team == 1 and not explicit_attack and not moving and attacker != null and is_instance_valid(attacker) and can_hit(attacker):
@@ -328,5 +338,6 @@ func _draw() -> void:
         draw_rect(Rect2(-19,-radius-23,38 * minf(1.0,capture_progress / (0.7 if capture_target.team==-1 else 3.0)),4),Color("#efcd76"))
     var amount := hp / maxf(1.0, max_hp)
     var bar_y = -51.0 if profile_name=="infantry" else -64.0
+    if unit_xp>=100.0: draw_string(ThemeDB.fallback_font,Vector2(-18,bar_y-5),"VET",HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("#efcd76"))
     draw_rect(Rect2(-19, bar_y, 38, 4), Color("#1d2524"))
     draw_rect(Rect2(-19, bar_y, 38 * amount, 4), Color("#94d889") if amount > 0.4 else Color("#e2a052"))
