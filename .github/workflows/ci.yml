@@ -1,60 +1,23 @@
-name: WebRTS checks
+name: Meridian Warfront — Godot 4
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  test-and-build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-
-  browser-playtest:
+  godot-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - name: Install browser automation
-        run: |
-          npm install --no-save --package-lock=false playwright@1.56.1
-          npx playwright install --with-deps chromium
-      - name: Run desktop and mobile placement playtests
-        run: node --test tests/browser-placement.mjs
-      - name: Upload playtest screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: placement-browser-screenshots
-          path: test-results/
-          if-no-files-found: ignore
-
-  godot-isometric-smoke:
-    if: github.ref == 'refs/heads/2d-isometric' || github.base_ref == '2d-isometric'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Godot 4 (headless)
+      - name: Install Godot 4.4.1
         uses: chickensoft-games/setup-godot@v2.4.3
         with:
           version: 4.4.1
           use-dotnet: false
           include-templates: false
-      - name: Import Godot project and SVG sprites
+      - name: Import resources and check scripts
         run: godot --headless --path godot --editor --quit
-      - name: Smoke-test battlefield startup
+      - name: Launch battlefield smoke test
         run: godot --headless --path godot --quit-after 10
