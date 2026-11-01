@@ -50,7 +50,7 @@ func run_checks() -> void:
  expect(not world.queue_production(0,"vehicle","a_mcv"),"Replacement MCV locked before War Factory and Depot")
  build("factory",Vector2(740,750))
  expect(not world.queue_production(0,"vehicle","a_mcv"),"MCV still locked before Service Depot")
- build("depot",Vector2(935,750))
+ build("depot",Vector2(740,980))
  expect(world.queue_production(0,"vehicle","a_mcv"),"Service Depot + War Factory unlock new MCV")
  world.deliver_ore(0,4500.0)
  world._tick_production(0,70.0)
