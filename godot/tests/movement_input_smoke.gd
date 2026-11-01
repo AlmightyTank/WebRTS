@@ -37,9 +37,16 @@ func _initialize() -> void:
  click_world(arena, Vector2(1440, 840), true)
  await process_frame
  expect(arena.units[0].pending_orders.size() == 1 and arena.units[0].destination == original, "Viewport Shift-right-click appends instead of replacing")
- var start: Vector2 = arena.units[0].position
+ var starts: Dictionary = {}
+ for unit in arena.units:
+  starts[unit] = unit.position
  await create_timer(1.0).timeout
- expect(arena.units[0].position.distance_to(start) > 5, "Live physics advances army")
+ var advanced := false
+ for unit in arena.units:
+  if unit.position.distance_to(starts[unit]) > 5.0:
+   advanced = true
+   break
+ expect(advanced, "Live physics advances army")
  if DisplayServer.get_name() != "headless":
   await RenderingServer.frame_post_draw
   root.get_texture().get_image().save_png("user://movement_lab.png")

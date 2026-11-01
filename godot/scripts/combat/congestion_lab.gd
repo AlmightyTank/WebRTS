@@ -20,7 +20,7 @@ func reset_battle() -> void:
  result_text.anchor_right = 0.0
  result_text.offset_left = 12.0
  result_text.add_theme_font_size_override("font_size", 16)
- result_text.text = "MOVEMENT LAB — 25 tanks\nRight-click: move | Shift: queue | S: stop | R: reset"
+ result_text.text = "MOVEMENT LAB — 25 tanks\nRight-click routes around walls | Shift: queue | S: stop | R: reset"
  _update_hud()
  queue_redraw()
 

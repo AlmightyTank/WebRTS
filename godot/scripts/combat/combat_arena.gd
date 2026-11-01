@@ -99,7 +99,7 @@ var selected: Array = []
 var paused := false
 var scenario_index := 0
 var mode := "MOVE"
-var formation := "LINE"
+var formation := "GROUP"
 var drag_start := Vector2.ZERO
 var drag_end := Vector2.ZERO
 var dragging_selection := false
@@ -411,6 +411,97 @@ func _ai_decide() -> void:
   if unit.target == null or not is_instance_valid(unit.target) or (unit.position.distance_to(enemy.position) + 100.0 < unit.position.distance_to(unit.target.position)):
    unit.order_attack(enemy)
 
+# Red Alert 2 right-click: pack the group into the nearest free cells around the
+# click, then each vehicle follows the cell path around static terrain.
+func gather_cells(point: Vector2, count: int) -> Array[Vector2]:
+ var result: Array[Vector2] = []
+ if count <= 0:
+  return result
+ var cell := world_cell(clamp_point(point))
+ if navigation.is_point_solid(cell):
+  cell = _nearby_open_cell(cell)
+ var x := 0
+ var y := 0
+ var dx := 0
+ var dy := -1
+ var seen := {}
+ var guard := 0
+ while result.size() < count and guard < COLS * ROWS:
+  guard += 1
+  var candidate := cell + Vector2i(x, y)
+  if navigation.is_in_boundsv(candidate) and not navigation.is_point_solid(candidate) and not seen.has(candidate):
+   seen[candidate] = true
+   result.append(cell_center(candidate))
+  if x == y or (x < 0 and x == -y) or (x > 0 and x == 1 - y):
+   var turn := dx
+   dx = -dy
+   dy = turn
+  x += dx
+  y += dy
+ while result.size() < count:
+  result.append(result[result.size() - 1] if not result.is_empty() else cell_center(cell))
+ return result
+
+# One ground unit occupies a cell. A follower waits while a unit ahead is
+# moving the same way, which is how an RA2 column files through a gap.
+func same_direction_holds_cell(actor, waypoint: Vector2) -> bool:
+ if actor.get("air") == true or actor.get("column_move") != true:
+  return false
+ var cell := world_cell(waypoint)
+ if world_cell(actor.position) == cell or world_cell(actor.destination) == cell:
+  return false
+ _ensure_occupancy()
+ var my_dir: Vector2 = actor.destination - actor.position
+ if my_dir.length_squared() < 4.0:
+  return false
+ var center := cell_center(cell)
+ for other in _occupancy.get(cell, []):
+  if other == actor or not is_instance_valid(other) or other.hp <= 0.0 or other.get("air") == true:
+   continue
+  if world_cell(other.position) != cell or not other.moving:
+   continue
+  var their_dir: Vector2 = other.destination - other.position
+  if their_dir.length_squared() < 4.0:
+   continue
+  if my_dir.normalized().dot(their_dir.normalized()) <= 0.35:
+   continue
+  if other.position.distance_squared_to(center) + 36.0 < actor.position.distance_squared_to(center):
+   return true
+ return false
+
+# Join the shared corridor at the first bend that is not behind this unit,
+# follow it through the gap, then branch to this unit's own cell.
+func column_route(origin: Vector2, spine: PackedVector2Array, slot: Vector2, is_air: bool) -> PackedVector2Array:
+ if is_air or spine.is_empty():
+  return find_route(origin, slot, is_air)
+ var goal: Vector2 = spine[spine.size() - 1]
+ var join := spine.size() - 1
+ var best := INF
+ var origin_goal := origin.distance_squared_to(goal)
+ for i in range(spine.size()):
+  if spine[i].distance_squared_to(goal) > origin_goal + float(CELL * CELL):
+   continue
+  var distance := origin.distance_squared_to(spine[i])
+  if distance < best:
+   best = distance
+   join = i
+ var route := PackedVector2Array()
+ var approach := find_route(origin, spine[join], false)
+ for point in approach:
+  _append_corner(route, point)
+ for i in range(join, spine.size()):
+  _append_corner(route, spine[i])
+ var branch := find_route(goal, slot, false)
+ for point in branch:
+  _append_corner(route, point)
+ if route.is_empty():
+  return find_route(origin, slot, false)
+ return route
+
+func _append_corner(route: PackedVector2Array, point: Vector2) -> void:
+ if route.is_empty() or route[route.size() - 1].distance_squared_to(point) > 16.0:
+  route.append(point)
+
 func formation_targets(origin: Vector2, count: int, toward: Vector2, shape: String) -> Array[Vector2]:
  var result: Array[Vector2] = []
  var forward := (toward-origin).normalized()
@@ -465,14 +556,28 @@ func issue_order(point: Vector2, attack_move: bool = false, queued: bool = false
   return
  if selected.is_empty():
   return
- var targets := formation_targets(_selection_midpoint(), selected.size(), point, formation)
- for i in range(selected.size()):
-  var u = selected[i]
+ var ordered: Array = []
+ for u in selected:
   if is_instance_valid(u):
-    if queued:
-     u.queue_move(targets[i], attack_move)
-    else:
-     u.order_move(targets[i], attack_move)
+   ordered.append(u)
+ ordered.sort_custom(func(a, b): return a.position.distance_squared_to(point) < b.position.distance_squared_to(point))
+ var targets: Array[Vector2] = gather_cells(point, ordered.size()) if formation == "GROUP" else formation_targets(_selection_midpoint(), ordered.size(), point, formation)
+ var spine := find_route(_selection_midpoint(), point, false) if formation == "GROUP" else PackedVector2Array()
+ for i in range(ordered.size()):
+  var u = ordered[i]
+  var slot: Vector2 = targets[i]
+  if queued:
+   u.queue_move(slot, attack_move)
+  else:
+   u.order_move(slot, attack_move)
+   if formation == "GROUP" and u.get("air") != true and not spine.is_empty():
+    var column := column_route(u.position, spine, slot, false)
+    if not column.is_empty():
+     u.route = column
+     u.route_index = 0
+     u.moving = true
+     u.destination = slot
+     u.column_move = true
 
 func _screen_to_world(screen_point: Vector2) -> Vector2:
  # InputEventScreenTouch coordinates are in viewport space, unlike mouse-world.
@@ -562,7 +667,7 @@ func _unhandled_input(event: InputEvent) -> void:
    KEY_S:
     for u in selected:
      if is_instance_valid(u): u.order_stop()
-   KEY_F: formation = "WEDGE" if formation == "LINE" else "LINE"
+   KEY_F: _cycle_formation()
    KEY_R: reset_battle()
    KEY_SPACE: paused = not paused
    KEY_ESCAPE: mode = "MOVE"
@@ -616,7 +721,7 @@ func _create_hud() -> void:
  root.add_child(bottom)
  var buttons := HBoxContainer.new()
  bottom.add_child(buttons)
- for entry in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Line / Wedge"],["PAUSE","Pause"],["RESET","Reset"]]:
+ for entry in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Formation"],["PAUSE","Pause"],["RESET","Reset"]]:
   var button := Button.new()
   button.text = entry[1]
   button.custom_minimum_size = Vector2(92,43)
@@ -647,6 +752,12 @@ func _create_hud() -> void:
  result_text.add_theme_font_size_override("font_size",22)
  root.add_child(result_text)
 
+func _cycle_formation() -> void:
+ match formation:
+  "GROUP": formation = "LINE"
+  "LINE": formation = "WEDGE"
+  _: formation = "GROUP"
+
 func _choose_scenario(index: int) -> void:
  scenario_index = index
  reset_battle()
@@ -663,7 +774,7 @@ func _on_toolbar(action: String) -> void:
   "STOP":
    for u in selected:
     if is_instance_valid(u): u.order_stop()
-  "FORMATION": formation = "WEDGE" if formation == "LINE" else "LINE"
+  "FORMATION": _cycle_formation()
   "PAUSE": paused = not paused
   "RESET": reset_battle()
  _update_hud()

@@ -116,6 +116,55 @@ func _initialize() -> void:
  for unit in crowd:
   unit.free()
  world.units.clear()
+ world.selected.clear()
+ world.obstacles.assign([Rect2(576, 0, 48, 408), Rect2(576, 504, 48, 700)])
+ world._create_navigation()
+ world.formation = "GROUP"
+ world.invalidate_occupancy()
+ var column: Array = []
+ for i in range(6):
+  var tanker = load("res://scripts/combat/combat_unit.gd").new()
+  tanker.arena = world
+  tanker.radius = 18.0
+  tanker.team = 0
+  tanker.position = Vector2(220.0 + float(i % 3) * 52.0, 400.0 + float(i / 3) * 52.0)
+  world.units.append(tanker)
+  world.selected.append(tanker)
+  column.append(tanker)
+ world.issue_order(Vector2(980, 456))
+ var top_wall: Rect2 = world.obstacles[0]
+ var bottom_wall: Rect2 = world.obstacles[1]
+ for tanker in column:
+  expect(tanker.destination.x > 700.0, "Group order keeps the arrival cell beyond the wall")
+  var previous: Vector2 = tanker.position
+  var crosses := false
+  for waypoint in tanker.route:
+   if world._segment_hits_rect(previous, waypoint, top_wall) or world._segment_hits_rect(previous, waypoint, bottom_wall):
+    crosses = true
+   previous = waypoint
+  expect(not crosses, "Column route follows the gap instead of the wall")
+ var max_in_one_cell := 0
+ for frame in range(2400):
+  var occupants := {}
+  for tanker in column:
+   if tanker.moving:
+    tanker._step_movement(1.0 / 60.0)
+   var cell: Vector2i = world.world_cell(tanker.position)
+   if cell.x == 12:
+    var key := cell.y
+    occupants[key] = int(occupants.get(key, 0)) + 1
+    max_in_one_cell = maxi(max_in_one_cell, int(occupants[key]))
+ var through := 0
+ for tanker in column:
+  if tanker.position.x > 650.0:
+   through += 1
+  else:
+   print("Column unit at ", tanker.position, " moving ", tanker.moving)
+ expect(through == column.size(), "Column files through a one-cell gap: " + str(through))
+ expect(max_in_one_cell <= 1, "Only one vehicle occupies the gap cell at a time")
+ for tanker in column:
+  tanker.free()
+ world.units.clear()
  actor.free()
  world.free()
  if failures.is_empty():
