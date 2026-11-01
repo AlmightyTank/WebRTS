@@ -142,9 +142,14 @@ static func asset_bounds(id: String) -> Rect2:
  return Rect2(-104,-115,208,180)
 
 static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: float = 0.0, aim: float = NAN, cargo: float = 0.0, animation: Dictionary = {}) -> void:
+ var source_id := kind
  kind = asset_kind(kind)
  var faction = Color("#389fda") if team == 0 else (Color("#d95c45") if team==1 else Color("#919b81"))
  var style: int = int(animation.get("faction_style",team))
+ if kind in ["rifleman","missile_team","engineer"]:
+  if source_id.begins_with("a_"): style=0
+  elif source_id.begins_with("r_"): style=1
+  elif source_id.begins_with("g_"): style=2
  if is_nan(aim): aim=heading
  var vehicle_key := ""
  if kind in UNIT_MESH_KINDS:
@@ -156,6 +161,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
    aim_frame = hull_frame # These assets have no independent aiming geometry.
   var cargo_frame := int(ceil(clampf(cargo, 0.0, 1.0) * 16.0)) if kind == "harvester" else 0
   vehicle_key = "%s:%d:%d:%d:%d" % [kind, team, hull_frame, aim_frame, cargo_frame]
+  if kind in ["rifleman","missile_team","engineer"]: vehicle_key += ":%d" % style
   if _vehicle_mesh_cache.has(vehicle_key):
    c.draw_mesh(_vehicle_mesh_cache[vehicle_key], null)
    return
@@ -204,7 +210,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
    box(c,Vector3(-16,-14,5),Vector3(32,28,14),STEEL)
    _turret(c,faction,aim,"tank",19)
   "harvester": _harvester(c,faction,heading,cargo)
-  "rifleman","missile_team","engineer": _infantry(c,faction,heading,aim,kind)
+  "rifleman","missile_team","engineer": _infantry(c,faction,heading,aim,kind,style)
   "tank","heavy_tank","aa","flak": _tank(c,faction,heading,aim,kind)
   "gunship","helicopter": _aircraft(c,faction,heading,kind)
  if depth_sorted: _flush_depth(c)
@@ -934,25 +940,73 @@ static func _harvester(c: CanvasItem, color: Color, heading: float, cargo: float
  beam(c,Vector3(30,11,10),Vector3(38,11,4),STEEL,3,heading)
  box(c,Vector3(35,-17,2),Vector3(7,34,5),YELLOW,heading)
 
-static func _infantry(c: CanvasItem, color: Color, heading: float, aim: float, kind: String) -> void:
- for y in [-5.0,2.0]:
-  box(c,Vector3(-4,y,0),Vector3(10,4,4),INK,heading)
-  box(c,Vector3(-3,y,4),Vector3(5,4,8),STEEL,heading)
- box(c,Vector3(-6,-6,12),Vector3(12,12,11),color,heading)
- box(c,Vector3(-4,-4,23),Vector3(8,8,6),Color("#c5ab7f"),heading)
- box(c,Vector3(-6,-6,28),Vector3(12,12,3),color,heading)
- box(c,Vector3(4,-4,25),Vector3(1,8,3),INK,heading)
- box(c,Vector3(-9,-5,13),Vector3(3,10,9),STEEL,heading)
- if kind=="missile_team":
-  beam(c,Vector3(-9,-6,23),Vector3(20,-6,23),STEEL,5,aim)
-  box(c,Vector3(17,-9,20),Vector3(6,6,6),YELLOW,aim)
- elif kind=="engineer":
-  box(c,Vector3(-6,-6,28),Vector3(12,12,4),YELLOW,heading)
-  box(c,Vector3(0,8,5),Vector3(10,6,7),YELLOW,heading)
-  beam(c,Vector3(5,-8,15),Vector3(15,-8,17),STEEL,2,aim)
+static func _infantry(c: CanvasItem, color: Color, heading: float, aim: float, kind: String, style: int = 0) -> void:
+ # Legs follow locomotion; the entire upper body and equipment share the aim pivot.
+ var cloth := Color("#4c6573") if style==0 else (Color("#666953") if style==1 else Color("#a38e65"))
+ var skin := Color("#bd936e")
+ _depth_faces.clear()
+ _collect_depth=true
+ for y in [-5.5,2.0]:
+  box(c,Vector3(-3,y,0),Vector3(10,4.5,4),INK,heading)
+  box(c,Vector3(-3,y,4),Vector3(5,4.5,9),cloth,heading)
+  if style==1: box(c,Vector3(0,y,7),Vector3(3,4.5,5),STEEL,heading)
+ _flush_depth(c)
+ _collect_depth=true
+ box(c,Vector3(-6,-6,12),Vector3(12,12,12),cloth,aim)
+ if style==0:
+  # Alliance fitted armor, compact radio pack, enclosed helmet and dark visor.
+  box(c,Vector3(2,-5,14),Vector3(5,10,9),color,aim)
+  box(c,Vector3(-9,-4,14),Vector3(3,8,9),STEEL,aim)
+  for y in [-9,6]: box(c,Vector3(-4,y,20),Vector3(8,3,5),color,aim)
+  box(c,Vector3(-4,-4,24),Vector3(8,8,5),skin,aim)
+  box(c,Vector3(-6,-6,28),Vector3(12,12,5),color,aim)
+  box(c,Vector3(4,-4,27),Vector3(2,8,3),INK,aim)
+ elif style==1:
+  # Republic broad plate vest, shoulder guards and thick steel helmet.
+  box(c,Vector3(1,-7,13),Vector3(7,14,11),color,aim)
+  box(c,Vector3(-10,-6,13),Vector3(4,12,12),STEEL,aim)
+  for y in [-10,6]: box(c,Vector3(-5,y,19),Vector3(11,4,6),color,aim)
+  box(c,Vector3(-4,-4,25),Vector3(8,8,5),skin,aim)
+  box(c,Vector3(-7,-7,29),Vector3(14,14,5),STEEL,aim)
+  box(c,Vector3(5,-6,29),Vector3(4,12,2),color,aim)
  else:
-  beam(c,Vector3(3,-7,17),Vector3(19,-7,17),INK,3,aim)
-  box(c,Vector3(1,-8,15),Vector3(6,3,5),STEEL,aim)
+  # GIA lighter webbing, uneven pouches and wrapped head covering.
+  box(c,Vector3(2,-5,15),Vector3(3,10,7),color,aim)
+  box(c,Vector3(-10,-4,13),Vector3(4,8,9),Color("#807452"),aim)
+  for y in [-7,4]: box(c,Vector3(3,y,12),Vector3(4,3,5),Color("#655a42"),aim)
+  box(c,Vector3(-4,-4,24),Vector3(8,8,6),skin,aim)
+  box(c,Vector3(-6,-6,29),Vector3(12,12,4),Color("#c2ad7c"),aim)
+  box(c,Vector3(-5,-5,24),Vector3(10,10,2),color,aim)
+ # Braced arms meet the receiver/tool rather than leaving a floating weapon.
+ for y in [-8,5]:
+  box(c,Vector3(-1,y,15),Vector3(11,3,5),cloth,aim)
+  box(c,Vector3(8,y,16),Vector3(4,3,4),skin,aim)
+ if kind=="missile_team":
+  var tube := STEEL if style!=2 else Color("#756c50")
+  box(c,Vector3(-12,-10,23),Vector3(34,7,7),tube,aim)
+  box(c,Vector3(18,-11,22),Vector3(7,9,9),INK,aim)
+  box(c,Vector3(-13,-11,22),Vector3(5,9,9),tube,aim)
+  box(c,Vector3(4,-10,30),Vector3(5,3,4),color,aim)
+  box(c,Vector3(8,-7,18),Vector3(4,3,5),INK,aim)
+  if style==1:
+   box(c,Vector3(-13,3,17),Vector3(6,5,15),tube,aim)
+  elif style==2:
+   box(c,Vector3(-13,2,16),Vector3(5,5,16),Color("#aa8c57"),aim)
+ elif kind=="engineer":
+  # Hardhat/utility cap and faction-specific field case distinguish noncombatants.
+  var hat := YELLOW if style!=2 else Color("#c2ad7c")
+  box(c,Vector3(-7,-7,33 if style==1 else 32),Vector3(14,14,3),hat,aim)
+  box(c,Vector3(-4,-4,35 if style==1 else 34),Vector3(8,8,2),hat,aim)
+  box(c,Vector3(1,9,5),Vector3(12,7,9),YELLOW if style==0 else (STEEL if style==1 else Color("#97764e")),aim)
+  box(c,Vector3(5,11,14),Vector3(4,2,3),INK,aim)
+  box(c,Vector3(9,-6,18),Vector3(9,9,2),INK,aim)
+  box(c,Vector3(11,-4,20),Vector3(5,5,1),Color("#75d4c0"),aim)
+ else:
+  box(c,Vector3(6,-8,17),Vector3(12,4,5),INK,aim)
+  box(c,Vector3(8,-8,22),Vector3(6,3,2),color,aim)
+  _gun_barrel(c,Vector3(16,-6,19),13 if style==1 else 10,1.8,aim)
+  box(c,Vector3(10,-7,13),Vector3(4,3,5),STEEL,aim)
+ _flush_depth(c)
 
 static func _aircraft(c: CanvasItem, color: Color, heading: float, kind: String) -> void:
  # Tilted faceted fuselage, cockpit, stub wings and separate weapon pods.
