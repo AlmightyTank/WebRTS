@@ -23,7 +23,7 @@ func run_checks() -> void:
  await process_frame
  expect(world.registry.has("standard_units"),"Shared v0.4 balance registry loads")
  expect(world.units.size()==1,"Initial Alliance starts with one MCV; AI MCV deployed")
- expect(world.structures.size()==1 and world.has_structure(1,"yard"),"AI starts with a deployed command yard")
+ expect(world.structures.size()==2 and world.has_structure(1,"yard"),"AI Yard and neutral outpost are present")
  expect(world.selected.size()==1,"Player MCV selected by default")
  expect(world._deploy_mcv(0),"Deploy MCV to Construction Yard")
  expect(world.has_structure(0,"yard"),"Deployed Yard grants base build authority")
@@ -82,4 +82,3 @@ func run_checks() -> void:
  else:
   print("SKIRMISH_SMOKE_FAIL "+str(failures.size()))
   quit(1)
-

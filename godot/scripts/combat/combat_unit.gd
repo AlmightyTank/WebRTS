@@ -26,6 +26,10 @@ var route := PackedVector2Array()
 var route_index := 0
 var profile_name := "infantry"
 var accuracy := 1.0 # fixed until accuracy model is tested
+var capture_target = null
+var capture_approach_point := Vector2.ZERO
+var capture_progress := 0.0
+var capture_pause := 0.0
 
 func configure(world: Node2D, unit_data: Dictionary, side: int, pos: Vector2, gun: Dictionary, flying: bool = false) -> void:
 	arena = world
@@ -52,11 +56,15 @@ func can_hit(other) -> bool:
 	return factor > 0.0 and (bool(weapon.get("anti_air", false)) if other.air else bool(weapon.get("anti_ground", true)))
 
 func order_move(point: Vector2, attack_move: bool = false) -> void:
+	capture_target = null
+	capture_progress = 0.0
 	target = null
 	aggressive = attack_move
 	_begin_route(point)
 
 func order_attack(enemy) -> void:
+	capture_target = null
+	capture_progress = 0.0
 	if not can_hit(enemy):
 		return
 	target = enemy
@@ -66,10 +74,48 @@ func order_attack(enemy) -> void:
 	aggressive = true
 
 func order_stop() -> void:
+	capture_target = null
+	capture_progress = 0.0
 	target = null
 	moving = false
 	aggressive = false
 	route.clear()
+
+func order_capture(building) -> void:
+	if unit_id not in ["a_engineer", "r_engineer"] or not is_instance_valid(building) or building.team == team:
+		return
+	capture_target = building
+	capture_progress = 0.0
+	capture_pause = 0.0
+	target = null
+	aggressive = false
+	capture_approach_point = arena.capture_approach(building, position)
+	_begin_route(capture_approach_point)
+
+func _tick_capture(delta: float) -> bool:
+	if unit_id not in ["a_engineer", "r_engineer"] or capture_target == null:
+		return false
+	if not is_instance_valid(capture_target) or capture_target.hp <= 0.0 or capture_target.team == team:
+		capture_target = null
+		capture_progress = 0.0
+		return false
+	if capture_pause > 0.0:
+		capture_pause = maxf(0.0,capture_pause - delta)
+	if position.distance_to(capture_approach_point) > 27.0:
+		if not moving:
+			_begin_route(capture_approach_point)
+		if moving:
+			_step_movement(delta)
+		return true
+	moving = false
+	route.clear()
+	if capture_pause <= 0.0:
+		capture_progress += delta
+	if capture_progress >= (0.7 if capture_target.team == -1 else 3.0):
+		var claimed = capture_target
+		capture_target = null
+		arena.capture_structure(self,claimed)
+	return true
 
 func _begin_route(point: Vector2) -> void:
 	destination = arena.clamp_point(point)
@@ -82,6 +128,9 @@ func _begin_route(point: Vector2) -> void:
 
 func _physics_process(delta: float) -> void:
 	if arena.paused or arena.battle_over or hp <= 0.0:
+		return
+	if _tick_capture(delta):
+		queue_redraw()
 		return
 	cooldown = maxf(0.0, cooldown - delta)
 	scan_timer -= delta
@@ -148,6 +197,9 @@ func fire(enemy) -> void:
 func receive_damage(value: float, attacker) -> void:
 	if hp <= 0.0:
 		return
+	if capture_target != null:
+		capture_progress = 0.0
+		capture_pause = 1.0
 	hp = maxf(0.0, hp - value)
 	if team == 1 and attacker != null and is_instance_valid(attacker) and can_hit(attacker):
 		target = attacker
@@ -168,6 +220,8 @@ func _draw() -> void:
 		draw_colored_polygon(PackedVector2Array([Vector2(20, 0), Vector2(-8, -14), Vector2(-4, -4), Vector2(-20, -5), Vector2(-20, 5), Vector2(-4, 4), Vector2(-8, 14)]), main_color)
 		draw_rect(Rect2(-7, -4, 16, 8), dark)
 	elif profile_name == "infantry":
+		if unit_id in ["a_engineer","r_engineer"]:
+			draw_arc(Vector2.ZERO,10.0,0,TAU,20,Color("#f3d991"),2.0)
 		draw_circle(Vector2(1, 3), radius, Color(0, 0, 0, 0.25))
 		draw_circle(Vector2.ZERO, 7.0, main_color)
 		draw_circle(Vector2(-1, -2), 3.2, dark)
@@ -186,6 +240,9 @@ func _draw() -> void:
 			draw_line(Vector2.ZERO, Vector2(31, 0), Color("#d6d6c5"), 5.0)
 			draw_circle(Vector2.ZERO, 10.0, main_color)
 	draw_set_transform(Vector2.ZERO, 0.0)
+	if capture_target != null and is_instance_valid(capture_target):
+		draw_rect(Rect2(-19,-radius-23,38,4),Color("#182c25"))
+		draw_rect(Rect2(-19,-radius-23,38 * minf(1.0,capture_progress / (0.7 if capture_target.team==-1 else 3.0)),4),Color("#efcd76"))
 	var amount := hp / maxf(1.0, max_hp)
 	draw_rect(Rect2(-19, -radius - 15, 38, 4), Color("#1d2524"))
 	draw_rect(Rect2(-19, -radius - 15, 38 * amount, 4), Color("#94d889") if amount > 0.4 else Color("#e2a052"))

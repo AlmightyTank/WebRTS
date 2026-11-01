@@ -7,6 +7,8 @@ const STRUCTURE_DATA := {
  "refinery":{"name":"Ore Refinery (+ Harvester)","cost":2000.0,"time":24.0,"power":0,"demand":50,"size":Vector2(142,116),"hp":1350},
  "barracks":{"name":"Barracks","cost":500.0,"time":10.0,"power":0,"demand":10,"size":Vector2(102,96),"hp":1350},
  "factory":{"name":"War Factory","cost":2000.0,"time":26.0,"power":0,"demand":30,"size":Vector2(146,118),"hp":1700},
+ "depot":{"name":"Service Depot","cost":850.0,"time":14.0,"power":0,"demand":25,"size":Vector2(118,100),"hp":1350},
+ "relay":{"name":"Neutral Relay Outpost","cost":0.0,"time":0.0,"power":0,"demand":0,"size":Vector2(90,80),"hp":1200},
  "turret":{"name":"Sentry Turret","cost":550.0,"time":9.0,"power":0,"demand":10,"size":Vector2(66,66),"hp":1350}
 }
 const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES"]
@@ -27,6 +29,13 @@ var economy_ai_timer := 0.0
 var skirmish_time := 0.0
 var ai_build_tick := 0
 var cheat_test := false
+var selected_building = null
+var pending_sale = null
+var repair_button: Button
+var sell_button: Button
+var refund_button: Button
+var cancel_queue_button: Button
+var sale_confirm_deadline := 0.0
 
 func _ready() -> void:
  super._ready()
@@ -34,7 +43,7 @@ func _ready() -> void:
  _rebuild_navigation()
 
 func _new_state() -> Dictionary:
- return {"credits":10000.0,"total_mined":0.0,"total_spent":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
+ return {"credits":10000.0,"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
 
 func reset_battle() -> void:
  # Override the Combat Lab's scenario starting point; its four benchmark
@@ -49,6 +58,9 @@ func reset_battle() -> void:
  projectiles.clear()
  structures.clear()
  selected.clear()
+ selected_building=null
+ pending_sale=null
+ sale_confirm_deadline=0.0
  states=[_new_state(),_new_state()]
  ore_fields=[
   {"position":Vector2(630,330),"remaining":7200.0,"initial":7200.0},
@@ -74,6 +86,8 @@ func reset_battle() -> void:
  _spawn_economy("r_mcv",1,Vector2(1600,610),false)
  # An AI follows the same construction/credit rules, but deploys its MCV immediately.
  _deploy_mcv(1)
+ # A capturable neutral structure provides a tactical expansion objective.
+ _place_structure("relay",-1,Vector2(1080,225),0.0)
  if ally!=null:
   ally.selected=true
   selected=[ally]
@@ -100,31 +114,42 @@ func _spawn_economy(id: String, side: int, where: Vector2, harvester: bool):
  return actor
 
 func _deploy_mcv(side: int) -> bool:
- var mcv
- for unit in units:
-  if is_instance_valid(unit) and unit.team==side and unit.unit_id in ["a_mcv","r_mcv"] and not unit.moving:
-   mcv=unit
-   break
+ var mcv = null
+ var expected_id="a_mcv" if side==0 else "r_mcv"
+ # Deploy the currently selected MCV rather than an unrelated idle vehicle.
+ if side==0:
+  for unit in selected:
+   if is_instance_valid(unit) and unit.team==side and unit.unit_id==expected_id and not unit.moving:
+    mcv=unit
+    break
+ if mcv==null:
+  for unit in units:
+   if is_instance_valid(unit) and unit.team==side and unit.unit_id==expected_id and not unit.moving:
+    mcv=unit
+    break
  if mcv==null: return false
  if not can_place(mcv.position,"yard",side): return false
  var where: Vector2=mcv.position
+ var paid_for_mcv: float=mcv.purchase_cost
  units.erase(mcv)
  selected.erase(mcv)
  mcv.queue_free()
- _place_structure("yard",side,where)
+ _place_structure("yard",side,where,paid_for_mcv)
  hud_status="Construction Yard deployed. Build power to begin." if side==0 else hud_status
  return true
 
-func _place_structure(id: String, side: int, point: Vector2) -> bool:
+func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-1.0) -> bool:
  var size: Vector2=Vector2(155,135) if id=="yard" else STRUCTURE_DATA[id]["size"]
  var b=Node2D.new()
  b.set_script(StructureScript)
  actors.add_child(b)
  b.configure(self,id,side,point,size)
+ # An MCV-derived yard and map-authored neutral outpost never generate sell money.
+ b.paid_value=0.0 if id=="relay" or (id=="yard" and paid_value<0.0) else (float(STRUCTURE_DATA[id]["cost"]) if paid_value<0.0 else paid_value)
  b.destroyed.connect(_building_destroyed)
  structures.append(b)
  _rebuild_navigation()
- _calculate_power(side)
+ if side>=0: _calculate_power(side)
  if id=="refinery":
   var nearest=point+Vector2(0,135 if side==0 else -135)
   var spawn_site=_find_open_position(nearest,22.0)
@@ -145,9 +170,11 @@ func _find_open_position(point: Vector2, radius: float) -> Vector2:
  return Vector2.ZERO
 
 func _building_destroyed(building) -> void:
+ if selected_building==building: selected_building=null
+ if pending_sale==building: pending_sale=null
  structures.erase(building)
  _rebuild_navigation()
- _calculate_power(building.team)
+ if building.team>=0: _calculate_power(building.team)
  _check_victory()
 
 func _on_destroyed(unit) -> void:
@@ -227,10 +254,12 @@ func _tech_ready(side: int, id: String) -> bool:
   "power": return has_structure(side,"yard")
   "refinery","barracks": return has_structure(side,"power")
   "factory": return has_structure(side,"refinery") and has_structure(side,"barracks")
+  "depot": return has_structure(side,"factory")
   "turret": return has_structure(side,"barracks")
-  "a_ranger","r_line": return has_structure(side,"barracks")
+  "a_ranger","r_line","a_engineer","r_engineer": return has_structure(side,"barracks")
   "a_javelin","r_hunter": return has_structure(side,"barracks") and has_structure(side,"refinery")
   "a_sentinel","r_bastion","a_harvester","r_hauler": return has_structure(side,"factory")
+  "a_mcv","r_mcv": return has_structure(side,"factory") and has_structure(side,"depot")
   "a_sentinel_aa","r_flak": return has_structure(side,"factory") and has_structure(side,"power")
  return false
 
@@ -241,6 +270,10 @@ func _recipe(id: String) -> Dictionary:
  return {}
 
 func queue_production(side: int, lane: String, id: String) -> bool:
+ if side<0 or side>=states.size() or not lane in ["build","defense","infantry","vehicle"]: return false
+ if id=="relay" or _lane_for(id)!=lane or _recipe(id).is_empty(): return false
+ if id.begins_with("a_") and side!=0: return false
+ if id.begins_with("r_") and side!=1: return false
  if not _has_producer(side,lane) or not _tech_ready(side,id): return false
  var lanes: Dictionary=states[side]["lanes"]
  if lane in ["build","defense"]:
@@ -254,6 +287,92 @@ func queue_production(side: int, lane: String, id: String) -> bool:
  lanes[lane]={"id":id,"paid":0.0,"ready":false}
  return true
 
+func cancel_production(side: int, lane: String, queued_index: int=-1) -> bool:
+ if side<0 or side>=states.size() or not lane in ["build","defense","infantry","vehicle"]: return false
+ var state: Dictionary=states[side]
+ if queued_index>=0:
+  if lane not in ["infantry","vehicle"]: return false
+  var queue: Array=state["queued"][lane]
+  if queued_index>=queue.size(): return false
+  queue.remove_at(queued_index) # Queued items have not been charged yet.
+  return true
+ var job: Dictionary=state["lanes"][lane]
+ if job.is_empty(): return false
+ var paid=maxf(0.0,float(job.get("paid",0.0)))
+ state["credits"]=float(state["credits"])+paid
+ state["total_refunded"]=float(state["total_refunded"])+paid
+ state["total_spent"]=maxf(0.0,float(state["total_spent"])-paid)
+ state["lanes"][lane]={}
+ if side==0 and placement_lane==lane: placement_lane=""
+ return true
+
+func _production_time_multiplier(side: int, lane: String) -> float:
+ # Each extra operational producer reduces time for this one SHARED lane.
+ # Four or more producers cannot push completion below 55% of base time.
+ var producer="yard" if lane in ["build","defense"] else ("barracks" if lane=="infantry" else "factory")
+ var count=_building_count(side,producer)
+ return maxf(0.55,pow(0.82,maxi(0,count-1)))
+
+func _advance_repairs(delta: float) -> void:
+ for b in structures:
+  if not is_instance_valid(b) or b.hp<=0.0 or not b.repairing or b.hp>=b.max_hp: continue
+  if b.team<0 or b.team>=states.size(): continue
+  var state: Dictionary=states[b.team]
+  var desired=minf(b.max_hp-b.hp,55.0*delta)
+  var affordable=minf(desired,float(state["credits"])/0.45)
+  if affordable<=0.0: continue
+  var expense=affordable*0.45
+  state["credits"]=float(state["credits"])-expense
+  state["total_spent"]=float(state["total_spent"])+expense
+  state["total_repairs"]=float(state["total_repairs"])+expense
+  b.hp=minf(b.max_hp,b.hp+affordable)
+  if b.hp>=b.max_hp: b.repairing=false
+  b.queue_redraw()
+
+func sell_structure(side: int, b) -> bool:
+ if b==null or not is_instance_valid(b) or b.team!=side or b.hp<=0.0 or not structures.has(b): return false
+ var payout=floorf(maxf(0.0,b.paid_value)*0.5)
+ var state: Dictionary=states[side]
+ state["credits"]=float(state["credits"])+payout
+ state["total_sales"]=float(state["total_sales"])+payout
+ b.repairing=false
+ _building_destroyed(b)
+ b.queue_free()
+ # Refinery sales retain their *existing* harvester; they never spawn another.
+ return true
+
+func capture_structure(engineer, b) -> bool:
+ if engineer==null or b==null or not is_instance_valid(engineer) or not is_instance_valid(b): return false
+ if not units.has(engineer) or not structures.has(b) or b.hp<=0.0: return false
+ if engineer.unit_id not in ["a_engineer","r_engineer"] or engineer.team==b.team: return false
+ var old_owner: int=b.team
+ b.team=engineer.team
+ b.name=("Alliance" if b.team==0 else "Republic")+"_"+b.kind
+ b.repairing=false
+ b.selected=false
+ b.queue_redraw()
+ _calculate_power(engineer.team)
+ if old_owner>=0: _calculate_power(old_owner)
+ # No free harvester on capture; the bundled harvester is granted only on fresh construction.
+ selected.erase(engineer)
+ units.erase(engineer)
+ engineer.queue_free()
+ hud_status="Captured "+str(STRUCTURE_DATA[b.kind]["name"]) if b.team==0 else hud_status
+ _check_victory()
+ return true
+
+func capture_approach(b, from: Vector2) -> Vector2:
+ var bounds: Rect2=b.ground_bounds()
+ var candidates: Array[Vector2]=[]
+ var midpoint=b.position
+ for offset in [Vector2(-1,0),Vector2(1,0),Vector2(0,-1),Vector2(0,1)]:
+  var dist=(bounds.size.x if absf(offset.x)>0 else bounds.size.y)*0.5+35.0
+  var point=midpoint+offset*dist
+  if can_occupy(point,9.0,false): candidates.append(point)
+ if candidates.is_empty(): return from
+ candidates.sort_custom(func(a,bp): return from.distance_squared_to(a)<from.distance_squared_to(bp))
+ return candidates[0]
+
 func _tick_production(side: int, delta: float) -> void:
  var lanes: Dictionary=states[side]["lanes"]
  for lane in ["build","defense","infantry","vehicle"]:
@@ -264,7 +383,9 @@ func _tick_production(side: int, delta: float) -> void:
     lanes[lane]={"id":waiting.pop_front(),"paid":0.0,"ready":false}
    continue
   if bool(job.get("ready",false)):
-   if side==1: _ai_place_ready(lane,str(job["id"]))
+   if lane in ["infantry","vehicle"]:
+    if _has_producer(side,lane) and _produce_unit(side,str(job["id"])): lanes[lane]={}
+   elif side==1: _ai_place_ready(lane,str(job["id"]))
    continue
   if not _has_producer(side,lane): continue
   var recipe=_recipe(str(job["id"]))
@@ -272,14 +393,8 @@ func _tick_production(side: int, delta: float) -> void:
   var cost=float(recipe["cost"])
   var duration=maxf(0.25,float(recipe["time"]))
   var speed=_power_speed(side,lane)
-  # Multiple same-domain producers accelerate one shared lane (RA2-style).
-  var producers=0
-  var producer_name="yard" if lane in ["build","defense"] else ("barracks" if lane=="infantry" else "factory")
-  for building in structures:
-   if is_instance_valid(building) and building.team==side and building.kind==producer_name: producers+=1
-  speed*=maxf(0.55,pow(0.82,maxi(0,producers-1)))
-  # Speed factor above represents seconds-per-item; inverse for actual progress.
-  var target_spend=cost/duration*delta/maxf(0.55,speed) if cost>0.0 else 0.0
+  var speed_multiplier=speed/_production_time_multiplier(side,lane)
+  var target_spend=cost/duration*delta*speed_multiplier if cost>0.0 else 0.0
   var payment=minf(maxf(0.0,float(states[side]["credits"])),minf(cost-float(job["paid"]),target_spend))
   states[side]["credits"]=float(states[side]["credits"])-payment
   states[side]["total_spent"]=float(states[side]["total_spent"])+payment
@@ -291,18 +406,31 @@ func _tick_production(side: int, delta: float) -> void:
     if _produce_unit(side,str(job["id"])): lanes[lane]={}
 
 func _produce_unit(side: int, id: String) -> bool:
- var producer="barracks" if id in ["a_ranger","a_javelin","r_line","r_hunter"] else "factory"
+ var producer="barracks" if id in ["a_ranger","a_javelin","r_line","r_hunter","a_engineer","r_engineer"] else "factory"
  for b in structures:
   if is_instance_valid(b) and b.team==side and b.kind==producer:
    var offset=Vector2(0,125) if side==0 else Vector2(0,-125)
    var where=_find_open_position(b.position+offset,20.0)
    if where==Vector2.ZERO: return false
-   if id in ["a_harvester","r_hauler"]:
-    _spawn_economy(id,side,where,true)
+   if id in ["a_harvester","r_hauler","a_mcv","r_mcv"]:
+    var vehicle=_spawn_economy(id,side,where,id in ["a_harvester","r_hauler"])
+    if vehicle!=null and id in ["a_mcv","r_mcv"]: vehicle.purchase_cost=float(_recipe(id)["cost"])
+   elif id in ["a_engineer","r_engineer"]:
+    _spawn_engineer(id,side,where)
    else:
     _spawn(id,side,where)
    return true
  return false
+
+func _spawn_engineer(id: String, side: int, where: Vector2) -> void:
+ # The engineer uses the same combat-unit steering/selection, but cannot attack.
+ var data: Dictionary=roster[id]
+ var u=Node2D.new()
+ u.set_script(UnitScript)
+ actors.add_child(u)
+ u.configure(self,data,side,where,{"type":"UNARMED","damage":0.0,"interval":1.0,"range":0.0,"anti_ground":false})
+ u.destroyed.connect(_on_destroyed)
+ units.append(u)
 
 func _ai_place_ready(lane: String, id: String) -> void:
  var sites=[Vector2(-235,-205),Vector2(-225,-10),Vector2(-225,190),Vector2(80,-225),Vector2(200,15),Vector2(170,195),Vector2(-400,110),Vector2(40,360),Vector2(-400,-230),Vector2(340,-250)]
@@ -391,14 +519,19 @@ func _ai_economy() -> void:
    if not has_structure(1,id) and _tech_ready(1,id):
     queue_production(1,"build",id)
     break
-  if has_structure(1,"factory") and float(state["credits"])>2500.0 and ai_build_tick%6==0:
-   queue_production(1,"build","power")
+  if has_structure(1,"factory") and not has_structure(1,"depot") and float(state["credits"])>1700.0:
+   queue_production(1,"build","depot")
+  elif has_structure(1,"factory") and float(state["credits"])>4000.0 and ai_build_tick%6==0:
+   queue_production(1,"build","factory" if _building_count(1,"factory")<2 else "power")
  if state["lanes"]["defense"].is_empty() and has_structure(1,"barracks") and ai_build_tick%5==0:
   if _building_count(1,"turret")<2: queue_production(1,"defense","turret")
  if has_structure(1,"barracks") and float(state["credits"])>800.0 and ai_build_tick%2==0:
   queue_production(1,"infantry","r_hunter" if has_structure(1,"refinery") and ai_build_tick%4==0 else "r_line")
  if has_structure(1,"factory") and float(state["credits"])>1700.0:
-  queue_production(1,"vehicle","r_bastion" if ai_build_tick%3!=0 else "r_flak")
+  if not has_structure(1,"yard") and has_structure(1,"depot"):
+   queue_production(1,"vehicle","r_mcv")
+  else:
+   queue_production(1,"vehicle","r_bastion" if ai_build_tick%3!=0 else "r_flak")
  ai_build_tick+=1
 
 func _building_count(side: int, id: String) -> int:
@@ -413,12 +546,25 @@ func _physics_process(delta: float) -> void:
  skirmish_time+=delta
  _tick_production(0,delta)
  _tick_production(1,delta)
+ _advance_repairs(delta)
  economy_ai_timer-=delta
  if economy_ai_timer<=0:
   economy_ai_timer=2.1
   _ai_economy()
 
 func _unhandled_input(event: InputEvent) -> void:
+ if placement_lane=="" and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+  var picked=_hit_building(get_global_mouse_position(),0)
+  _select_building(picked)
+  if picked!=null:
+   get_viewport().set_input_as_handled()
+   return
+ if placement_lane=="" and event is InputEventScreenTouch and not event.pressed and event.index==0 and not touch_dragged:
+  var picked=_hit_building(_screen_to_world(event.position),0)
+  if picked!=null:
+   _select_building(picked)
+   get_viewport().set_input_as_handled()
+   return
  if event is InputEventKey and event.pressed and not event.echo:
   if event.keycode==KEY_H:
    if _deploy_mcv(0): _update_hud()
@@ -446,7 +592,31 @@ func _unhandled_input(event: InputEvent) -> void:
   return
  super._unhandled_input(event)
 
+func _hit_building(point: Vector2, side: int=-2):
+ for b in structures:
+  if is_instance_valid(b) and b.hp>0 and (side==-2 or b.team==side) and b.ground_bounds().grow(8).has_point(point): return b
+ return null
+
+func _select_building(b) -> void:
+ if selected_building!=null and is_instance_valid(selected_building):
+  selected_building.selected=false
+  selected_building.queue_redraw()
+ selected_building=b
+ pending_sale=null
+ if b!=null and is_instance_valid(b):
+  b.selected=true
+  b.queue_redraw()
+ _update_hud()
+
 func issue_order(point: Vector2, attack_move: bool=false) -> void:
+ var capture_target=_hit_building(point,-2)
+ if capture_target!=null and capture_target.team!=0:
+  var assigned=false
+  for u in selected:
+   if is_instance_valid(u) and u.unit_id=="a_engineer":
+    u.order_capture(capture_target)
+    assigned=true
+  if assigned: return
  var enemy_building
  for b in structures:
   if is_instance_valid(b) and b.team==1 and b.ground_bounds().grow(8).has_point(point): enemy_building=b; break
@@ -501,7 +671,7 @@ func _create_hud() -> void:
   tab_buttons.append(tab)
  build_container=VBoxContainer.new()
  column.add_child(build_container)
- for id in ["power","refinery","barracks","factory","turret","a_ranger","a_javelin","a_sentinel","a_sentinel_aa","a_harvester"]:
+ for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
   var button=Button.new()
   button.text=id
   button.custom_minimum_size=Vector2(256,48)
@@ -520,6 +690,30 @@ func _create_hud() -> void:
  harvest.custom_minimum_size=Vector2(240,40)
  harvest.pressed.connect(_on_harvest)
  column.add_child(harvest)
+ var cancel=Button.new()
+ cancel.text="CANCEL CURRENT / REFUND"
+ cancel.custom_minimum_size=Vector2(240,34)
+ cancel.pressed.connect(_cancel_current_tab)
+ column.add_child(cancel)
+ refund_button=cancel
+ var cancel_queued=Button.new()
+ cancel_queued.text="REMOVE LAST QUEUED UNIT"
+ cancel_queued.custom_minimum_size=Vector2(240,30)
+ cancel_queued.pressed.connect(_cancel_last_queued)
+ column.add_child(cancel_queued)
+ cancel_queue_button=cancel_queued
+ var repair=Button.new()
+ repair.text="REPAIR SELECTED BUILDING"
+ repair.custom_minimum_size=Vector2(240,34)
+ repair.pressed.connect(_toggle_repair_selected)
+ column.add_child(repair)
+ repair_button=repair
+ var sell=Button.new()
+ sell.text="SELL SELECTED (CONFIRM)"
+ sell.custom_minimum_size=Vector2(240,34)
+ sell.pressed.connect(_on_sell_selected)
+ column.add_child(sell)
+ sell_button=sell
  var bottom=PanelContainer.new()
  bottom.anchor_top=1.0
  bottom.anchor_bottom=1.0
@@ -546,6 +740,45 @@ func _create_hud() -> void:
 func _on_deploy() -> void:
  if _deploy_mcv(0): _update_hud()
 
+func _cancel_current_tab() -> void:
+ var lane=["build","defense","infantry","vehicle"][current_tab]
+ if cancel_production(0,lane):
+  hud_status="Canceled production; invested credits refunded."
+ else:
+  hud_status="Nothing currently building in this category."
+ _update_hud()
+
+func _cancel_last_queued() -> void:
+ var lane=["build","defense","infantry","vehicle"][current_tab]
+ var waiting: Array=states[0]["queued"].get(lane,[])
+ if not waiting.is_empty() and cancel_production(0,lane,waiting.size()-1):
+  hud_status="Removed uncharged queued unit."
+ else: hud_status="No queued units in this tab."
+ _update_hud()
+
+func _toggle_repair_selected() -> void:
+ if selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0:
+  hud_status="Select one of your buildings first."
+ else:
+  selected_building.repairing=not selected_building.repairing
+  hud_status="Repair active: credits deducted per HP." if selected_building.repairing else "Repair stopped."
+ _update_hud()
+
+func _on_sell_selected() -> void:
+ if selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0:
+  hud_status="Select one of your buildings first."
+ elif pending_sale==selected_building and skirmish_time<=sale_confirm_deadline:
+  var label=str(STRUCTURE_DATA.get(selected_building.kind,{}).get("name","building"))
+  if sell_structure(0,selected_building):
+   hud_status="Sold "+label+" for 50% of paid construction value."
+   selected_building=null
+  pending_sale=null
+ else:
+  pending_sale=selected_building
+  sale_confirm_deadline=skirmish_time+5.0
+  hud_status="CONFIRM SALE: tap SELL again within 5 seconds."
+ _update_hud()
+
 func _on_harvest() -> void:
  for actor in selected:
   if is_instance_valid(actor) and actor.unit_id=="a_harvester": actor.set_harvest()
@@ -569,8 +802,8 @@ func _on_build_button(id: String) -> void:
 
 func _lane_for(id: String) -> String:
  if id=="turret": return "defense"
- if id in ["power","refinery","barracks","factory"]: return "build"
- if id in ["a_ranger","a_javelin","r_line","r_hunter"]: return "infantry"
+ if id in ["power","refinery","barracks","factory","depot"]: return "build"
+ if id in ["a_ranger","a_javelin","a_engineer","r_line","r_hunter","r_engineer"]: return "infantry"
  return "vehicle"
 
 func _update_hud() -> void:
@@ -585,7 +818,9 @@ func _update_hud() -> void:
    var recipe=_recipe(str(job["id"]))
    var percentage=int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1.0))))
    details.append("%s %s %d%%" % [lane.to_upper(),str(recipe.get("name",job["id"])),percentage])
- info_text.text=" | ".join(details) if not details.is_empty() else hud_status
+ if selected_building!=null and is_instance_valid(selected_building):
+  details.append("SELECTED %s HP %d/%d %s" % [selected_building.kind,int(selected_building.hp),int(selected_building.max_hp),"REPAIRING" if selected_building.repairing else ""])
+ info_text.text=" | ".join(details)+" | "+hud_status if not details.is_empty() else hud_status
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
  for id in action_buttons.keys():
@@ -600,6 +835,10 @@ func _update_hud() -> void:
   var ready=not job.is_empty() and str(job["id"])==id and bool(job["ready"])
   button.text="READY: PLACE "+label if ready else ("%s    $%d  %ds" % [label,cost,int(recipe.get("time",0))])
   button.disabled=not ready and (not _tech_ready(0,id) or not _has_producer(0,lane) or (not job.is_empty() and lane in ["build","defense"]))
+ if is_instance_valid(refund_button): refund_button.disabled=state["lanes"][["build","defense","infantry","vehicle"][current_tab]].is_empty()
+ if is_instance_valid(cancel_queue_button): cancel_queue_button.disabled=current_tab not in [2,3] or state["queued"][["infantry","vehicle"][maxi(0,current_tab-2)]].is_empty()
+ if is_instance_valid(repair_button): repair_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
+ if is_instance_valid(sell_button): sell_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
  queue_redraw()
 
 func _draw() -> void:
@@ -619,4 +858,3 @@ func _draw() -> void:
    var pos=Vector2(roundf(get_global_mouse_position().x/24.0)*24.0,roundf(get_global_mouse_position().y/24.0)*24.0)
    var size: Vector2=STRUCTURE_DATA[str(job["id"])]["size"]
    draw_rect(Rect2(pos-size/2.0,size),Color(0.3,0.95,0.45,0.28) if can_place(pos,str(job["id"]),0) else Color(0.98,0.2,0.25,0.3))
-

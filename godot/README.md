@@ -1,4 +1,4 @@
-# Meridian Warfront — Procedural RTS Economy & Combat Vertical Slice
+# Meridian Warfront — Procedural RTS RA2 Economy, Engineers & Expansion
 
 **Godot 4.4.1, pure code-drawn top-down battlefield.** `res://scenes/skirmish.tscn` is the primary entry point. The previous combat-only scenarios remain in `res://scenes/combat_lab.tscn` for regression tests. The old isometric renderer is NOT part of this project.
 
@@ -32,9 +32,19 @@
 - Republic AI deploys its Yard and follows its own paid building, defense and troop production. Both sides obey credit and prerequisite rules, not hidden grants.
 - Victory/defeat when one side loses all significant placed structures and all surviving MCVs. Combat Lab scenario keys are not active in the main skirmish.
 
+## New RA2-style commands (v0.8)
+
+- **CANCEL CURRENT / REFUND:** cancels the currently building structure, defense or unit, returning exactly the credits paid so far; a completed but unplaced READY structure is refundable. This is separate from right-click/Esc, which only exits placement mode without canceling the READY job.
+- **REMOVE LAST QUEUED UNIT:** removes the most recently queued (unstarted, uncharged) troop or vehicle order in the active tab.
+- **REPAIR SELECTED BUILDING:** click/tap one of your buildings, then toggle repairs. Repairs restore 55 HP per second while affordable and charge 0.45 credits per HP. Repairs stop at full health, when canceled or when resources run out.
+- **SELL SELECTED (CONFIRM):** click a friendly building and press SELL twice within five seconds. Returns 50% of the construction or MCV purchase value. Original starter MCV/Yard and neutral relay cannot generate free credits; selling a refinery never creates a new harvester.
+- **Factory scaling:** additional operational barracks, War Factories or Construction Yards speed up their respective shared queues (up to a 0.55× time floor). The existing Buildings/Defense lanes stay independent; extra factories do not create unlimited lanes. Low power still slows all eligible production.
+- **Expansion MCV:** after building a **Service Depot**, purchase an MCV in the VEHICLES tab. Select it, move it to clear ground and press H to deploy an additional Yard and base-building anchor.
+- **Engineer capture:** train a **Field Engineer** at the Barracks, select it and right-click an enemy structure or the neutral relay in the north-center of the map. Neutral capture takes 0.7s; enemy takeover requires 3 uninterrupted seconds near the target. Engineers are consumed after success; damage interrupts capture progress. No refinery harvesting vehicle is spawned by capture.
+
 ## Current limits / intentionally not implemented
 
-- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. No upgrades, general-specific trees, naval, aircraft factories, engineers/capture, saving, networking, or refined audio yet.
+- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. No upgrades, general-specific trees, naval, aircraft factories, saving, networking, or refined audio yet.
 - Building production time/health and some structure silhouettes are provisional. Full battle balancing requires interactive device testing. The core v0.4 combat stats remain loaded from `res://data/unit_balance_v0.4.json`.
 - AI is a budget-constrained scripted opponent, not a full tactical strategic planner; its building sites are selected from predefined viable locations.
 - RTS mobile layout needs additional touch QA for differing aspect ratios and scaling.
@@ -46,6 +56,7 @@ python3 godot/tests/data_contract.py
 godot --headless --editor --path godot --import --quit
 godot --headless --path godot --script res://tests/combat_smoke.gd
 godot --headless --path godot --script res://tests/skirmish_smoke.gd
+godot --headless --path godot --script res://tests/ra2_systems_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 

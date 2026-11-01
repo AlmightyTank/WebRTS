@@ -24,6 +24,7 @@ var working := false
 var state := "IDLE"
 var mine_timer := 0.0
 var deposits := 0
+var purchase_cost := 0.0
 
 func configure(world, data: Dictionary, side: int, pos: Vector2, harvester: bool) -> void:
  arena=world

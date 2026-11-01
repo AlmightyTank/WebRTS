@@ -11,6 +11,8 @@ var air := false
 var radius := 56.0
 var footprint := Vector2(126, 106)
 var selected := false
+var repairing := false
+var paid_value := 0.0
 var timer := 0.0
 var weapon := {"type":"SMALL_ARMS", "damage":16.0, "interval":0.7, "range":165.0, "projectile_speed":620.0}
 
@@ -50,7 +52,7 @@ func receive_damage(amount: float, _attacker) -> void:
   queue_free()
 
 func _draw() -> void:
- var main=Color("#6795aa") if team==0 else Color("#ab785e")
+ var main=Color("#6795aa") if team==0 else (Color("#ab785e") if team==1 else Color("#999780"))
  var top=main.lightened(0.22)
  var edge=main.darkened(0.45)
  var size=footprint
@@ -80,10 +82,21 @@ func _draw() -> void:
    draw_rect(Rect2(-44,-22,88,44),edge)
    draw_rect(Rect2(-28,-16,57,28),Color("#1d343b"))
    for i in range(3): draw_line(Vector2(-37+i*25,-21),Vector2(-37+i*25,19),top,2)
+  "depot":
+   draw_rect(Rect2(-30,-24,60,42),edge)
+   draw_rect(Rect2(-18,-26,36,28),top)
+   for i in range(3): draw_line(Vector2(-36+i*34,26),Vector2(-24+i*34,8),top,3)
+  "relay":
+   draw_rect(Rect2(-29,-24,58,42),edge)
+   draw_line(Vector2(0,-26),Vector2(0,-70),top,5)
+   draw_arc(Vector2(0,-70),16,0,TAU,25,top,3)
+   draw_circle(Vector2(0,-70),5,Color("#f1dd95"))
   "turret":
    draw_circle(Vector2.ZERO,21,edge)
    draw_circle(Vector2.ZERO,14,main)
    draw_line(Vector2.ZERO,Vector2(32,-4),top,7)
+ if repairing:
+  draw_arc(Vector2.ZERO,radius+10.0,0,TAU,28,Color("#67e7bf"),2.5)
  if selected: draw_rect(Rect2(-size*0.5-Vector2(5,5),size+Vector2(10,10)),Color("#e5e8b8"),false,2.0)
  var ratio=hp/maxf(1.0,max_hp)
  draw_rect(Rect2(-size.x*0.5,-size.y*0.5-32,size.x,5),Color("#182a27"))
