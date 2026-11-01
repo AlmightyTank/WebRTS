@@ -1,9 +1,9 @@
-; Engine configuration file.
+; Engine configuration file — Meridian Warfront procedural combat lab
 config_version=5
 
 [application]
 config/name="Meridian Warfront"
-run/main_scene="res://scenes/battlefield.tscn"
+run/main_scene="res://scenes/combat_lab.tscn"
 
 [display]
 window/size/viewport_width=1280

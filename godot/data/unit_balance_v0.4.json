@@ -1,0 +1,2623 @@
+{
+  "meta": {
+    "revision": "0.4 design proposal",
+    "date": "2026-10-31",
+    "status": "unverified proposed balance / no gameplay implemented",
+    "locked_concepts": [
+      "Top-down with 2.5D building depth",
+      "RA2-style sidebar Construction Yard",
+      "Finite iron ore + later renewable income",
+      "Fast arcade combat",
+      "Complete small AI skirmish as first milestone"
+    ],
+    "unit_armor_classes": [
+      "PERSONNEL",
+      "LIGHT",
+      "MEDIUM",
+      "HEAVY",
+      "AIR",
+      "NAVAL"
+    ],
+    "health_points": "Integer max HP; changed by armor upgrade and veterancy",
+    "weapon_stat_format": "Base hit damage / firing interval seconds, range R in world units; actual final damage also uses weapon-type multiplier against target armor. Multiple projectiles are specified with ×N. Splash radius R is in world units.",
+    "time": "In-game construction seconds at 1x producer count and no economic/power penalties; gradual credit spending.",
+    "unit_speed": "World units per second at normal speed. Aircraft speed is flight world units per second.",
+    "low_power": "Halves production rate in baseline; energy doctrinal weapons have described additional penalties.",
+    "veterancy": "Rookie 1.0; Veteran +8% HP/+8% damage; Elite +15% HP/+15% damage. Veteran Crews grants Veteran only on newly built tanks.",
+    "airfield": "2 ready pads per standard Airfield, 3 after exclusive Air Superiority upgrade; aircraft reload at field; cannot fire unlimited missiles away from field.",
+    "naval": "Naval units only appear if skirmish map contains reachable water and appropriate Naval Dock.",
+    "caution": "The damage numbers are not canon RA2/Zero Hour numbers and are not asserted balanced; tune only after playtests."
+  },
+  "weapon_armor_multipliers": {
+    "SMALL_ARMS": {
+      "PERSONNEL": 1.0,
+      "LIGHT": 0.55,
+      "MEDIUM": 0.16,
+      "HEAVY": 0.08,
+      "AIR": 0.0,
+      "NAVAL": 0.1,
+      "STRUCTURE": 0.22
+    },
+    "AP": {
+      "PERSONNEL": 0.4,
+      "LIGHT": 1.05,
+      "MEDIUM": 1.2,
+      "HEAVY": 1.2,
+      "AIR": 0,
+      "NAVAL": 0.8,
+      "STRUCTURE": 0.75
+    },
+    "EXPLOSIVE": {
+      "PERSONNEL": 1.1,
+      "LIGHT": 1.05,
+      "MEDIUM": 0.7,
+      "HEAVY": 0.48,
+      "AIR": 0,
+      "NAVAL": 0.75,
+      "STRUCTURE": 1.1
+    },
+    "ROCKET": {
+      "PERSONNEL": 0.65,
+      "LIGHT": 1.05,
+      "MEDIUM": 1.1,
+      "HEAVY": 1.15,
+      "AIR": 1.0,
+      "NAVAL": 1.0,
+      "STRUCTURE": 0.95
+    },
+    "AA": {
+      "PERSONNEL": 0.2,
+      "LIGHT": 0.45,
+      "MEDIUM": 0.25,
+      "HEAVY": 0.12,
+      "AIR": 1.4,
+      "NAVAL": 0.3,
+      "STRUCTURE": 0.3
+    },
+    "ENERGY": {
+      "PERSONNEL": 0.75,
+      "LIGHT": 1.05,
+      "MEDIUM": 1.1,
+      "HEAVY": 1.05,
+      "AIR": 0.7,
+      "NAVAL": 0.6,
+      "STRUCTURE": 0.9
+    },
+    "ARTILLERY": {
+      "PERSONNEL": 1.0,
+      "LIGHT": 1.0,
+      "MEDIUM": 1.05,
+      "HEAVY": 0.78,
+      "AIR": 0,
+      "NAVAL": 0.9,
+      "STRUCTURE": 1.4
+    }
+  },
+  "upgrades": {
+    "INF_ARMOR": {
+      "name": "Infantry Ballistic Vests",
+      "credits": 450,
+      "research_seconds": 25,
+      "research_location": "Barracks",
+      "effect": "Infantry +15% max HP; no effect on vehicles"
+    },
+    "INF_OPTICS": {
+      "name": "Optical Sights",
+      "credits": 550,
+      "research_seconds": 30,
+      "research_location": "Barracks+Radar",
+      "effect": "Line, scout and specialist infantry +10% weapon range; not guided rockets"
+    },
+    "ARMOR_PLATING": {
+      "name": "Composite Armor",
+      "credits": 900,
+      "research_seconds": 42,
+      "research_location": "War Factory+Tech Center",
+      "effect": "Vehicles with this tag +15% max HP"
+    },
+    "TARGETING": {
+      "name": "Targeting Computer",
+      "credits": 800,
+      "research_seconds": 35,
+      "research_location": "War Factory+Radar",
+      "effect": "Tagged cannon/energy vehicles +10% damage to MEDIUM/HEAVY armor"
+    },
+    "TRACK_DRIVE": {
+      "name": "Improved Drive Trains",
+      "credits": 600,
+      "research_seconds": 32,
+      "research_location": "War Factory",
+      "effect": "Tagged light and medium vehicles +10% move speed"
+    },
+    "AA_TRACKING": {
+      "name": "Tracking Array",
+      "credits": 650,
+      "research_seconds": 32,
+      "research_location": "Radar",
+      "effect": "Tagged AA units/detectors +12% AA range; detector +10% detection range"
+    },
+    "ARTY_COMPUTER": {
+      "name": "Ballistic Fire Control",
+      "credits": 800,
+      "research_seconds": 40,
+      "research_location": "Radar",
+      "effect": "Mobile artillery −12% shell scatter; no damage boost"
+    },
+    "AIRFRAMES": {
+      "name": "Reinforced Airframes",
+      "credits": 950,
+      "research_seconds": 48,
+      "research_location": "Airfield+Tech Center",
+      "effect": "Aircraft +15% max HP"
+    },
+    "ECM_PODS": {
+      "name": "Electronic Countermeasures",
+      "credits": 950,
+      "research_seconds": 42,
+      "research_location": "Airfield+Radar",
+      "effect": "Incoming guided missiles have −15% hit probability; cannot stack with similar effect"
+    },
+    "HARVEST_EFF": {
+      "name": "Fast Unloading",
+      "credits": 650,
+      "research_seconds": 28,
+      "research_location": "Refinery+War Factory",
+      "effect": "Harvester unloading time −20%; no cargo creation"
+    },
+    "MCV_DEPLOY": {
+      "name": "Hydraulic Deploy",
+      "credits": 550,
+      "research_seconds": 28,
+      "research_location": "Service Depot",
+      "effect": "MCV deploy/pack time −20%"
+    },
+    "NAVAL_FIRE": {
+      "name": "Naval Gunnery Systems",
+      "credits": 850,
+      "research_seconds": 38,
+      "research_location": "Naval Dock+Radar",
+      "effect": "Ship direct-fire range +8%; does not affect superweapons"
+    },
+    "A_DATALINK": {
+      "name": "Alliance Precision Datalink",
+      "credits": 850,
+      "research_seconds": 38,
+      "research_location": "Satellite Uplink",
+      "effect": "Tagged Alliance units +8% accuracy on moving targets"
+    },
+    "A_SENSOR_NET": {
+      "name": "Advanced Sensor Mesh",
+      "credits": 650,
+      "research_seconds": 30,
+      "research_location": "Satellite Uplink",
+      "effect": "Tagged reconnaissance units gain +40 vision/detection range"
+    },
+    "R_DISCIPLINE": {
+      "name": "Republic Fire Discipline",
+      "credits": 550,
+      "research_seconds": 30,
+      "research_location": "Garrison Barracks+Radar",
+      "effect": "Tagged infantry +10% accuracy while stationary"
+    },
+    "R_REACTIVE": {
+      "name": "Reactive Armor",
+      "credits": 1050,
+      "research_seconds": 48,
+      "research_location": "Military Research Center",
+      "effect": "Tagged Republican armored vehicles −12% incoming AP/rocket damage"
+    },
+    "R_SHELLS": {
+      "name": "Improved Heavy Shells",
+      "credits": 850,
+      "research_seconds": 42,
+      "research_location": "Command Radar",
+      "effect": "Tagged Republic artillery/ships +8% anti-structure damage"
+    },
+    "G_CAMO": {
+      "name": "Improvised Camouflage",
+      "credits": 650,
+      "research_seconds": 32,
+      "research_location": "Signal Shack",
+      "effect": "Tagged GIA infantry/aircraft hide at rest 3s; firing breaks stealth"
+    },
+    "G_SCAVENGE": {
+      "name": "Wreck Recovery Protocol",
+      "credits": 550,
+      "research_seconds": 30,
+      "research_location": "Field Workshop",
+      "effect": "Tagged GIA units may extract one capped combat-only wreck bonus"
+    },
+    "G_HEAVY_DEF": {
+      "name": "Heavy Static Fortification",
+      "credits": 850,
+      "research_seconds": 40,
+      "research_location": "Black Market Laboratory",
+      "effect": "GIA heavy emplacement +15% maximum HP, not a unit buff"
+    },
+    "AS_HANGARS": {
+      "name": "Reinforced Hangars",
+      "credits": 1050,
+      "research_seconds": 45,
+      "research_location": "Airfield",
+      "effect": "Airfield pad capacity 2→3; Air Superiority gunships rearm 12% faster"
+    },
+    "AS_COUNTERMEASURES": {
+      "name": "Advanced Countermeasures",
+      "credits": 1200,
+      "research_seconds": 50,
+      "research_location": "Airfield+Radar",
+      "effect": "Ace aircraft and Skywatch chance of guided missile hit −18%, nonstacking with ECM; takes better value"
+    },
+    "DE_CAPACITORS": {
+      "name": "Beam Capacitors",
+      "credits": 1100,
+      "research_seconds": 45,
+      "research_location": "Advanced Tech Center",
+      "effect": "Arc Lance/Arc Sapper +12% beam damage; Beam Bastion +12% damage"
+    },
+    "DE_GRID": {
+      "name": "Grid Stabilizers",
+      "credits": 950,
+      "research_seconds": 40,
+      "research_location": "Advanced Tech Center",
+      "effect": "Lance and Lattice low-power firing penalty 2.0×→1.35×; Beam Bastion stays offline at brownout"
+    },
+    "SO_SILENT": {
+      "name": "Silent Running",
+      "credits": 850,
+      "research_seconds": 36,
+      "research_location": "Satellite Uplink",
+      "effect": "Ghost Carrier and Ghost Sniper recloak after 2s instead of 3s"
+    },
+    "SO_DESIGNATION": {
+      "name": "Coordinated Designation",
+      "credits": 950,
+      "research_seconds": 42,
+      "research_location": "Satellite Uplink+Tech Center",
+      "effect": "Pathfinder/Phantom marks target 8s: allied guided weapons +10% damage to marked target"
+    },
+    "HA_AUTOLOAD": {
+      "name": "Heavy Autoloaders",
+      "credits": 1250,
+      "research_seconds": 48,
+      "research_location": "Military Research Center",
+      "effect": "Juggernaut/Imperator weapon reload interval −12%"
+    },
+    "HA_VETERANS": {
+      "name": "Veteran Crews",
+      "credits": 1500,
+      "research_seconds": 60,
+      "research_location": "Heavy Foundry+Tech Center",
+      "effect": "New Juggernaut, Imperator tanks spawn at 1st veterancy; not retroactive"
+    },
+    "AR_OBSERVERS": {
+      "name": "Forward Observers",
+      "credits": 950,
+      "research_seconds": 40,
+      "research_location": "Command Radar",
+      "effect": "Stormrail near line-of-sight spotter −18% scatter; Survey Drone detect +20"
+    },
+    "AR_RAPID": {
+      "name": "Rapid Fire Mission",
+      "credits": 1200,
+      "research_seconds": 50,
+      "research_location": "Military Research Center",
+      "effect": "Stormrail deployment 3.5→2.5s and reload −10%"
+    },
+    "FD_FORTS": {
+      "name": "Reinforced Fortifications",
+      "credits": 1000,
+      "research_seconds": 45,
+      "research_location": "Military Research Center",
+      "effect": "Steel Pillbox and Forward Bastion +20% max HP; Garrison Guard +10% while garrisoned"
+    },
+    "FD_FIELDWORKS": {
+      "name": "Mobile Field Works",
+      "credits": 750,
+      "research_seconds": 34,
+      "research_location": "Fortified Outpost",
+      "effect": "Siege Carrier deploy 3→2s; Fortification Engineer barriers 60→85s"
+    },
+    "GW_CAMO": {
+      "name": "Camo Netting",
+      "credits": 850,
+      "research_seconds": 35,
+      "research_location": "Signal Shack",
+      "effect": "Shade/Ghost Technical/Saboteur recloak 0.8s sooner; valid GIA structures gain concealed silhouette"
+    },
+    "GW_PASSAGE": {
+      "name": "Safe Passage",
+      "credits": 800,
+      "research_seconds": 38,
+      "research_location": "Tunnel Network",
+      "effect": "Ghost Technical and Saboteur tunnel exit protection +30% damage reduction for 3s"
+    },
+    "MW_GUIDANCE": {
+      "name": "Guidance Van Network",
+      "credits": 1050,
+      "research_seconds": 44,
+      "research_location": "Signal Shack",
+      "effect": "Siege Rocket/Volley/Guidance Van missile scatter −15%; no flat extra damage"
+    },
+    "MW_RELOAD": {
+      "name": "Rapid Reload",
+      "credits": 1250,
+      "research_seconds": 52,
+      "research_location": "Black Market Laboratory",
+      "effect": "Siege Rocket Squad/Volley Launcher firing intervals −12%"
+    },
+    "SM_RECOVERY": {
+      "name": "Recovery Crews",
+      "credits": 850,
+      "research_seconds": 38,
+      "research_location": "Field Workshop or Mobile Salvage Yard",
+      "effect": "Ripper/Junker/Scrap Runner recover wrecks 25% faster; no same-wreck repeat"
+    },
+    "SM_IMPROV": {
+      "name": "Field Improvisation",
+      "credits": 1000,
+      "research_seconds": 44,
+      "research_location": "Black Market Laboratory",
+      "effect": "Junker wreck tiers max +12% each instead of +10%; Recovery Truck heals 24 HP/s at same credit cost"
+    }
+  },
+  "standard_units": [
+    {
+      "id": "a_ranger",
+      "name": "Ranger",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Line infantry",
+      "tier": "T0",
+      "producer": "Barracks",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 105,
+      "credits": 150,
+      "build_seconds": 5,
+      "weapon": "Assault rifle · small arms 11/0.65s R145 ground",
+      "ability": "Garrison; take cover; suppress light infantry",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "INF_OPTICS",
+        "A_DATALINK"
+      ],
+      "speed": 85
+    },
+    {
+      "id": "a_javelin",
+      "name": "Javelin Missile Team",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Anti-armor infantry",
+      "tier": "T0",
+      "producer": "Barracks",
+      "prerequisites": "Barracks+Refinery",
+      "armor": "PERSONNEL",
+      "hp": 90,
+      "credits": 320,
+      "build_seconds": 9,
+      "weapon": "Guided rocket · rocket 75/3.2s R220 ground/air",
+      "ability": "Deploy 0.8s; targets tanks and helicopters",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "INF_OPTICS",
+        "A_DATALINK"
+      ],
+      "speed": 68
+    },
+    {
+      "id": "a_engineer",
+      "name": "Field Engineer",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Capture/repair",
+      "tier": "T0",
+      "producer": "Barracks",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 85,
+      "credits": 450,
+      "build_seconds": 10,
+      "weapon": "Unarmed",
+      "ability": "Capture neutral/enemy structure; repair one allied structure; consumed on capture",
+      "upgrade_ids": [
+        "INF_ARMOR"
+      ],
+      "speed": 78
+    },
+    {
+      "id": "a_lynx",
+      "name": "Lynx IFV",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Light anti-infantry transport",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory",
+      "armor": "LIGHT",
+      "hp": 360,
+      "credits": 750,
+      "build_seconds": 14,
+      "weapon": "Autocannon · kinetic 24/0.5s R185 ground",
+      "ability": "Transport 3 infantry; fire infantry support ports; no firing when evacuating",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "TARGETING",
+        "A_DATALINK"
+      ],
+      "speed": 120
+    },
+    {
+      "id": "a_sentinel",
+      "name": "Sentinel MBT",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Main battle tank",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory",
+      "armor": "HEAVY",
+      "hp": 740,
+      "credits": 1200,
+      "build_seconds": 22,
+      "weapon": "120mm cannon · armor-piercing 115/2.4s R205 ground",
+      "ability": "Independent turret; attack-move; crush light cover (not infantry)",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TARGETING",
+        "TRACK_DRIVE"
+      ],
+      "speed": 80
+    },
+    {
+      "id": "a_specter",
+      "name": "Specter Scout Drone",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Recon scout",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 180,
+      "credits": 480,
+      "build_seconds": 10,
+      "weapon": "Light pulse gun · small arms 9/0.5s R130 ground",
+      "ability": "Extended vision; detects concealed targets R180; fragile",
+      "upgrade_ids": [
+        "AA_TRACKING",
+        "A_SENSOR_NET"
+      ],
+      "speed": 145
+    },
+    {
+      "id": "a_sentinel_aa",
+      "name": "Sentinel AA Vehicle",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Mobile anti-air",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 380,
+      "credits": 900,
+      "build_seconds": 17,
+      "weapon": "Twin SAM · AA rocket 80/2.2s R320 air; light cannon 10/0.5s R120 ground",
+      "ability": "Tracks aircraft while moving",
+      "upgrade_ids": [
+        "AA_TRACKING",
+        "TRACK_DRIVE",
+        "A_DATALINK"
+      ],
+      "speed": 115
+    },
+    {
+      "id": "a_howitzer",
+      "name": "Precision Howitzer",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Mobile artillery",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Radar",
+      "armor": "MEDIUM",
+      "hp": 420,
+      "credits": 1400,
+      "build_seconds": 25,
+      "weapon": "155mm shell · artillery 190/5s R400 ground; min R85",
+      "ability": "Brace 2.2s before fire; splash R55; reveal firing position",
+      "upgrade_ids": [
+        "ARTY_COMPUTER",
+        "TARGETING"
+      ],
+      "speed": 67
+    },
+    {
+      "id": "a_arc_beam",
+      "name": "Arc Beam Tank",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Elite armor destroyer",
+      "tier": "T2",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Tech Center",
+      "armor": "HEAVY",
+      "hp": 590,
+      "credits": 1900,
+      "build_seconds": 31,
+      "weapon": "Focused beam · energy 60/0.9s R255 ground",
+      "ability": "Spool 1.5s; full damage after continuous fire; poor vs swarms",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TARGETING",
+        "A_DATALINK"
+      ],
+      "speed": 77
+    },
+    {
+      "id": "a_striker",
+      "name": "Striker Gunship",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Close air support",
+      "tier": "T2",
+      "producer": "Airfield",
+      "prerequisites": "Airfield",
+      "armor": "AIR",
+      "hp": 400,
+      "credits": 1250,
+      "build_seconds": 23,
+      "weapon": "Rockets · guided 70/1.4s R210 ground",
+      "ability": "4 strike salvos; automatic rearm at airfield; hover vulnerable to AA",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS",
+        "A_DATALINK"
+      ],
+      "speed": 175
+    },
+    {
+      "id": "a_vortex",
+      "name": "Vortex Fighter",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Interceptor/strike",
+      "tier": "T2",
+      "producer": "Airfield",
+      "prerequisites": "Airfield+Tech Center",
+      "armor": "AIR",
+      "hp": 330,
+      "credits": 1450,
+      "build_seconds": 29,
+      "weapon": "Air missiles · AA 125/1.8s R260 air; light ground missiles 90/2.4s R230 ground",
+      "ability": "4 missiles per sortie; return to reload; boost dash",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS",
+        "A_DATALINK"
+      ],
+      "speed": 250
+    },
+    {
+      "id": "a_harvester",
+      "name": "Ore Harvester",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Resource vehicle",
+      "tier": "T0",
+      "producer": "War Factory",
+      "prerequisites": "Refinery for bundled first; War Factory for extra",
+      "armor": "HEAVY",
+      "hp": 850,
+      "credits": 1200,
+      "build_seconds": 25,
+      "weapon": "Unarmed",
+      "ability": "Cargo 800 ore-value units; auto mine-return-unload; issued free once per refinery placement",
+      "upgrade_ids": [
+        "HARVEST_EFF",
+        "ARMOR_PLATING"
+      ],
+      "speed": 66
+    },
+    {
+      "id": "a_mcv",
+      "name": "Alliance MCV",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Mobile Construction Vehicle",
+      "tier": "T2",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Service Depot",
+      "armor": "HEAVY",
+      "hp": 1150,
+      "credits": 3000,
+      "build_seconds": 45,
+      "weapon": "Unarmed",
+      "ability": "Deploy/pack Construction Yard; no moving while transforming",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "MCV_DEPLOY"
+      ],
+      "speed": 60
+    },
+    {
+      "id": "a_patrol",
+      "name": "Patrol Corvette",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Light naval",
+      "tier": "NAVAL",
+      "producer": "Naval Dock",
+      "prerequisites": "Naval Dock",
+      "armor": "NAVAL",
+      "hp": 600,
+      "credits": 1100,
+      "build_seconds": 25,
+      "weapon": "Deck cannon · HE 90/1.8s R260 ground/sea; AA gun 16/0.3s R200 air",
+      "ability": "Coastal reconnaissance; escorts harvest routes near water",
+      "upgrade_ids": [
+        "NAVAL_FIRE",
+        "AA_TRACKING"
+      ],
+      "speed": 85
+    },
+    {
+      "id": "a_dart",
+      "name": "Dart Missile Frigate",
+      "faction": "alliance",
+      "variant": "standard",
+      "role": "Heavy naval",
+      "tier": "NAVAL",
+      "producer": "Naval Dock",
+      "prerequisites": "Naval Dock+Tech Center",
+      "armor": "NAVAL",
+      "hp": 950,
+      "credits": 2400,
+      "build_seconds": 45,
+      "weapon": "Cruise missiles · guided 230/5.5s R460 land/sea; AA 70/2.2s R270 air",
+      "ability": "Long-range bombardment; minimum R120",
+      "upgrade_ids": [
+        "NAVAL_FIRE",
+        "A_DATALINK"
+      ],
+      "speed": 85
+    },
+    {
+      "id": "r_line",
+      "name": "Line Infantry",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Line infantry",
+      "tier": "T0",
+      "producer": "Garrison Barracks",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 120,
+      "credits": 140,
+      "build_seconds": 5,
+      "weapon": "Service rifle · small arms 11/0.65s R140 ground",
+      "ability": "Garrison; fortified crouch improves cover",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "INF_OPTICS",
+        "R_DISCIPLINE"
+      ],
+      "speed": 78
+    },
+    {
+      "id": "r_hunter",
+      "name": "Tank Hunter",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Anti-armor infantry",
+      "tier": "T0",
+      "producer": "Garrison Barracks",
+      "prerequisites": "Barracks+Refinery",
+      "armor": "PERSONNEL",
+      "hp": 110,
+      "credits": 290,
+      "build_seconds": 9,
+      "weapon": "Shoulder rocket · rocket 80/3.3s R210 ground/air",
+      "ability": "Entrench for +15% rocket range, cannot move while braced",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "INF_OPTICS",
+        "R_DISCIPLINE"
+      ],
+      "speed": 65
+    },
+    {
+      "id": "r_engineer",
+      "name": "Combat Engineer",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Capture/repair",
+      "tier": "T0",
+      "producer": "Garrison Barracks",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 105,
+      "credits": 450,
+      "build_seconds": 10,
+      "weapon": "Unarmed",
+      "ability": "Capture; repairs structures; consumed on capture",
+      "upgrade_ids": [
+        "INF_ARMOR"
+      ],
+      "speed": 77
+    },
+    {
+      "id": "r_ironclad",
+      "name": "Ironclad APC",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Infantry carrier",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory",
+      "armor": "MEDIUM",
+      "hp": 540,
+      "credits": 850,
+      "build_seconds": 17,
+      "weapon": "Heavy MG · small arms 19/0.45s R175 ground",
+      "ability": "Transport 5 infantry; can unload behind cover",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TRACK_DRIVE",
+        "R_REACTIVE"
+      ],
+      "speed": 97
+    },
+    {
+      "id": "r_bastion",
+      "name": "Bastion MBT",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Main battle tank",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory",
+      "armor": "HEAVY",
+      "hp": 900,
+      "credits": 1350,
+      "build_seconds": 25,
+      "weapon": "Heavy smoothbore · AP 130/2.6s R200 ground",
+      "ability": "Hull armor +15% frontal protection while facing target",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TARGETING",
+        "R_REACTIVE"
+      ],
+      "speed": 70
+    },
+    {
+      "id": "r_recon",
+      "name": "Recon APC",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Fast reconnaissance",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 340,
+      "credits": 600,
+      "build_seconds": 12,
+      "weapon": "Coaxial MG · small arms 12/0.45s R135 ground",
+      "ability": "Detection radius 180; speed burst 4s with 16s cooldown",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "AA_TRACKING"
+      ],
+      "speed": 140
+    },
+    {
+      "id": "r_flak",
+      "name": "Flak Carrier",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Mobile anti-air",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Radar",
+      "armor": "MEDIUM",
+      "hp": 500,
+      "credits": 850,
+      "build_seconds": 18,
+      "weapon": "Flak shells · AA 55/0.85s R270 air; 20/0.85s ground",
+      "ability": "Area flak against clustered light air targets",
+      "upgrade_ids": [
+        "AA_TRACKING",
+        "ARMOR_PLATING"
+      ],
+      "speed": 95
+    },
+    {
+      "id": "r_thunder",
+      "name": "Thunderbolt Artillery",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Mobile artillery",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Radar",
+      "armor": "MEDIUM",
+      "hp": 475,
+      "credits": 1450,
+      "build_seconds": 27,
+      "weapon": "Heavy howitzer · artillery 220/5.3s R370 ground, min R90",
+      "ability": "Deploy 2.5s; splash R65; cannot shoot while moving",
+      "upgrade_ids": [
+        "ARTY_COMPUTER",
+        "R_SHELLS"
+      ],
+      "speed": 60
+    },
+    {
+      "id": "r_mammoth",
+      "name": "Mammoth Siege Tank",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Superheavy tank",
+      "tier": "T2",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Tech Center",
+      "armor": "HEAVY",
+      "hp": 1700,
+      "credits": 2450,
+      "build_seconds": 43,
+      "weapon": "Twin cannons · AP 130×2/3.5s R215 ground; AA rocket 55/3s R200 air",
+      "ability": "Very slow; crush light obstacles; vulnerable to surrounding",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TARGETING",
+        "R_REACTIVE"
+      ],
+      "speed": 47
+    },
+    {
+      "id": "r_siege_heli",
+      "name": "Siege Helicopter",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Ground support rotorcraft",
+      "tier": "T2",
+      "producer": "Strike Airbase",
+      "prerequisites": "Airfield",
+      "armor": "AIR",
+      "hp": 470,
+      "credits": 1550,
+      "build_seconds": 26,
+      "weapon": "Heavy rockets · guided 92/1.65s R215 ground",
+      "ability": "6 salvos; returns to reload; slow hover",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS"
+      ],
+      "speed": 165
+    },
+    {
+      "id": "r_bomber",
+      "name": "Heavy Bomber",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Strategic aircraft",
+      "tier": "T2",
+      "producer": "Strike Airbase",
+      "prerequisites": "Airfield+Tech Center",
+      "armor": "AIR",
+      "hp": 580,
+      "credits": 2300,
+      "build_seconds": 43,
+      "weapon": "Bomb load · explosive 400/strike R95 splash ground",
+      "ability": "2 payloads per sortie; long rearm; AA vulnerable",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS"
+      ],
+      "speed": 205
+    },
+    {
+      "id": "r_hauler",
+      "name": "Industrial Hauler",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Resource vehicle",
+      "tier": "T0",
+      "producer": "Armor Works",
+      "prerequisites": "Refinery for bundled first; War Factory for extra",
+      "armor": "HEAVY",
+      "hp": 1000,
+      "credits": 1250,
+      "build_seconds": 27,
+      "weapon": "Unarmed",
+      "ability": "Cargo 900; slower than Alliance harvester; first one bundled",
+      "upgrade_ids": [
+        "HARVEST_EFF",
+        "ARMOR_PLATING"
+      ],
+      "speed": 59
+    },
+    {
+      "id": "r_mcv",
+      "name": "Republic MCV",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Mobile Construction Vehicle",
+      "tier": "T2",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Service Depot",
+      "armor": "HEAVY",
+      "hp": 1300,
+      "credits": 3100,
+      "build_seconds": 48,
+      "weapon": "Unarmed",
+      "ability": "Deploy/pack Construction Yard; heavy hull",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "MCV_DEPLOY"
+      ],
+      "speed": 52
+    },
+    {
+      "id": "r_patrol",
+      "name": "Armored River Monitor",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Light naval",
+      "tier": "NAVAL",
+      "producer": "Armored Shipyard",
+      "prerequisites": "Naval Dock",
+      "armor": "NAVAL",
+      "hp": 850,
+      "credits": 1300,
+      "build_seconds": 29,
+      "weapon": "Dual deck guns · HE 115/2s R265 ground/sea; flak 40/1s R175 air",
+      "ability": "High durability for shallow water",
+      "upgrade_ids": [
+        "NAVAL_FIRE",
+        "R_SHELLS"
+      ],
+      "speed": 85
+    },
+    {
+      "id": "r_dread",
+      "name": "Bastion Missile Cruiser",
+      "faction": "republic",
+      "variant": "standard",
+      "role": "Heavy naval",
+      "tier": "NAVAL",
+      "producer": "Armored Shipyard",
+      "prerequisites": "Naval Dock+Tech Center",
+      "armor": "NAVAL",
+      "hp": 1450,
+      "credits": 2750,
+      "build_seconds": 50,
+      "weapon": "Missile barrage · guided 180×2/6s R440 land/sea; flak 75/2.2s R240 air",
+      "ability": "Slow; shore siege requires scout vision",
+      "upgrade_ids": [
+        "NAVAL_FIRE",
+        "AA_TRACKING"
+      ],
+      "speed": 85
+    },
+    {
+      "id": "g_militia",
+      "name": "Militia Fighter",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Light infantry",
+      "tier": "T0",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 90,
+      "credits": 100,
+      "build_seconds": 4,
+      "weapon": "Scrap rifle · small arms 10/0.7s R130 ground",
+      "ability": "Garrison; cheaper squads; scavenges spare rounds for no economic profit",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "INF_OPTICS",
+        "G_CAMO"
+      ],
+      "speed": 92
+    },
+    {
+      "id": "g_rocket_cell",
+      "name": "Rocket Cell",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Anti-armor infantry",
+      "tier": "T0",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks+Refinery",
+      "armor": "PERSONNEL",
+      "hp": 85,
+      "credits": 260,
+      "build_seconds": 8,
+      "weapon": "Scrap rocket · rocket 75/3.2s R205 ground/air",
+      "ability": "Ambush first shot +15% damage from cover",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "INF_OPTICS",
+        "G_CAMO"
+      ],
+      "speed": 72
+    },
+    {
+      "id": "g_tech",
+      "name": "Salvage Technician",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Capture/repair",
+      "tier": "T0",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 80,
+      "credits": 400,
+      "build_seconds": 9,
+      "weapon": "Unarmed",
+      "ability": "Capture structures; repair GIA vehicles at reduced rate",
+      "upgrade_ids": [
+        "INF_ARMOR"
+      ],
+      "speed": 90
+    },
+    {
+      "id": "g_technical",
+      "name": "Raider Technical",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Light raider",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory",
+      "armor": "LIGHT",
+      "hp": 290,
+      "credits": 550,
+      "build_seconds": 12,
+      "weapon": "Mounted MG · small arms 18/0.45s R155 ground",
+      "ability": "Transport 2 infantry; fast flank; not a tank",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "G_SCAVENGE"
+      ],
+      "speed": 145
+    },
+    {
+      "id": "g_scavenger",
+      "name": "Scavenger Tank",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Main battle tank",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory",
+      "armor": "MEDIUM",
+      "hp": 630,
+      "credits": 950,
+      "build_seconds": 19,
+      "weapon": "Salvaged cannon · AP 105/2.7s R190 ground",
+      "ability": "Can collect one wreck upgrade: +10% damage OR +10% max HP",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TARGETING",
+        "G_SCAVENGE"
+      ],
+      "speed": 87
+    },
+    {
+      "id": "g_bike",
+      "name": "Raider Bike",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Fast scout",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 165,
+      "credits": 320,
+      "build_seconds": 7,
+      "weapon": "Light MG · small arms 9/0.4s R115 ground",
+      "ability": "Detection R135; fastest ground spotter",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "G_CAMO"
+      ],
+      "speed": 165
+    },
+    {
+      "id": "g_rocket_truck",
+      "name": "Rocket Truck",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Mobile anti-air",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 330,
+      "credits": 730,
+      "build_seconds": 15,
+      "weapon": "Twin rockets · AA 95/2.3s R290 air; 45/2.3s R160 ground",
+      "ability": "Brief setup to fire; low armor",
+      "upgrade_ids": [
+        "AA_TRACKING",
+        "TRACK_DRIVE"
+      ],
+      "speed": 130
+    },
+    {
+      "id": "g_rocket_buggy",
+      "name": "Rocket Buggy",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Long-range skirmisher",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 250,
+      "credits": 800,
+      "build_seconds": 17,
+      "weapon": "Multi-rocket · explosive 50×3/4s R325 ground",
+      "ability": "Kite attack; max turn speed; small splash",
+      "upgrade_ids": [
+        "ARTY_COMPUTER",
+        "TRACK_DRIVE",
+        "G_SCAVENGE"
+      ],
+      "speed": 144
+    },
+    {
+      "id": "g_reclaimed",
+      "name": "Reclaimed Assault Tank",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Elite improvised armor",
+      "tier": "T2",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Tech Center",
+      "armor": "HEAVY",
+      "hp": 980,
+      "credits": 1650,
+      "build_seconds": 31,
+      "weapon": "Heavy salvaged cannon · AP 130/3s R205 ground",
+      "ability": "One permanent wreck mod per life; can choose weapon or armor",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TARGETING",
+        "G_SCAVENGE"
+      ],
+      "speed": 72
+    },
+    {
+      "id": "g_heli",
+      "name": "Improvised Attack Helicopter",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Air support",
+      "tier": "T2",
+      "producer": "Hidden Airstrip",
+      "prerequisites": "Airfield",
+      "armor": "AIR",
+      "hp": 330,
+      "credits": 1050,
+      "build_seconds": 20,
+      "weapon": "Unguided rockets · explosive 58×2/1.8s R180 ground",
+      "ability": "4 attack runs; return to rearm; very AA vulnerable",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "G_CAMO"
+      ],
+      "speed": 178
+    },
+    {
+      "id": "g_drone_wing",
+      "name": "Missile Drone Wing",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Unmanned air attack",
+      "tier": "T2",
+      "producer": "Hidden Airstrip",
+      "prerequisites": "Airfield+Tech Center",
+      "armor": "AIR",
+      "hp": 240,
+      "credits": 1550,
+      "build_seconds": 29,
+      "weapon": "Attack drone missiles · guided 80×2/2.2s R200 ground/air",
+      "ability": "6 missiles; wing counts as one selectable unit; fragile",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS"
+      ],
+      "speed": 218
+    },
+    {
+      "id": "g_collector",
+      "name": "Salvage Collector",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Resource vehicle",
+      "tier": "T0",
+      "producer": "Salvage Garage",
+      "prerequisites": "Refinery for bundled first; War Factory for extra",
+      "armor": "HEAVY",
+      "hp": 650,
+      "credits": 1000,
+      "build_seconds": 22,
+      "weapon": "Unarmed",
+      "ability": "Cargo 650; fast turnaround; first one bundled",
+      "upgrade_ids": [
+        "HARVEST_EFF"
+      ],
+      "speed": 82
+    },
+    {
+      "id": "g_mcv",
+      "name": "GIA MCV",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Mobile Construction Vehicle",
+      "tier": "T2",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Service Depot",
+      "armor": "HEAVY",
+      "hp": 850,
+      "credits": 2600,
+      "build_seconds": 42,
+      "weapon": "Unarmed",
+      "ability": "Deploy/pack Resistance Headquarters; relatively fast",
+      "upgrade_ids": [
+        "MCV_DEPLOY",
+        "ARMOR_PLATING"
+      ],
+      "speed": 68
+    },
+    {
+      "id": "g_shadow",
+      "name": "Shadow Operative",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Covert commando",
+      "tier": "T2",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks+Tech Center",
+      "armor": "PERSONNEL",
+      "hp": 105,
+      "credits": 850,
+      "build_seconds": 18,
+      "weapon": "Suppressed carbine · small arms 20/0.85s R155 ground",
+      "ability": "Stealth while still; saboteur charge vs unguarded structure, 30s cooldown",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "G_CAMO"
+      ],
+      "speed": 97
+    },
+    {
+      "id": "g_river",
+      "name": "Raider Riverboat",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Light naval",
+      "tier": "NAVAL",
+      "producer": "Riverboat Yard",
+      "prerequisites": "Naval Dock",
+      "armor": "NAVAL",
+      "hp": 510,
+      "credits": 850,
+      "build_seconds": 21,
+      "weapon": "Deck MG · small arms 20/0.3s R210 ground/sea; AA 10/0.3s R145 air",
+      "ability": "Shallow water raiding; can transport 3 infantry",
+      "upgrade_ids": [
+        "NAVAL_FIRE",
+        "G_SCAVENGE"
+      ],
+      "speed": 85
+    },
+    {
+      "id": "g_missile_boat",
+      "name": "Improvised Missile Barge",
+      "faction": "gia",
+      "variant": "standard",
+      "role": "Heavy naval",
+      "tier": "NAVAL",
+      "producer": "Riverboat Yard",
+      "prerequisites": "Naval Dock+Tech Center",
+      "armor": "NAVAL",
+      "hp": 850,
+      "credits": 1900,
+      "build_seconds": 36,
+      "weapon": "Rocket salvos · guided 105×2/5.2s R390 land/sea",
+      "ability": "Deploy 2.5s to fire; vulnerable in transit",
+      "upgrade_ids": [
+        "NAVAL_FIRE",
+        "ARTY_COMPUTER"
+      ],
+      "speed": 85
+    }
+  ],
+  "specialist_units": [
+    {
+      "id": "a_ace",
+      "name": "Vortex Ace Interceptor",
+      "faction": "alliance",
+      "variant": "alliance_air",
+      "role": "Elite air superiority fighter",
+      "tier": "T2",
+      "producer": "Airfield",
+      "prerequisites": "Airfield+Tech Center",
+      "armor": "AIR",
+      "hp": 430,
+      "credits": 1800,
+      "build_seconds": 34,
+      "weapon": "Guided AA missiles · AA 160/1.7s R290 air; strike missiles 105/2.4s R230 ground",
+      "ability": "6 missiles per sortie; intercepts one incoming AA missile each 18s",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS",
+        "AS_COUNTERMEASURES"
+      ],
+      "speed": 270
+    },
+    {
+      "id": "a_tempest",
+      "name": "Tempest Assault VTOL",
+      "faction": "alliance",
+      "variant": "alliance_air",
+      "role": "Anti-armor gunship",
+      "tier": "T2",
+      "producer": "Airfield",
+      "prerequisites": "Airfield",
+      "armor": "AIR",
+      "hp": 460,
+      "credits": 1650,
+      "build_seconds": 29,
+      "weapon": "Piercing rockets · guided 110/1.65s R230 ground",
+      "ability": "6 salvos; 2s firing hover exposes aircraft to AA",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "ECM_PODS",
+        "AS_HANGARS"
+      ],
+      "speed": 177
+    },
+    {
+      "id": "a_missile_escort",
+      "name": "Lynx Missile Escort",
+      "faction": "alliance",
+      "variant": "alliance_air",
+      "role": "Missile escort light vehicle",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory",
+      "armor": "LIGHT",
+      "hp": 350,
+      "credits": 850,
+      "build_seconds": 16,
+      "weapon": "Dual missiles · rocket 80/2.5s R220 ground; 70/2.5s R260 air",
+      "ability": "Transport 2 infantry; low sustained anti-infantry power",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "AA_TRACKING"
+      ],
+      "speed": 125
+    },
+    {
+      "id": "a_skywatch",
+      "name": "Skywatch Recon Craft",
+      "faction": "alliance",
+      "variant": "alliance_air",
+      "role": "Exclusive command scout",
+      "tier": "T2",
+      "producer": "Airfield",
+      "prerequisites": "Airfield+Radar",
+      "armor": "AIR",
+      "hp": 280,
+      "credits": 900,
+      "build_seconds": 20,
+      "weapon": "Unarmed",
+      "ability": "Large 300 vision, detector R220; 25s endurance per sortie; airfield reload 12s",
+      "upgrade_ids": [
+        "AIRFRAMES",
+        "AS_COUNTERMEASURES"
+      ],
+      "speed": 220
+    },
+    {
+      "id": "a_lance",
+      "name": "Arc Lance Tank",
+      "faction": "alliance",
+      "variant": "alliance_energy",
+      "role": "Energy main battle tank",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory",
+      "armor": "HEAVY",
+      "hp": 670,
+      "credits": 1450,
+      "build_seconds": 26,
+      "weapon": "Pulse lance · energy 92/1.65s R215 ground",
+      "ability": "Accurate first shot; at low power weapon fire interval doubles; conventional missiles unaffected",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "DE_CAPACITORS",
+        "DE_GRID"
+      ],
+      "speed": 76
+    },
+    {
+      "id": "a_lattice",
+      "name": "Lattice Interceptor",
+      "faction": "alliance",
+      "variant": "alliance_energy",
+      "role": "Point-defense AA vehicle",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 370,
+      "credits": 1150,
+      "build_seconds": 22,
+      "weapon": "Pulse array · energy 45/0.6s R260 air, 24/0.6s R140 ground",
+      "ability": "Intercept one hostile rocket every 3.5s; low power disables interceptions",
+      "upgrade_ids": [
+        "AA_TRACKING",
+        "DE_GRID"
+      ],
+      "speed": 118
+    },
+    {
+      "id": "a_arc_sapper",
+      "name": "Arc Sapper",
+      "faction": "alliance",
+      "variant": "alliance_energy",
+      "role": "Exclusive anti-electronics infantry",
+      "tier": "T1",
+      "producer": "Barracks",
+      "prerequisites": "Barracks+Radar",
+      "armor": "PERSONNEL",
+      "hp": 95,
+      "credits": 450,
+      "build_seconds": 11,
+      "weapon": "Arc carbine · energy 20/0.8s R145 ground",
+      "ability": "EMP burst: 3s disable on vehicle/defense; 26s cooldown, range 110; not an instant kill",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "DE_CAPACITORS"
+      ],
+      "speed": 80
+    },
+    {
+      "id": "a_pathfinder",
+      "name": "Pathfinder Team",
+      "faction": "alliance",
+      "variant": "alliance_ops",
+      "role": "Stealth recon infantry",
+      "tier": "T0",
+      "producer": "Barracks",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 90,
+      "credits": 260,
+      "build_seconds": 8,
+      "weapon": "Marksman rifle · small arms 35/1.7s R205 ground",
+      "ability": "Detection R200; hides after 3s stationary; no effective anti-armor",
+      "upgrade_ids": [
+        "INF_OPTICS",
+        "SO_DESIGNATION"
+      ],
+      "speed": 83
+    },
+    {
+      "id": "a_ghost_carrier",
+      "name": "Ghost Recon Carrier",
+      "faction": "alliance",
+      "variant": "alliance_ops",
+      "role": "Camouflaged transport",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory",
+      "armor": "LIGHT",
+      "hp": 295,
+      "credits": 950,
+      "build_seconds": 18,
+      "weapon": "Silenced MG · small arms 14/0.6s R150 ground",
+      "ability": "Transports 4; stealth after 3s idle, revealed by firing/detectors",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "SO_SILENT"
+      ],
+      "speed": 130
+    },
+    {
+      "id": "a_phantom_drone",
+      "name": "Phantom Sensor Drone",
+      "faction": "alliance",
+      "variant": "alliance_ops",
+      "role": "Long-lived sensor scout",
+      "tier": "T1",
+      "producer": "War Factory",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 155,
+      "credits": 650,
+      "build_seconds": 13,
+      "weapon": "Unarmed",
+      "ability": "Vision 280, detection R250; drone cloaks while stationary, speed reduced",
+      "upgrade_ids": [
+        "A_SENSOR_NET",
+        "SO_DESIGNATION"
+      ],
+      "speed": 150
+    },
+    {
+      "id": "a_ghost_sniper",
+      "name": "Ghost Sniper",
+      "faction": "alliance",
+      "variant": "alliance_ops",
+      "role": "Exclusive special infantry",
+      "tier": "T2",
+      "producer": "Barracks",
+      "prerequisites": "Barracks+Radar+Tech Center",
+      "armor": "PERSONNEL",
+      "hp": 95,
+      "credits": 650,
+      "build_seconds": 16,
+      "weapon": "Precision rifle · small arms 95/3s R260 ground",
+      "ability": "Prioritizes exposed personnel; stealth at rest; 18s relocation stealth cooldown",
+      "upgrade_ids": [
+        "INF_OPTICS",
+        "SO_SILENT",
+        "SO_DESIGNATION"
+      ],
+      "speed": 76
+    },
+    {
+      "id": "r_jugger",
+      "name": "Juggernaut Battle Tank",
+      "faction": "republic",
+      "variant": "republic_armor",
+      "role": "Slow breakthrough MBT",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory",
+      "armor": "HEAVY",
+      "hp": 1100,
+      "credits": 1700,
+      "build_seconds": 30,
+      "weapon": "High-velocity cannon · AP 165/2.7s R205 ground",
+      "ability": "Front +20% damage reduction; speed -18% vs Bastion",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "HA_AUTOLOAD",
+        "HA_VETERANS"
+      ],
+      "speed": 57
+    },
+    {
+      "id": "r_imperator",
+      "name": "Imperator Heavy Tank",
+      "faction": "republic",
+      "variant": "republic_armor",
+      "role": "Superheavy fortress breaker",
+      "tier": "T2",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Tech Center",
+      "armor": "HEAVY",
+      "hp": 2150,
+      "credits": 3050,
+      "build_seconds": 52,
+      "weapon": "Twin siege cannons · AP 170×2/3.8s R220 ground; AA 65/3s R195 air",
+      "ability": "Very slow; cannot reverse quickly; high recovery penalty if lost",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "HA_AUTOLOAD",
+        "HA_VETERANS"
+      ],
+      "speed": 43
+    },
+    {
+      "id": "r_armored_scout",
+      "name": "Armored Scout Carrier",
+      "faction": "republic",
+      "variant": "republic_armor",
+      "role": "Armored recon APC",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Radar",
+      "armor": "MEDIUM",
+      "hp": 550,
+      "credits": 850,
+      "build_seconds": 18,
+      "weapon": "Heavy MG · small arms 18/0.5s R140 ground",
+      "ability": "Detect R160; slower than Recon APC; transports 2",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "R_REACTIVE"
+      ],
+      "speed": 105
+    },
+    {
+      "id": "r_breacher",
+      "name": "Assault Breacher",
+      "faction": "republic",
+      "variant": "republic_armor",
+      "role": "Exclusive anti-garrison infantry",
+      "tier": "T1",
+      "producer": "Garrison Barracks",
+      "prerequisites": "Barracks+War Factory",
+      "armor": "PERSONNEL",
+      "hp": 170,
+      "credits": 400,
+      "build_seconds": 11,
+      "weapon": "Close assault shotgun · HE 32/0.9s R90 ground",
+      "ability": "Clear garrison: suppress occupied building for 4s; 28s cooldown",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "R_DISCIPLINE"
+      ],
+      "speed": 74
+    },
+    {
+      "id": "r_stormrail",
+      "name": "Stormrail Howitzer",
+      "faction": "republic",
+      "variant": "republic_artillery",
+      "role": "Long-range siege artillery",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Radar",
+      "armor": "MEDIUM",
+      "hp": 440,
+      "credits": 1850,
+      "build_seconds": 33,
+      "weapon": "Precision shell · artillery 265/6s R470 ground; min R140",
+      "ability": "Deploy 3.5s; accuracy relies on sight; weak within min range",
+      "upgrade_ids": [
+        "ARTY_COMPUTER",
+        "AR_OBSERVERS",
+        "AR_RAPID"
+      ],
+      "speed": 54
+    },
+    {
+      "id": "r_escort",
+      "name": "Escort Battle Tank",
+      "faction": "republic",
+      "variant": "republic_artillery",
+      "role": "Fast screening MBT",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory",
+      "armor": "MEDIUM",
+      "hp": 680,
+      "credits": 1050,
+      "build_seconds": 20,
+      "weapon": "Compact cannon · AP 95/2.1s R190 ground",
+      "ability": "+18% move speed vs Bastion; quick pivot",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "TRACK_DRIVE"
+      ],
+      "speed": 100
+    },
+    {
+      "id": "r_survey",
+      "name": "Survey Spotter Drone",
+      "faction": "republic",
+      "variant": "republic_artillery",
+      "role": "Exclusive artillery observer",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 165,
+      "credits": 520,
+      "build_seconds": 12,
+      "weapon": "Unarmed",
+      "ability": "Detect R180; reveals last known position 4s; artillery mark radius 140, 25s cooldown",
+      "upgrade_ids": [
+        "AR_OBSERVERS",
+        "AA_TRACKING"
+      ],
+      "speed": 141
+    },
+    {
+      "id": "r_garrison",
+      "name": "Garrison Guard",
+      "faction": "republic",
+      "variant": "republic_fortress",
+      "role": "Fortified infantry",
+      "tier": "T0",
+      "producer": "Garrison Barracks",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 140,
+      "credits": 200,
+      "build_seconds": 6,
+      "weapon": "Defensive LMG · small arms 14/0.55s R145 ground",
+      "ability": "In cover +30% damage reduction, +20% range; slower movement",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "FD_FORTS",
+        "R_DISCIPLINE"
+      ],
+      "speed": 66
+    },
+    {
+      "id": "r_siege_carrier",
+      "name": "Siege Carrier",
+      "faction": "republic",
+      "variant": "republic_fortress",
+      "role": "Mobile pillbox APC",
+      "tier": "T1",
+      "producer": "Armor Works",
+      "prerequisites": "War Factory",
+      "armor": "HEAVY",
+      "hp": 780,
+      "credits": 1300,
+      "build_seconds": 25,
+      "weapon": "Heavy MG · small arms 27/0.55s R190 ground",
+      "ability": "Carries 5; deploy as immobile protected strongpoint in 3s",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "FD_FIELDWORKS",
+        "R_REACTIVE"
+      ],
+      "speed": 77
+    },
+    {
+      "id": "r_field_engineer",
+      "name": "Fortification Engineer",
+      "faction": "republic",
+      "variant": "republic_fortress",
+      "role": "Exclusive build-support infantry",
+      "tier": "T1",
+      "producer": "Garrison Barracks",
+      "prerequisites": "Barracks+Radar",
+      "armor": "PERSONNEL",
+      "hp": 110,
+      "credits": 480,
+      "build_seconds": 12,
+      "weapon": "Unarmed",
+      "ability": "Places one temporary 400 HP sandbag barrier for 60s; 35s cooldown; cannot extend build radius",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "FD_FIELDWORKS"
+      ],
+      "speed": 79
+    },
+    {
+      "id": "g_shade",
+      "name": "Shade Cell",
+      "faction": "gia",
+      "variant": "gia_guerrilla",
+      "role": "Ambush infantry",
+      "tier": "T0",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks",
+      "armor": "PERSONNEL",
+      "hp": 80,
+      "credits": 175,
+      "build_seconds": 6,
+      "weapon": "Silenced rifle · small arms 13/0.75s R135 ground",
+      "ability": "Cloak after 2s idle/in cover; bonus first shot vs infantry; no tank penetration",
+      "upgrade_ids": [
+        "INF_OPTICS",
+        "GW_CAMO"
+      ],
+      "speed": 95
+    },
+    {
+      "id": "g_ghost_technical",
+      "name": "Ghost Technical",
+      "faction": "gia",
+      "variant": "gia_guerrilla",
+      "role": "Stealth raider transport",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory",
+      "armor": "LIGHT",
+      "hp": 260,
+      "credits": 700,
+      "build_seconds": 14,
+      "weapon": "Concealed MG · small arms 14/0.5s R140 ground",
+      "ability": "Carries 3; camouflaged at rest; decloaks while firing",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "GW_CAMO",
+        "GW_PASSAGE"
+      ],
+      "speed": 155
+    },
+    {
+      "id": "g_saboteur",
+      "name": "Hideout Saboteur",
+      "faction": "gia",
+      "variant": "gia_guerrilla",
+      "role": "Exclusive covert infantry",
+      "tier": "T2",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks+Radar+Tech Center",
+      "armor": "PERSONNEL",
+      "hp": 95,
+      "credits": 700,
+      "build_seconds": 16,
+      "weapon": "Suppressed SMG · small arms 12/0.45s R110 ground",
+      "ability": "Disable enemy building for 9s on infiltration; 45s cooldown; target alerts opponent",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "GW_CAMO",
+        "GW_PASSAGE"
+      ],
+      "speed": 105
+    },
+    {
+      "id": "g_siege_rocket",
+      "name": "Siege Rocket Squad",
+      "faction": "gia",
+      "variant": "gia_missile",
+      "role": "Heavy anti-armor infantry",
+      "tier": "T0",
+      "producer": "Militia Camp",
+      "prerequisites": "Barracks+Refinery",
+      "armor": "PERSONNEL",
+      "hp": 90,
+      "credits": 360,
+      "build_seconds": 11,
+      "weapon": "Siege rocket · rocket 110/3.8s R235 ground/air",
+      "ability": "Brace 1.2s to fire; weak while moving; no stealth",
+      "upgrade_ids": [
+        "INF_ARMOR",
+        "MW_GUIDANCE",
+        "MW_RELOAD"
+      ],
+      "speed": 65
+    },
+    {
+      "id": "g_volley",
+      "name": "Volley Launcher",
+      "faction": "gia",
+      "variant": "gia_missile",
+      "role": "Mobile missile artillery",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 300,
+      "credits": 1150,
+      "build_seconds": 24,
+      "weapon": "Volley pod · rocket 62×4/5.5s R350 ground",
+      "ability": "Stationary 2s setup, long reload, high burst; min R70",
+      "upgrade_ids": [
+        "ARTY_COMPUTER",
+        "MW_GUIDANCE",
+        "MW_RELOAD"
+      ],
+      "speed": 95
+    },
+    {
+      "id": "g_spotter",
+      "name": "Missile Guidance Van",
+      "faction": "gia",
+      "variant": "gia_missile",
+      "role": "Exclusive targeting vehicle",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 270,
+      "credits": 700,
+      "build_seconds": 16,
+      "weapon": "Light MG · small arms 10/0.6s R120 ground",
+      "ability": "Designate target area R240; allied missiles gain +15% accuracy for 12s; 25s cooldown",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "MW_GUIDANCE"
+      ],
+      "speed": 122
+    },
+    {
+      "id": "g_ripper",
+      "name": "Ripper Technical",
+      "faction": "gia",
+      "variant": "gia_salvage",
+      "role": "Salvage raider",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory",
+      "armor": "LIGHT",
+      "hp": 230,
+      "credits": 625,
+      "build_seconds": 12,
+      "weapon": "Mounted MG · small arms 16/0.42s R145 ground",
+      "ability": "+22% speed vs Technical; salvages one nearby enemy wreck; fragile",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "SM_RECOVERY",
+        "SM_IMPROV"
+      ],
+      "speed": 177
+    },
+    {
+      "id": "g_junker",
+      "name": "Junker Assault Tank",
+      "faction": "gia",
+      "variant": "gia_salvage",
+      "role": "Upgradeable improvisation tank",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory",
+      "armor": "MEDIUM",
+      "hp": 560,
+      "credits": 1000,
+      "build_seconds": 20,
+      "weapon": "Scrap cannon · AP 92/2.65s R185 ground",
+      "ability": "Up to 2 enemy-wreck upgrades; each gives +10% damage OR +10% HP, capped",
+      "upgrade_ids": [
+        "ARMOR_PLATING",
+        "SM_RECOVERY",
+        "SM_IMPROV"
+      ],
+      "speed": 95
+    },
+    {
+      "id": "g_scraprunner",
+      "name": "Scrap Runner",
+      "faction": "gia",
+      "variant": "gia_salvage",
+      "role": "Fast salvage recon",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Radar",
+      "armor": "LIGHT",
+      "hp": 145,
+      "credits": 350,
+      "build_seconds": 8,
+      "weapon": "Weak carbine · small arms 8/0.42s R105 ground",
+      "ability": "Rapid wreck pickup; reveal R160; outpaced by dedicated combat scouts",
+      "upgrade_ids": [
+        "TRACK_DRIVE",
+        "SM_RECOVERY"
+      ],
+      "speed": 185
+    },
+    {
+      "id": "g_recovery",
+      "name": "Wreck Recovery Truck",
+      "faction": "gia",
+      "variant": "gia_salvage",
+      "role": "Exclusive field support",
+      "tier": "T1",
+      "producer": "Salvage Garage",
+      "prerequisites": "War Factory+Service Depot",
+      "armor": "LIGHT",
+      "hp": 320,
+      "credits": 850,
+      "build_seconds": 17,
+      "weapon": "Unarmed",
+      "ability": "Repairs nearby friendly vehicles at 20 HP/s while stationary, charges 2 credits/HP; cannot self-repair",
+      "upgrade_ids": [
+        "SM_RECOVERY",
+        "SM_IMPROV"
+      ],
+      "speed": 115
+    }
+  ],
+  "generals": {
+    "alliance_air": {
+      "faction": "alliance",
+      "name": "Air Superiority",
+      "replacements": {
+        "a_vortex": "a_ace",
+        "a_striker": "a_tempest",
+        "a_lynx": "a_missile_escort"
+      },
+      "remove": [
+        "a_sentinel",
+        "a_arc_beam"
+      ],
+      "add": [
+        "a_skywatch"
+      ],
+      "building_replacements": {},
+      "upgrades": [
+        "AS_HANGARS",
+        "AS_COUNTERMEASURES"
+      ],
+      "disabled_upgrades": [],
+      "modifiers": [
+        "Airfield capacity 3 aircraft rather than 2 with Reinforced Hangars",
+        "Striker/Vortex standard slots unavailable; no standard or advanced tanks"
+      ],
+      "weakness": "No mainline ground MBT; vulnerable to AA and airfield raids",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Recon Overflight",
+          "cooldown_seconds": 100,
+          "effect": "Reveal 350-wide path for 18s"
+        },
+        {
+          "rank": 3,
+          "name": "Interdiction Flight",
+          "cooldown_seconds": 210,
+          "effect": "Two interceptable strike passes against marked ground area"
+        },
+        {
+          "rank": 5,
+          "name": "Sky Supremacy",
+          "cooldown_seconds": 360,
+          "effect": "Four warning-marked aircraft attack waves; no persistent units"
+        }
+      ],
+      "effective_roster_ids": [
+        "a_patrol",
+        "a_dart",
+        "a_ranger",
+        "a_javelin",
+        "a_engineer",
+        "a_harvester",
+        "a_specter",
+        "a_missile_escort",
+        "a_sentinel_aa",
+        "a_howitzer",
+        "a_skywatch",
+        "a_tempest",
+        "a_ace",
+        "a_mcv"
+      ]
+    },
+    "alliance_energy": {
+      "faction": "alliance",
+      "name": "Directed Energy",
+      "replacements": {
+        "a_sentinel": "a_lance",
+        "a_sentinel_aa": "a_lattice"
+      },
+      "remove": [
+        "a_howitzer"
+      ],
+      "add": [
+        "a_arc_sapper"
+      ],
+      "building_replacements": {
+        "Sentry Turret": "Beam Bastion"
+      },
+      "upgrades": [
+        "DE_CAPACITORS",
+        "DE_GRID"
+      ],
+      "disabled_upgrades": [
+        "ARTY_COMPUTER"
+      ],
+      "modifiers": [
+        "Beam Bastion 800 credits/14s/−45 power, replaces Sentry Turret 550/9s/−10",
+        "Arc Lance and Lattice lose effectiveness during base-wide brownout"
+      ],
+      "weakness": "High power dependence; weak long-range conventional artillery",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Grid Surge",
+          "cooldown_seconds": 120,
+          "effect": "Allied energy weapons in 190 radius +20% rate for 12s; +20% power draw"
+        },
+        {
+          "rank": 3,
+          "name": "Target Lattice",
+          "cooldown_seconds": 185,
+          "effect": "Reveal and mark 160 radius for 14s; accuracy +12%"
+        },
+        {
+          "rank": 5,
+          "name": "Orbital Pulse",
+          "cooldown_seconds": 370,
+          "effect": "Warned 120 radius pulse; lower building damage than Particle Beam"
+        }
+      ],
+      "effective_roster_ids": [
+        "a_patrol",
+        "a_dart",
+        "a_ranger",
+        "a_javelin",
+        "a_engineer",
+        "a_harvester",
+        "a_arc_sapper",
+        "a_specter",
+        "a_lynx",
+        "a_lattice",
+        "a_lance",
+        "a_striker",
+        "a_vortex",
+        "a_arc_beam",
+        "a_mcv"
+      ]
+    },
+    "alliance_ops": {
+      "faction": "alliance",
+      "name": "Special Operations",
+      "replacements": {
+        "a_ranger": "a_pathfinder",
+        "a_lynx": "a_ghost_carrier",
+        "a_specter": "a_phantom_drone"
+      },
+      "remove": [
+        "a_arc_beam"
+      ],
+      "add": [
+        "a_ghost_sniper"
+      ],
+      "building_replacements": {},
+      "upgrades": [
+        "SO_SILENT",
+        "SO_DESIGNATION"
+      ],
+      "disabled_upgrades": [
+        "ARTY_COMPUTER"
+      ],
+      "modifiers": [
+        "Lose the heaviest artillery computer optimization on Precision Howitzer",
+        "Stealth ends on firing, taking damage or being detected; +3s recloak"
+      ],
+      "weakness": "Expensive elite infantry and lighter anti-armor ceiling",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Signal Sweep",
+          "cooldown_seconds": 105,
+          "effect": "Reveal detectors and enemy radar emitters R300 for 12s"
+        },
+        {
+          "rank": 3,
+          "name": "Covert Insertion",
+          "cooldown_seconds": 225,
+          "effect": "Deploy 3 limited-lifetime Pathfinder squads at revealed legal site"
+        },
+        {
+          "rank": 5,
+          "name": "Electronic Blackout",
+          "cooldown_seconds": 390,
+          "effect": "Disable radar/targeting in target R170 for 12s; no total power shutdown"
+        }
+      ],
+      "effective_roster_ids": [
+        "a_patrol",
+        "a_dart",
+        "a_pathfinder",
+        "a_javelin",
+        "a_engineer",
+        "a_harvester",
+        "a_phantom_drone",
+        "a_sentinel_aa",
+        "a_ghost_carrier",
+        "a_sentinel",
+        "a_howitzer",
+        "a_striker",
+        "a_vortex",
+        "a_ghost_sniper",
+        "a_mcv"
+      ]
+    },
+    "republic_armor": {
+      "faction": "republic",
+      "name": "Heavy Armor",
+      "replacements": {
+        "r_bastion": "r_jugger",
+        "r_mammoth": "r_imperator",
+        "r_recon": "r_armored_scout"
+      },
+      "remove": [
+        "r_thunder"
+      ],
+      "add": [
+        "r_breacher"
+      ],
+      "building_replacements": {},
+      "upgrades": [
+        "HA_AUTOLOAD",
+        "HA_VETERANS"
+      ],
+      "disabled_upgrades": [
+        "ARTY_COMPUTER",
+        "R_SHELLS"
+      ],
+      "modifiers": [
+        "Siege Helicopter cost 1550→1800; Heavy Bomber cost 2300→2650",
+        "Only tanks from this general gain Veteran Crews initial veterancy"
+      ],
+      "weakness": "Slow expensive ground push, no mobile artillery",
+      "unit_cost_overrides": {
+        "r_siege_heli": {
+          "credits": 1800
+        },
+        "r_bomber": {
+          "credits": 2650
+        }
+      },
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Field Repairs",
+          "cooldown_seconds": 125,
+          "effect": "Restore 15% HP over 12s to up to 6 friendly vehicles in area"
+        },
+        {
+          "rank": 3,
+          "name": "Armor Reserve",
+          "cooldown_seconds": 240,
+          "effect": "Call in 2 temporary escorted Juggernauts via map edge"
+        },
+        {
+          "rank": 5,
+          "name": "Breakthrough Order",
+          "cooldown_seconds": 375,
+          "effect": "Nearby tanks +15% move and suppression resistance for 18s"
+        }
+      ],
+      "effective_roster_ids": [
+        "r_patrol",
+        "r_dread",
+        "r_hauler",
+        "r_line",
+        "r_hunter",
+        "r_engineer",
+        "r_ironclad",
+        "r_flak",
+        "r_armored_scout",
+        "r_jugger",
+        "r_breacher",
+        "r_imperator",
+        "r_mcv",
+        "r_siege_heli",
+        "r_bomber"
+      ]
+    },
+    "republic_artillery": {
+      "faction": "republic",
+      "name": "Artillery Command",
+      "replacements": {
+        "r_thunder": "r_stormrail",
+        "r_bastion": "r_escort"
+      },
+      "remove": [
+        "r_mammoth"
+      ],
+      "add": [
+        "r_survey"
+      ],
+      "building_replacements": {
+        "Heavy Anti-Tank Emplacement": "Counterbattery Station"
+      },
+      "upgrades": [
+        "AR_OBSERVERS",
+        "AR_RAPID"
+      ],
+      "disabled_upgrades": [
+        "R_REACTIVE"
+      ],
+      "modifiers": [
+        "Counterbattery Station 2000 credits/24s/−105 power, minimum range 160",
+        "Escort Tank is faster and less armored; cannot research Reactive Armor"
+      ],
+      "weakness": "Fragile at close range; requires scouting and time to deploy",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Spotter Recon",
+          "cooldown_seconds": 110,
+          "effect": "Reveal R230 for 14s; detected target marks remain 4s"
+        },
+        {
+          "rank": 3,
+          "name": "Rolling Barrage",
+          "cooldown_seconds": 240,
+          "effect": "3 telegraphed artillery salvos across 260 length"
+        },
+        {
+          "rank": 5,
+          "name": "Fire Mission Omega",
+          "cooldown_seconds": 395,
+          "effect": "5 delayed artillery salvos over R190; unit warning 4s"
+        }
+      ],
+      "effective_roster_ids": [
+        "r_patrol",
+        "r_dread",
+        "r_hauler",
+        "r_line",
+        "r_hunter",
+        "r_engineer",
+        "r_survey",
+        "r_recon",
+        "r_ironclad",
+        "r_flak",
+        "r_escort",
+        "r_stormrail",
+        "r_mcv",
+        "r_siege_heli",
+        "r_bomber"
+      ]
+    },
+    "republic_fortress": {
+      "faction": "republic",
+      "name": "Fortress Defense",
+      "replacements": {
+        "r_line": "r_garrison",
+        "r_ironclad": "r_siege_carrier"
+      },
+      "remove": [
+        "r_recon",
+        "r_bomber"
+      ],
+      "add": [
+        "r_field_engineer"
+      ],
+      "building_replacements": {
+        "Machine-Gun Bunker": "Steel Pillbox",
+        "Fortified Outpost": "Forward Bastion"
+      },
+      "upgrades": [
+        "FD_FORTS",
+        "FD_FIELDWORKS"
+      ],
+      "disabled_upgrades": [],
+      "modifiers": [
+        "Steel Pillbox 800 credits/15s/−5 power; Forward Bastion 1600/25s/−35",
+        "Land vehicle move speed −8% except siege carriers; no Heavy Bomber or Recon APC"
+      ],
+      "weakness": "Slow map control; vulnerable to coordinated artillery and harvester raids",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Emergency Fortification",
+          "cooldown_seconds": 130,
+          "effect": "Place temporary 450 HP sandbags in friendly build area for 45s"
+        },
+        {
+          "rank": 3,
+          "name": "Reserve Garrison",
+          "cooldown_seconds": 240,
+          "effect": "Spawn 5 line-equivalent defenders at owned Barracks/Outpost"
+        },
+        {
+          "rank": 5,
+          "name": "Hold the Line",
+          "cooldown_seconds": 420,
+          "effect": "Area R210 around owned structure: fortification +15% reduction and +6 HP/s repair for 16s; repair costs credits"
+        }
+      ],
+      "effective_roster_ids": [
+        "r_patrol",
+        "r_dread",
+        "r_hauler",
+        "r_garrison",
+        "r_hunter",
+        "r_engineer",
+        "r_flak",
+        "r_siege_carrier",
+        "r_bastion",
+        "r_thunder",
+        "r_field_engineer",
+        "r_mammoth",
+        "r_mcv",
+        "r_siege_heli"
+      ]
+    },
+    "gia_guerrilla": {
+      "faction": "gia",
+      "name": "Guerrilla Warfare",
+      "replacements": {
+        "g_militia": "g_shade",
+        "g_technical": "g_ghost_technical"
+      },
+      "remove": [
+        "g_scavenger",
+        "g_reclaimed"
+      ],
+      "add": [
+        "g_saboteur"
+      ],
+      "building_replacements": {
+        "Gun Nest": "Concealed Gun Nest"
+      },
+      "upgrades": [
+        "GW_CAMO",
+        "GW_PASSAGE"
+      ],
+      "disabled_upgrades": [],
+      "modifiers": [
+        "Concealed Gun Nest 650 credits/11s/−5 power; lower sustained DPS than standard Gun Nest",
+        "Stealth cannot persist through attack, detection or sustained fast movement"
+      ],
+      "weakness": "No main battle tanks; must defeat armor via rockets and ambush",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "False Signals",
+          "cooldown_seconds": 95,
+          "effect": "Creates 2 detectable false radar contacts for 20s"
+        },
+        {
+          "rank": 3,
+          "name": "Ambush Cell",
+          "cooldown_seconds": 220,
+          "effect": "Deploy 4 Shade Cell units in revealed legal brush; 45s duration"
+        },
+        {
+          "rank": 5,
+          "name": "Hidden Passage",
+          "cooldown_seconds": 400,
+          "effect": "Temporary tunnel entrance in legal revealed terrain for 60s; warning on placement"
+        }
+      ],
+      "effective_roster_ids": [
+        "g_river",
+        "g_missile_boat",
+        "g_shade",
+        "g_rocket_cell",
+        "g_tech",
+        "g_collector",
+        "g_bike",
+        "g_ghost_technical",
+        "g_rocket_truck",
+        "g_rocket_buggy",
+        "g_heli",
+        "g_drone_wing",
+        "g_saboteur",
+        "g_shadow",
+        "g_mcv"
+      ]
+    },
+    "gia_missile": {
+      "faction": "gia",
+      "name": "Missile Warfare",
+      "replacements": {
+        "g_rocket_cell": "g_siege_rocket",
+        "g_rocket_buggy": "g_volley"
+      },
+      "remove": [
+        "g_shadow"
+      ],
+      "add": [
+        "g_spotter"
+      ],
+      "building_replacements": {
+        "Salvaged AA Platform": "Missile Defense Nest"
+      },
+      "upgrades": [
+        "MW_GUIDANCE",
+        "MW_RELOAD"
+      ],
+      "disabled_upgrades": [
+        "G_CAMO"
+      ],
+      "modifiers": [
+        "Missile Defense Nest 1100 credits/16s/−55 power; improved AA but limited ground fire",
+        "Ballistic Missile Silo can buy 1100-credit Warhead Saturation package to widen AoE but reduce center damage 25%"
+      ],
+      "weakness": "Slow setup and long reloads; no stealth or Shadow Operative",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Rocket Recon Beacon",
+          "cooldown_seconds": 110,
+          "effect": "Marks revealed R160 zone; missile scatter −12% for 14s"
+        },
+        {
+          "rank": 3,
+          "name": "Harassing Salvo",
+          "cooldown_seconds": 225,
+          "effect": "3 light delayed rocket salvos over R125"
+        },
+        {
+          "rank": 5,
+          "name": "Saturation Strike",
+          "cooldown_seconds": 390,
+          "effect": "Broad warned guided rocket barrage over R205; weaker center damage than strategic silo"
+        }
+      ],
+      "effective_roster_ids": [
+        "g_river",
+        "g_missile_boat",
+        "g_militia",
+        "g_siege_rocket",
+        "g_tech",
+        "g_collector",
+        "g_bike",
+        "g_technical",
+        "g_spotter",
+        "g_rocket_truck",
+        "g_scavenger",
+        "g_volley",
+        "g_heli",
+        "g_drone_wing",
+        "g_reclaimed",
+        "g_mcv"
+      ]
+    },
+    "gia_salvage": {
+      "faction": "gia",
+      "name": "Salvage & Mobility",
+      "replacements": {
+        "g_technical": "g_ripper",
+        "g_scavenger": "g_junker",
+        "g_bike": "g_scraprunner"
+      },
+      "remove": [
+        "g_drone_wing"
+      ],
+      "add": [
+        "g_recovery"
+      ],
+      "building_replacements": {
+        "Field Workshop": "Mobile Salvage Yard"
+      },
+      "upgrades": [
+        "SM_RECOVERY",
+        "SM_IMPROV"
+      ],
+      "disabled_upgrades": [
+        "G_HEAVY_DEF"
+      ],
+      "modifiers": [
+        "Mobile Salvage Yard 1050 credits/18s/−30 power; replaces Field Workshop 850/14s/−25",
+        "Cannot research Heavy Static Fortification upgrade; retains baseline anti-armor defense"
+      ],
+      "weakness": "Weak starting armor, requires contested enemy wrecks for scaling",
+      "unit_cost_overrides": {},
+      "powers": [
+        {
+          "rank": 1,
+          "name": "Rapid Salvage",
+          "cooldown_seconds": 120,
+          "effect": "Wreck recovery rate +40% for 18s in R180; value caps remain"
+        },
+        {
+          "rank": 3,
+          "name": "Roadside Reinforcements",
+          "cooldown_seconds": 250,
+          "effect": "2 Raider-class vehicles enter from viable friendly road/outpost"
+        },
+        {
+          "rank": 5,
+          "name": "Scavenger Convoy",
+          "cooldown_seconds": 405,
+          "effect": "4 temporary light scavenger vehicles enter at map edge; no free permanent credits"
+        }
+      ],
+      "effective_roster_ids": [
+        "g_river",
+        "g_missile_boat",
+        "g_militia",
+        "g_rocket_cell",
+        "g_tech",
+        "g_collector",
+        "g_scraprunner",
+        "g_ripper",
+        "g_rocket_truck",
+        "g_rocket_buggy",
+        "g_recovery",
+        "g_junker",
+        "g_heli",
+        "g_shadow",
+        "g_reclaimed",
+        "g_mcv"
+      ]
+    }
+  }
+}

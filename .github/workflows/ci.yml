@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  godot-smoke:
+  combat-lab:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -17,7 +17,11 @@ jobs:
           version: 4.4.1
           use-dotnet: false
           include-templates: false
-      - name: Import resources and check scripts
-        run: godot --headless --path godot --editor --quit
-      - name: Launch battlefield smoke test
-        run: godot --headless --path godot --quit-after 10
+      - name: Validate balance registry
+        run: python3 godot/tests/data_contract.py
+      - name: Import and parse Godot scripts
+        run: godot --headless --editor --path godot --import --quit
+      - name: Execute combat behavior assertions
+        run: godot --headless --path godot --script res://tests/combat_smoke.gd
+      - name: Launch the playable combat scene
+        run: godot --headless --path godot --quit-after 180
