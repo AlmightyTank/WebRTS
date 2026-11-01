@@ -657,6 +657,8 @@ func _produce_unit(side: int, id: String) -> bool:
  if producer==null: return false
  # A blocked active exit stalls READY production, never secretly uses another factory.
  var offset=Vector2(0,125) if side==0 else Vector2(0,-125)
+ if lane=="infantry":
+  offset=_infantry_exit_offset(side,producer)
  var where=_find_open_position(producer.position+offset,20.0)
  if where==Vector2.ZERO: return false
  var unit=null
@@ -668,6 +670,7 @@ func _produce_unit(side: int, id: String) -> bool:
  else:
   unit=_spawn(id,side,where)
  if unit==null: return false
+ producer.notify_unit_exit()
  var waypoint=_rally_destination(side,producer)
  if waypoint!=Vector2.ZERO:
   if unit.has_method("order_rally"): unit.order_rally(waypoint)
@@ -675,6 +678,12 @@ func _produce_unit(side: int, id: String) -> bool:
    var military=id not in ["a_engineer","r_engineer"]
    unit.order_move(waypoint,producer.rally_attack_move and military)
  return true
+
+func _infantry_exit_offset(side: int, producer) -> Vector2:
+ var art = preload("res://scripts/ui/industrial_art.gd")
+ var exit: Vector2 = art.building_exit(side)
+ # Clear the footprint before spawning; retain the door's horizontal alignment.
+ return Vector2(exit.x,maxf(exit.y,producer.footprint.y*0.5+30.0))
 
 func _spawn_engineer(id: String, side: int, where: Vector2):
  # The engineer uses the same combat-unit steering/selection, but cannot attack.

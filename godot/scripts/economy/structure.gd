@@ -20,6 +20,10 @@ var rally_stage_id := ""
 var rally_attack_move := false
 var rally_spawn_index := 0
 var timer := 0.0
+var art_time: float = 0.0
+var door_open: float = 0.0
+var exit_activity: float = 0.0
+var art_working: bool = false
 var weapon := {"type":"SMALL_ARMS", "damage":16.0, "interval":0.7, "range":165.0, "projectile_speed":620.0}
 
 func configure(world, building_kind: String, side: int, pos: Vector2, size: Vector2) -> void:
@@ -36,6 +40,29 @@ func configure(world, building_kind: String, side: int, pos: Vector2, size: Vect
 
 func ground_bounds() -> Rect2:
  return Rect2(position-footprint*0.5, footprint)
+
+func notify_unit_exit() -> void:
+ exit_activity=2.0
+
+func _process(delta: float) -> void:
+ if kind not in ["yard","power","barracks","refinery","factory","depot"] or arena==null: return
+ if arena.paused or arena.battle_over: return
+ var powered: bool = arena.power_ok(team)
+ art_working=false
+ if kind=="yard":
+  var lanes: Dictionary = arena.states[team]["lanes"]
+  for lane in ["build","defense"]:
+   if not lanes[lane].is_empty() and not bool(lanes[lane].get("ready",false)): art_working=true
+ if powered: art_time+=delta
+ exit_activity=maxf(0.0,exit_activity-delta)
+ var target := 0.0
+ if kind in ["barracks","factory"]:
+  target=1.0 if exit_activity>0.0 else 0.0
+ elif kind=="yard" and powered:
+  # Service-only ambient cycle. Never produces or spawns a unit.
+  target=0.7 if fmod(art_time,18.0)>13.0 else 0.0
+ door_open=move_toward(door_open,target,delta*2.5)
+ queue_redraw()
 
 func _physics_process(delta: float) -> void:
  if arena.paused or arena.battle_over or hp<=0 or kind!="turret" or not arena.power_ok(team): return
@@ -59,7 +86,7 @@ func receive_damage(amount: float, _attacker) -> void:
 
 func _draw() -> void:
  var size := footprint
- IndustrialArt.draw_asset(self,kind,team)
+ IndustrialArt.draw_asset(self,kind,team,0.0,NAN,0.0,{"time":art_time,"door":door_open,"working":art_working})
  if repairing:
   draw_arc(Vector2.ZERO,radius+10.0,0,TAU,28,Color("#67e7bf"),2.5)
  if selected: draw_rect(Rect2(-size*0.5-Vector2(5,5),size+Vector2(10,10)),Color("#e5e8b8"),false,2.0)

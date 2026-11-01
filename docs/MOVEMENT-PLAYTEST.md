@@ -42,7 +42,7 @@ submitting each procedural plate and line separately. The vehicle cache is bound
 to 512 meshes. Hull/turret artwork uses 64 angular steps; gameplay angles remain
 continuous. Harvesters retain separate cargo geometry in 16 fill steps; assets
 without independent turrets do not duplicate meshes for unused aim angles.
-Run
+Building artwork keeps its separate existing cache. Run
 `godot --path godot --script res://tests/unit_mesh_cache_smoke.gd` to check every
 unit's mesh reuse and capture `user://unit_mesh_gallery.png`.
 

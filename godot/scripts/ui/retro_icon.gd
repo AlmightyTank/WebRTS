@@ -24,7 +24,7 @@ func _draw() -> void:
   var bounds = IndustrialArt.asset_bounds(icon_name)
   var scale_factor = minf(size.x/bounds.size.x,size.y/bounds.size.y)
   draw_set_transform(size*0.5-bounds.get_center()*scale_factor,0,Vector2.ONE*scale_factor)
-  IndustrialArt.draw_asset(self,icon_name,1 if icon_name.begins_with("r_") else 0)
+  IndustrialArt.draw_asset(self,icon_name,2 if icon_name.begins_with("g_") else (1 if icon_name.begins_with("r_") else 0))
   draw_set_transform(Vector2.ZERO)
   return
  var factor=minf(size.x/72.0,size.y/52.0)
