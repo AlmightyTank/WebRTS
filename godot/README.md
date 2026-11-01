@@ -54,6 +54,15 @@
 - Existing **right-click rally placement**, manual active factory selection, multiple-factory speed bonuses, and direct personal rally points still work. The panel scrolls so the new controls remain accessible on smaller screens.
 - Cancelling rally placement with **Esc / right-click** keeps the previous destination. A fresh skirmish resets the stage locations and producer assignments.
 
+## Production sidebar and touch-first staging controls (v0.8.4)
+
+- **Producer cards:** the production drawer starts with one readable card for every owned Barracks and War Factory. The active factory in each shared Infantry/Vehicle lane is visibly marked **ACTIVE** and shows its position, staging destination and movement mode. Tap/click any card to select it and change where the next completed unit spawns.
+- **Always-visible summary:** the drawer header summarizes active Infantry and Vehicle factory numbers plus their assigned destination (Personal, Alpha, Bravo or Charlie), including **ATK** when attack-move rally is enabled. The active production building is also outlined with an **ACTIVE SPAWN** marker in the world.
+- **Direct staging choices:** touch-sized Personal/Alpha/Bravo/Charlie buttons show the current selection. **SET DESTINATION (G)** positions the selected producer's personal rally or its shared staging area; **MOVE / ATTACK (T)** chooses the production rally behavior. The full dropdown remains available on desktop.
+- **Responsive layouts:** a normal right sidebar on desktop becomes a bottom **collapsible production sheet** on narrow or short screens (including mobile portrait/landscape). Tapping its header opens/collapses the controls. The command toolbar supports horizontal touch scrolling. Primary controls use at least 44–48 logical pixel targets.
+- **Scope:** this is a UI/interaction update. Shared production queues, factory acceleration, per-building rally assignments and unit combat behavior stay unchanged. The old and new factory mechanics are regression-tested.
+- **Automated tests:** `godot --headless --path godot --script res://tests/production_hud_smoke.gd` verifies desktop/phone layout bounds, drawer states, touch targets, active cards, staging choices, movement toggles, and deletion/reset cleanup.
+
 ## Current limits / intentionally not implemented
 
 - This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. No upgrades, general-specific trees, naval, aircraft factories, saving, networking, or refined audio yet.
@@ -70,6 +79,7 @@ godot --headless --path godot --script res://tests/combat_smoke.gd
 godot --headless --path godot --script res://tests/skirmish_smoke.gd
 godot --headless --path godot --script res://tests/ra2_systems_smoke.gd
 godot --headless --path godot --script res://tests/rally_staging_smoke.gd
+godot --headless --path godot --script res://tests/production_hud_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 

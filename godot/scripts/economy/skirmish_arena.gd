@@ -45,11 +45,30 @@ var rally_button: Button
 var rally_stage_selector: OptionButton
 var rally_mode_button: Button
 var staging_areas: Array = []
+# UI references only; rally and production authority remain in the simulation.
+var hud_top_panel: PanelContainer
+var hud_dock: PanelContainer
+var hud_toolbar: PanelContainer
+var hud_scroll: ScrollContainer
+var hud_build_column: VBoxContainer
+var hud_toolbar_scroll: ScrollContainer
+var sidebar_toggle: Button
+var producer_summary: Label
+var producer_list: VBoxContainer
+var producer_buttons: Dictionary = {}
+var producer_list_signature := ""
+var stage_chips: Array = []
+var stage_detail: Label
+var compact_hud := false
+var sidebar_open := true
+var hud_layout_revision := 0
 
 func _ready() -> void:
  super._ready()
  # reset_battle() captures immutable scenery on the first run.
  _rebuild_navigation()
+ get_viewport().size_changed.connect(_on_hud_viewport_resized)
+ _on_hud_viewport_resized()
 
 func _new_state() -> Dictionary:
  return {"credits":10000.0,"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
@@ -270,7 +289,10 @@ func _set_active_producer(side: int, lane: String, b) -> bool:
  if side<0 or side>=active_producers.size() or lane not in ["infantry","vehicle"]: return false
  var kind="barracks" if lane=="infantry" else "factory"
  if b==null or not is_instance_valid(b) or not structures.has(b) or b.hp<=0.0 or b.team!=side or b.kind!=kind: return false
+ var old=active_producers[side][lane]
  active_producers[side][lane]=b
+ if old!=null and is_instance_valid(old): old.queue_redraw()
+ b.queue_redraw()
  queue_redraw()
  return true
 
@@ -887,6 +909,158 @@ func issue_order(point: Vector2, attack_move: bool=false) -> void:
   return
  super.issue_order(point,attack_move)
 
+# Godot 4 canvas-items stretch uses visible viewport coordinates on desktop
+# and Android. Keep a single geometry contract for landscape and portrait.
+func _hud_layout_for_size(view_size: Vector2, expanded: bool=true) -> Dictionary:
+ var w=maxf(320.0,view_size.x)
+ var h=maxf(280.0,view_size.y)
+ var compact=w<980.0 or h<590.0
+ if compact:
+  var expanded_height=minf(320.0,maxf(164.0,h*0.48))
+  var drawer_height=expanded_height if expanded else 48.0
+  return {
+   "compact":true,
+   "top":Rect2(8.0,8.0,w-16.0,60.0),
+   "toolbar":Rect2(8.0,74.0,w-16.0,55.0),
+   "dock":Rect2(8.0,h-drawer_height-8.0,w-16.0,drawer_height)
+  }
+ var dock_width=clampf(w*0.27,306.0,360.0)
+ return {
+  "compact":false,
+  "top":Rect2(12.0,12.0,w-dock_width-38.0,84.0),
+  "toolbar":Rect2(12.0,h-84.0,w-dock_width-38.0,72.0),
+  "dock":Rect2(w-dock_width-10.0,12.0,dock_width,h-24.0)
+ }
+
+func _set_control_rect(node: Control, bounds: Rect2) -> void:
+ node.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+ node.position=bounds.position
+ node.size=bounds.size
+
+func _apply_hud_layout(view_size: Vector2) -> void:
+ if not is_instance_valid(hud_dock): return
+ var layout=_hud_layout_for_size(view_size,sidebar_open)
+ compact_hud=bool(layout["compact"])
+ if not compact_hud: sidebar_open=true
+ layout=_hud_layout_for_size(view_size,sidebar_open)
+ _set_control_rect(hud_top_panel,layout["top"])
+ _set_control_rect(hud_toolbar,layout["toolbar"])
+ _set_control_rect(hud_dock,layout["dock"])
+ if is_instance_valid(sidebar_toggle):
+  sidebar_toggle.text=("PRODUCTION  ▲  COLLAPSE" if sidebar_open else "PRODUCTION  ▼  OPEN") if compact_hud else "PRODUCTION / ACTIVE FACTORIES"
+  sidebar_toggle.disabled=not compact_hud
+ if is_instance_valid(producer_summary):
+  producer_summary.visible=sidebar_open
+ if is_instance_valid(hud_scroll):
+  hud_scroll.visible=sidebar_open
+  hud_scroll.custom_minimum_size=Vector2.ZERO
+  if is_instance_valid(hud_build_column):
+   hud_build_column.custom_minimum_size=Vector2.ZERO
+ if is_instance_valid(rally_stage_selector):
+  rally_stage_selector.visible=not compact_hud
+ if is_instance_valid(activate_producer_button):
+  activate_producer_button.visible=not compact_hud
+ if is_instance_valid(hud_text): hud_text.clip_text=true
+ if is_instance_valid(info_text): info_text.clip_text=true
+ hud_layout_revision+=1
+
+func _on_hud_viewport_resized() -> void:
+ var is_compact=_hud_layout_for_size(get_viewport_rect().size,true)["compact"]
+ if is_compact and not compact_hud: sidebar_open=false
+ _apply_hud_layout(get_viewport_rect().size)
+
+func _toggle_sidebar() -> void:
+ if not compact_hud: return
+ sidebar_open=not sidebar_open
+ _apply_hud_layout(get_viewport_rect().size)
+ _update_hud()
+
+func _producer_snapshot(side: int) -> Array:
+ var result: Array=[]
+ for lane in ["infantry","vehicle"]:
+  var label="BARRACKS" if lane=="infantry" else "WAR FACTORY"
+  var ordinal=0
+  for b in structures:
+   if not is_instance_valid(b) or b.hp<=0.0 or b.team!=side or b.kind!=("barracks" if lane=="infantry" else "factory"): continue
+   ordinal+=1
+   var active=b==_active_producer(side,lane)
+   result.append({
+    "building":b,"lane":lane,"ordinal":ordinal,"type":label,
+    "active":active,"stage":"PERSONAL" if b.rally_stage_id=="" else b.rally_stage_id,
+    "mode":"ATTACK-MOVE" if b.rally_attack_move else "MOVE",
+    "point":_producer_rally_point(side,b)
+   })
+ return result
+
+func _on_producer_card_pressed(b) -> void:
+ if b==null or not is_instance_valid(b) or not structures.has(b) or b.team!=0: return
+ _select_building(b)
+ hud_status="ACTIVE: "+("Barracks" if b.kind=="barracks" else "War Factory")+". Change stage or rally mode below."
+ _update_hud()
+
+func _refresh_producer_cards() -> void:
+ if not is_instance_valid(producer_list): return
+ var snapshot=_producer_snapshot(0)
+ var signature=""
+ for item in snapshot: signature+=str(item["building"].get_instance_id())+";"
+ if signature!=producer_list_signature:
+  producer_list_signature=signature
+  for child in producer_list.get_children():
+   producer_list.remove_child(child)
+   child.queue_free()
+  producer_buttons.clear()
+  if snapshot.is_empty():
+   var empty=Label.new()
+   empty.text="Build a Barracks or War Factory to select its production exit."
+   empty.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+   producer_list.add_child(empty)
+  for item in snapshot:
+   var b=item["building"]
+   var button=Button.new()
+   button.name="Producer_"+str(b.get_instance_id())
+   button.toggle_mode=true
+   button.custom_minimum_size=Vector2(240,52)
+   button.pressed.connect(_on_producer_card_pressed.bind(b))
+   producer_list.add_child(button)
+   producer_buttons[b.get_instance_id()]=button
+ for item in snapshot:
+  var b=item["building"]
+  var card: Button=producer_buttons.get(b.get_instance_id())
+  if card==null: continue
+  var point: Vector2=item["point"]
+  card.text=("%s %s #%d  ·  %s\n%s  •  %d, %d" % [
+   "● ACTIVE" if item["active"] else "○ SELECT",
+   item["type"],item["ordinal"],item["mode"],item["stage"],int(point.x),int(point.y)
+  ])
+  card.button_pressed=bool(item["active"])
+  card.tooltip_text="Tap to use this building as the "+str(item["lane"])+" spawn exit. Stage and rally settings belong to this building."
+  card.add_theme_color_override("font_color",Color("#c8f5dd") if item["active"] else Color("#ced5df"))
+ if is_instance_valid(producer_summary):
+  var infantry_summary="INF —"
+  var vehicle_summary="VEH —"
+  for item in snapshot:
+   if not item["active"]: continue
+   var short_stage="PERS" if item["stage"]=="PERSONAL" else item["stage"]
+   var summary=("#%d %s%s" % [int(item["ordinal"]),short_stage," ATK" if item["mode"]=="ATTACK-MOVE" else ""])
+   if item["lane"]=="infantry": infantry_summary="INF "+summary
+   else: vehicle_summary="VEH "+summary
+  producer_summary.text=infantry_summary+"  |  "+vehicle_summary
+  producer_summary.clip_text=true
+  producer_summary.tooltip_text="Active production destinations. Tap producer cards to switch the spawn exit."
+
+func _refresh_staging_chips(source) -> void:
+ for i in range(stage_chips.size()):
+  var chip: Button=stage_chips[i]
+  chip.disabled=source==null
+  chip.button_pressed=source!=null and (source.rally_stage_id==("" if i==0 else STAGING_IDS[i-1]))
+ if not is_instance_valid(stage_detail): return
+ if source==null:
+  stage_detail.text="Select a producer to choose Personal / Alpha / Bravo / Charlie."
+  return
+ var label="PERSONAL" if source.rally_stage_id=="" else source.rally_stage_id
+ var pt=_producer_rally_point(0,source)
+ stage_detail.text="%s  ·  %s  ·  (%d, %d)" % [label,"ATTACK-MOVE" if source.rally_attack_move else "MOVE",int(pt.x),int(pt.y)]
+
 func _create_hud() -> void:
  hud=CanvasLayer.new()
  add_child(hud)
@@ -895,44 +1069,123 @@ func _create_hud() -> void:
  root.mouse_filter=Control.MOUSE_FILTER_IGNORE
  hud.add_child(root)
  var top=PanelContainer.new()
- top.position=Vector2(12,12)
- top.custom_minimum_size=Vector2(775,83)
+ top.mouse_filter=Control.MOUSE_FILTER_STOP
  root.add_child(top)
+ hud_top_panel=top
  var stats=VBoxContainer.new()
  top.add_child(stats)
  title_text=Label.new()
- title_text.text="MERIDIAN WARFRONT  /  CONSTRUCTION + COMBAT  v0.7"
- title_text.add_theme_font_size_override("font_size",18)
+ title_text.text="MERIDIAN WARFRONT  /  SKIRMISH v0.8.4"
+ title_text.add_theme_font_size_override("font_size",17)
+ title_text.clip_text=true
  stats.add_child(title_text)
  hud_text=Label.new()
+ hud_text.clip_text=true
  stats.add_child(hud_text)
  info_text=Label.new()
+ info_text.clip_text=true
  stats.add_child(info_text)
+
  var dock=PanelContainer.new()
- dock.anchor_left=1.0
- dock.anchor_right=1.0
- dock.offset_left=-294.0
- dock.offset_right=-10.0
- dock.offset_top=12.0
- dock.offset_bottom=620.0
+ dock.mouse_filter=Control.MOUSE_FILTER_STOP
  root.add_child(dock)
+ hud_dock=dock
+ var dock_stack=VBoxContainer.new()
+ dock.add_child(dock_stack)
+ sidebar_toggle=Button.new()
+ sidebar_toggle.text="PRODUCTION / ACTIVE FACTORIES"
+ sidebar_toggle.custom_minimum_size=Vector2(0,46)
+ sidebar_toggle.pressed.connect(_toggle_sidebar)
+ dock_stack.add_child(sidebar_toggle)
+ producer_summary=Label.new()
+ producer_summary.text="INF —  |  VEH —"
+ producer_summary.add_theme_font_size_override("font_size",13)
+ producer_summary.clip_text=true
+ dock_stack.add_child(producer_summary)
  var scroll=ScrollContainer.new()
  scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
  scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
- scroll.custom_minimum_size=Vector2(267,0)
- dock.add_child(scroll)
+ scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ scroll.follow_focus=true
+ dock_stack.add_child(scroll)
+ hud_scroll=scroll
  var column=VBoxContainer.new()
- column.custom_minimum_size=Vector2(256,0)
+ column.custom_minimum_size=Vector2(270,0)
  scroll.add_child(column)
+ hud_build_column=column
  var header=Label.new()
- header.text="CONSTRUCTION + RALLY"
+ header.text="SPAWN EXIT  ·  TAP TO ACTIVATE"
+ header.add_theme_font_size_override("font_size",13)
  column.add_child(header)
+ producer_list=VBoxContainer.new()
+ column.add_child(producer_list)
+ var stage_header=Label.new()
+ stage_header.text="SEND NEW UNITS TO"
+ stage_header.add_theme_font_size_override("font_size",13)
+ column.add_child(stage_header)
+ var stage_row=HBoxContainer.new()
+ column.add_child(stage_row)
+ for i in range(4):
+  var chip=Button.new()
+  chip.text=["SELF","ALPHA","BRAVO","CHARLIE"][i]
+  chip.toggle_mode=true
+  chip.custom_minimum_size=Vector2(60,48)
+  chip.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  chip.pressed.connect(_on_stage_selected.bind(i))
+  stage_row.add_child(chip)
+  stage_chips.append(chip)
+ stage_detail=Label.new()
+ stage_detail.text="Select a producer to assign a destination."
+ stage_detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ column.add_child(stage_detail)
+
+ var rally_row=HBoxContainer.new()
+ column.add_child(rally_row)
+ var rally=Button.new()
+ rally.text="SET DESTINATION (G)"
+ rally.custom_minimum_size=Vector2(125,48)
+ rally.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ rally.pressed.connect(_begin_rally)
+ rally_row.add_child(rally)
+ rally_button=rally
+ var mode_button=Button.new()
+ mode_button.text="MOVE / ATTACK (T)"
+ mode_button.custom_minimum_size=Vector2(125,48)
+ mode_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ mode_button.pressed.connect(_toggle_rally_attack_move)
+ rally_row.add_child(mode_button)
+ rally_mode_button=mode_button
+
+ var stage=OptionButton.new()
+ stage.name="RallyDestinationSelector"
+ stage.custom_minimum_size=Vector2(240,44)
+ stage.add_item("Personal rally",0)
+ for i in range(STAGING_IDS.size()):
+  stage.add_item("Stage "+STAGING_IDS[i],i+1)
+ stage.item_selected.connect(_on_stage_selected)
+ # Keep the desktop dropdown as an accessible alternative to the quick chips.
+ column.add_child(stage)
+ rally_stage_selector=stage
+ var activate=Button.new()
+ activate.text="ACTIVATE SELECTED PRODUCTION BUILDING"
+ activate.custom_minimum_size=Vector2(220,46)
+ activate.pressed.connect(_activate_selected_producer)
+ column.add_child(activate)
+ activate_producer_button=activate
+
+ var section=HSeparator.new()
+ column.add_child(section)
+ var tab_header=Label.new()
+ tab_header.text="PRODUCTION QUEUES"
+ column.add_child(tab_header)
  var tabs=HBoxContainer.new()
  column.add_child(tabs)
  for i in range(4):
   var tab=Button.new()
   tab.text=["BUILD","DEF","INF","VEH"][i]
-  tab.custom_minimum_size=Vector2(64,37)
+  tab.toggle_mode=true
+  tab.custom_minimum_size=Vector2(60,48)
+  tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   tab.pressed.connect(_set_tab.bind(i))
   tabs.add_child(tab)
   tab_buttons.append(tab)
@@ -941,97 +1194,77 @@ func _create_hud() -> void:
  for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
   var button=Button.new()
   button.text=id
-  button.custom_minimum_size=Vector2(256,48)
+  button.custom_minimum_size=Vector2(220,50)
   button.pressed.connect(_on_build_button.bind(id))
   build_container.add_child(button)
   action_buttons[id]=button
- var separator=HSeparator.new()
- column.add_child(separator)
+ var divider=HSeparator.new()
+ column.add_child(divider)
+ var operations=Label.new()
+ operations.text="BASE & PRODUCTION ACTIONS"
+ column.add_child(operations)
  var deploy=Button.new()
  deploy.text="DEPLOY SELECTED MCV (H)"
- deploy.custom_minimum_size=Vector2(240,46)
+ deploy.custom_minimum_size=Vector2(220,48)
  deploy.pressed.connect(_on_deploy)
  column.add_child(deploy)
  var harvest=Button.new()
  harvest.text="AUTO-HARVEST SELECTED"
- harvest.custom_minimum_size=Vector2(240,40)
+ harvest.custom_minimum_size=Vector2(220,48)
  harvest.pressed.connect(_on_harvest)
  column.add_child(harvest)
  var cancel=Button.new()
  cancel.text="CANCEL CURRENT / REFUND"
- cancel.custom_minimum_size=Vector2(240,34)
+ cancel.custom_minimum_size=Vector2(220,48)
  cancel.pressed.connect(_cancel_current_tab)
  column.add_child(cancel)
  refund_button=cancel
  var cancel_queued=Button.new()
  cancel_queued.text="REMOVE LAST QUEUED UNIT"
- cancel_queued.custom_minimum_size=Vector2(240,30)
+ cancel_queued.custom_minimum_size=Vector2(220,48)
  cancel_queued.pressed.connect(_cancel_last_queued)
  column.add_child(cancel_queued)
  cancel_queue_button=cancel_queued
  var repair=Button.new()
  repair.text="REPAIR SELECTED BUILDING"
- repair.custom_minimum_size=Vector2(240,34)
+ repair.custom_minimum_size=Vector2(220,48)
  repair.pressed.connect(_toggle_repair_selected)
  column.add_child(repair)
  repair_button=repair
  var sell=Button.new()
  sell.text="SELL SELECTED (CONFIRM)"
- sell.custom_minimum_size=Vector2(240,34)
+ sell.custom_minimum_size=Vector2(220,48)
  sell.pressed.connect(_on_sell_selected)
  column.add_child(sell)
  sell_button=sell
- var activate=Button.new()
- activate.text="USE SELECTED PRODUCTION BUILDING"
- activate.custom_minimum_size=Vector2(240,34)
- activate.pressed.connect(_activate_selected_producer)
- column.add_child(activate)
- activate_producer_button=activate
- var rally=Button.new()
- rally.text="SET RALLY POINT (G)"
- rally.custom_minimum_size=Vector2(240,34)
- rally.pressed.connect(_begin_rally)
- column.add_child(rally)
- rally_button=rally
- var rally_header=Label.new()
- rally_header.text="PRODUCTION DESTINATION / STAGING"
- column.add_child(rally_header)
- var stage=OptionButton.new()
- stage.custom_minimum_size=Vector2(240,36)
- stage.add_item("Personal rally",0)
- for i in range(STAGING_IDS.size()):
-  stage.add_item("Stage "+STAGING_IDS[i],i+1)
- stage.item_selected.connect(_on_stage_selected)
- column.add_child(stage)
- rally_stage_selector=stage
- var mode_button=Button.new()
- mode_button.text="RALLY MODE: MOVE (T)"
- mode_button.custom_minimum_size=Vector2(240,36)
- mode_button.pressed.connect(_toggle_rally_attack_move)
- column.add_child(mode_button)
- rally_mode_button=mode_button
+
  var bottom=PanelContainer.new()
- bottom.anchor_top=1.0
- bottom.anchor_bottom=1.0
- bottom.offset_top=-89.0
- bottom.offset_bottom=-12.0
- bottom.offset_left=12.0
+ bottom.mouse_filter=Control.MOUSE_FILTER_STOP
  root.add_child(bottom)
+ hud_toolbar=bottom
+ var toolbar_scroll=ScrollContainer.new()
+ toolbar_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+ toolbar_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+ toolbar_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ bottom.add_child(toolbar_scroll)
+ hud_toolbar_scroll=toolbar_scroll
  var row=HBoxContainer.new()
- bottom.add_child(row)
+ toolbar_scroll.add_child(row)
  for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Formation"],["PAUSE","Pause"],["RESET","Restart"]]:
   var button=Button.new()
   button.text=pair[1]
-  button.custom_minimum_size=Vector2(92,45)
+  button.custom_minimum_size=Vector2(100,48)
   button.pressed.connect(_on_toolbar.bind(pair[0]))
   row.add_child(button)
  result_text=Label.new()
  result_text.anchor_left=0.5
  result_text.anchor_right=0.5
  result_text.offset_left=-180
- result_text.offset_top=108
+ result_text.offset_top=136
  result_text.add_theme_font_size_override("font_size",24)
+ result_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
  root.add_child(result_text)
+ _on_hud_viewport_resized()
 
 func _on_deploy() -> void:
  if _deploy_mcv(0): _update_hud()
@@ -1122,7 +1355,8 @@ func _update_hud() -> void:
    var endpoint=_producer_rally_point(0,b)
    var label="PERSONAL" if b.rally_stage_id=="" else b.rally_stage_id
    details.append("%s EXIT (%d,%d) %s (%d,%d) %s" % [lane.to_upper(),int(b.position.x),int(b.position.y),label,int(endpoint.x),int(endpoint.y),"ATTACK-MOVE" if b.rally_attack_move else "MOVE"])
- info_text.text=" | ".join(details)+" | "+hud_status if not details.is_empty() else hud_status
+ # Keep immediate guidance readable instead of overflowing the viewport.
+ info_text.text=hud_status if compact_hud else (" | ".join(details)+" | "+hud_status if not details.is_empty() else hud_status)
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
  for id in action_buttons.keys():
@@ -1153,7 +1387,11 @@ func _update_hud() -> void:
    rally_stage_selector.select(maxi(0,idx))
  if is_instance_valid(rally_mode_button):
   rally_mode_button.disabled=source==null
-  rally_mode_button.text="RALLY MODE: "+("ATTACK-MOVE" if source!=null and source.rally_attack_move else "MOVE")+" (T)"
+  rally_mode_button.text=("ATTACK-MOVE (T)" if source!=null and source.rally_attack_move else "MOVE (T)")
+ _refresh_producer_cards()
+ _refresh_staging_chips(source)
+ if is_instance_valid(sidebar_toggle) and compact_hud and not sidebar_open:
+  sidebar_toggle.text="PRODUCTION ▼   "+producer_summary.text
  queue_redraw()
 
 func _draw() -> void:

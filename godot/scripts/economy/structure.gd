@@ -103,6 +103,12 @@ func _draw() -> void:
  if repairing:
   draw_arc(Vector2.ZERO,radius+10.0,0,TAU,28,Color("#67e7bf"),2.5)
  if selected: draw_rect(Rect2(-size*0.5-Vector2(5,5),size+Vector2(10,10)),Color("#e5e8b8"),false,2.0)
+ if team==0 and kind in ["barracks","factory"] and arena!=null and arena.has_method("_active_producer"):
+  var lane="infantry" if kind=="barracks" else "vehicle"
+  if arena._active_producer(team,lane)==self:
+   var active_color=Color("#8fe9cb") if kind=="barracks" else Color("#ffd489")
+   draw_rect(Rect2(-size*0.5-Vector2(9,9),size+Vector2(18,18)),active_color,false,3.0)
+   draw_string(ThemeDB.fallback_font,Vector2(-size.x*0.5,-size.y*0.5-42),"ACTIVE SPAWN",HORIZONTAL_ALIGNMENT_LEFT,-1,15,active_color)
  var ratio=hp/maxf(1.0,max_hp)
  draw_rect(Rect2(-size.x*0.5,-size.y*0.5-32,size.x,5),Color("#182a27"))
  draw_rect(Rect2(-size.x*0.5,-size.y*0.5-32,size.x*ratio,5),Color("#95df87") if ratio>0.4 else Color("#f2a56a"))
