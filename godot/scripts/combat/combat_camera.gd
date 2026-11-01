@@ -61,11 +61,7 @@ func _clamp() -> void:
 
 func _process(delta: float) -> void:
  var dir := Input.get_vector("ui_left","ui_right","ui_up","ui_down")
- if Input.is_key_pressed(KEY_A) and not Input.is_key_pressed(KEY_SHIFT):
-  # A is reserved for attack-move; use arrow keys or WASD except A.
-  pass
  if Input.is_key_pressed(KEY_W): dir.y -= 1.0
- if Input.is_key_pressed(KEY_S): dir.y += 1.0
  if Input.is_key_pressed(KEY_D): dir.x += 1.0
  if Input.is_key_pressed(KEY_Q): dir.x -= 1.0
  if dir != Vector2.ZERO:
