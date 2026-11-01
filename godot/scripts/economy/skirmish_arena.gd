@@ -925,21 +925,25 @@ func _hud_layout_for_size(view_size: Vector2, expanded: bool=true) -> Dictionary
  var w=maxf(320.0,view_size.x)
  var h=maxf(280.0,view_size.y)
  var compact=w<980.0 or h<590.0
+ var edge=clampf(minf(w,h)*0.025,6.0,12.0)
+ var top_height=clampf(h*0.11,34.0,64.0)
+ var toolbar_height=clampf(h*0.16,48.0,80.0)
  if compact:
-  var expanded_height=minf(320.0,maxf(164.0,h*0.48))
-  var drawer_height=expanded_height if expanded else 48.0
+  var expanded_height=minf(320.0,maxf(144.0,h*0.46))
+  var drawer_height=expanded_height if expanded else 42.0
   return {
    "compact":true,
-   "top":Rect2(8.0,8.0,w-16.0,60.0),
-   "toolbar":Rect2(8.0,74.0,w-16.0,55.0),
-   "dock":Rect2(8.0,h-drawer_height-8.0,w-16.0,drawer_height)
+   "top":Rect2(edge,edge,w-edge*2.0,top_height),
+   "toolbar":Rect2(edge,h-toolbar_height-edge,w-edge*2.0,toolbar_height),
+   "dock":Rect2(edge,h-drawer_height-edge,w-edge*2.0,drawer_height)
   }
- var dock_width=clampf(w*0.27,306.0,360.0)
+ var dock_width=clampf(w*0.20,220.0,300.0)
+ var play_width=w-dock_width-edge*3.0
  return {
   "compact":false,
-  "top":Rect2(12.0,12.0,w-dock_width-38.0,84.0),
-  "toolbar":Rect2(12.0,h-84.0,w-dock_width-38.0,72.0),
-  "dock":Rect2(w-dock_width-10.0,12.0,dock_width,h-24.0)
+  "top":Rect2(edge,edge,play_width,top_height),
+  "toolbar":Rect2(edge,h-toolbar_height-edge,play_width,toolbar_height),
+  "dock":Rect2(w-dock_width-edge,edge,dock_width,h-edge*2.0)
  }
 
 func _set_control_rect(node: Control, bounds: Rect2) -> void:
@@ -967,7 +971,7 @@ func _apply_hud_layout(view_size: Vector2) -> void:
   if is_instance_valid(hud_build_column):
    hud_build_column.custom_minimum_size=Vector2.ZERO
  if is_instance_valid(radar_view):
-  radar_view.custom_minimum_size=Vector2(260,92 if compact_hud else 135)
+  radar_view.custom_minimum_size=Vector2(0,82 if compact_hud else 108)
  if is_instance_valid(rally_stage_selector):
   rally_stage_selector.visible=not compact_hud
  if is_instance_valid(activate_producer_button):
@@ -1087,10 +1091,11 @@ func _create_hud() -> void:
  root.add_child(top)
  hud_top_panel=top
  var stats=VBoxContainer.new()
+ stats.add_theme_constant_override("separation",1)
  top.add_child(stats)
  title_text=Label.new()
- title_text.text="MERIDIAN WARFRONT / RETRO COMMAND v0.9"
- title_text.add_theme_font_size_override("font_size",17)
+ title_text.text="MERIDIAN WARFRONT"
+ title_text.add_theme_font_size_override("font_size",11)
  title_text.clip_text=true
  stats.add_child(title_text)
  hud_text=Label.new()
@@ -1108,12 +1113,12 @@ func _create_hud() -> void:
  dock.add_child(dock_stack)
  sidebar_toggle=Button.new()
  sidebar_toggle.text="PRODUCTION / ACTIVE FACTORIES"
- sidebar_toggle.custom_minimum_size=Vector2(0,46)
+ sidebar_toggle.custom_minimum_size=Vector2(0,28)
  sidebar_toggle.pressed.connect(_toggle_sidebar)
  dock_stack.add_child(sidebar_toggle)
  producer_summary=Label.new()
  producer_summary.text="INF —  |  VEH —"
- producer_summary.add_theme_font_size_override("font_size",13)
+ producer_summary.add_theme_font_size_override("font_size",8)
  producer_summary.clip_text=true
  dock_stack.add_child(producer_summary)
  var scroll=ScrollContainer.new()
@@ -1124,14 +1129,14 @@ func _create_hud() -> void:
  dock_stack.add_child(scroll)
  hud_scroll=scroll
  var column=VBoxContainer.new()
- column.custom_minimum_size=Vector2(270,0)
+ column.custom_minimum_size=Vector2(0,0)
  scroll.add_child(column)
  hud_build_column=column
  var badge=HBoxContainer.new()
  column.add_child(badge)
  var crest=Control.new()
  crest.set_script(RetroIcon)
- crest.custom_minimum_size=Vector2(43,43)
+ crest.custom_minimum_size=Vector2(28,28)
  badge.add_child(crest)
  crest.configure("EMBLEM")
  var faction=Label.new()
@@ -1140,7 +1145,7 @@ func _create_hud() -> void:
  RetroSkin.label(faction,false,true)
  radar_view=Control.new()
  radar_view.set_script(RetroRadar)
- radar_view.custom_minimum_size=Vector2(260,135)
+ radar_view.custom_minimum_size=Vector2(0,108)
  column.add_child(radar_view)
  radar_view.configure(self)
  retro_economy_label=Label.new()
@@ -1148,7 +1153,7 @@ func _create_hud() -> void:
  column.add_child(retro_economy_label)
  RetroSkin.label(retro_economy_label,false,true)
  retro_powerbar=ProgressBar.new()
- retro_powerbar.custom_minimum_size=Vector2(260,12)
+ retro_powerbar.custom_minimum_size=Vector2(0,7)
  retro_powerbar.show_percentage=false
  retro_powerbar.max_value=100.0
  retro_powerbar.value=100.0
@@ -1166,7 +1171,7 @@ func _create_hud() -> void:
   var tab=Button.new()
   tab.text=["BUILD","DEF","INF","VEH"][i]
   tab.toggle_mode=true
-  tab.custom_minimum_size=Vector2(60,48)
+  tab.custom_minimum_size=Vector2(0,27)
   tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   tab.pressed.connect(_set_tab.bind(i))
   RetroSkin.button(tab,i==0,true)
@@ -1180,22 +1185,22 @@ func _create_hud() -> void:
  for id in ["power","refinery","barracks","factory","depot","turret","a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_harvester","a_mcv"]:
   var button=Button.new()
   button.text=id
-  button.custom_minimum_size=Vector2(120,104)
+  button.custom_minimum_size=Vector2(0,56)
   button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   button.pressed.connect(_on_build_button.bind(id))
   RetroSkin.button(button)
   build_container.add_child(button)
   var icon=Control.new()
   icon.set_script(RetroIcon)
-  icon.position=Vector2(28,2)
-  icon.size=Vector2(63,43)
+  icon.position=Vector2(3,2)
+  icon.size=Vector2(34,25)
   button.add_child(icon)
   icon.configure(id)
   production_tile_icons[id]=icon
   action_buttons[id]=button
  var header=Label.new()
  header.text="SPAWN EXIT  ·  TAP TO ACTIVATE"
- header.add_theme_font_size_override("font_size",13)
+ header.add_theme_font_size_override("font_size",9)
  column.add_child(header)
  producer_list=VBoxContainer.new()
  column.add_child(producer_list)
@@ -1209,7 +1214,7 @@ func _create_hud() -> void:
   var chip=Button.new()
   chip.text=["SELF","ALPHA","BRAVO","CHARLIE"][i]
   chip.toggle_mode=true
-  chip.custom_minimum_size=Vector2(60,48)
+  chip.custom_minimum_size=Vector2(0,27)
   chip.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   chip.pressed.connect(_on_stage_selected.bind(i))
   RetroSkin.button(chip,false,true)
@@ -1224,14 +1229,14 @@ func _create_hud() -> void:
  column.add_child(rally_row)
  var rally=Button.new()
  rally.text="SET DESTINATION (G)"
- rally.custom_minimum_size=Vector2(125,48)
+ rally.custom_minimum_size=Vector2(0,28)
  rally.size_flags_horizontal=Control.SIZE_EXPAND_FILL
  rally.pressed.connect(_begin_rally)
  rally_row.add_child(rally)
  rally_button=rally
  var mode_button=Button.new()
  mode_button.text="MOVE / ATTACK (T)"
- mode_button.custom_minimum_size=Vector2(125,48)
+ mode_button.custom_minimum_size=Vector2(0,28)
  mode_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
  mode_button.pressed.connect(_toggle_rally_attack_move)
  rally_row.add_child(mode_button)
@@ -1239,7 +1244,7 @@ func _create_hud() -> void:
 
  var stage=OptionButton.new()
  stage.name="RallyDestinationSelector"
- stage.custom_minimum_size=Vector2(240,44)
+ stage.custom_minimum_size=Vector2(0,27)
  stage.add_item("Personal rally",0)
  for i in range(STAGING_IDS.size()):
   stage.add_item("Stage "+STAGING_IDS[i],i+1)
@@ -1249,7 +1254,7 @@ func _create_hud() -> void:
  rally_stage_selector=stage
  var activate=Button.new()
  activate.text="ACTIVATE SELECTED PRODUCTION BUILDING"
- activate.custom_minimum_size=Vector2(220,46)
+ activate.custom_minimum_size=Vector2(0,28)
  activate.pressed.connect(_activate_selected_producer)
  column.add_child(activate)
  activate_producer_button=activate
@@ -1266,7 +1271,7 @@ func _create_hud() -> void:
  column.add_child(queue_row)
  for q in range(4):
   var slot=Label.new()
-  slot.custom_minimum_size=Vector2(59,38)
+  slot.custom_minimum_size=Vector2(0,26)
   slot.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   slot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
   slot.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
@@ -1281,35 +1286,35 @@ func _create_hud() -> void:
  column.add_child(operations)
  var deploy=Button.new()
  deploy.text="DEPLOY SELECTED MCV (H)"
- deploy.custom_minimum_size=Vector2(220,48)
+ deploy.custom_minimum_size=Vector2(0,28)
  deploy.pressed.connect(_on_deploy)
  column.add_child(deploy)
  var harvest=Button.new()
  harvest.text="AUTO-HARVEST SELECTED"
- harvest.custom_minimum_size=Vector2(220,48)
+ harvest.custom_minimum_size=Vector2(0,28)
  harvest.pressed.connect(_on_harvest)
  column.add_child(harvest)
  var cancel=Button.new()
  cancel.text="CANCEL CURRENT / REFUND"
- cancel.custom_minimum_size=Vector2(220,48)
+ cancel.custom_minimum_size=Vector2(0,28)
  cancel.pressed.connect(_cancel_current_tab)
  column.add_child(cancel)
  refund_button=cancel
  var cancel_queued=Button.new()
  cancel_queued.text="REMOVE LAST QUEUED UNIT"
- cancel_queued.custom_minimum_size=Vector2(220,48)
+ cancel_queued.custom_minimum_size=Vector2(0,28)
  cancel_queued.pressed.connect(_cancel_last_queued)
  column.add_child(cancel_queued)
  cancel_queue_button=cancel_queued
  var repair=Button.new()
  repair.text="REPAIR SELECTED BUILDING"
- repair.custom_minimum_size=Vector2(220,48)
+ repair.custom_minimum_size=Vector2(0,28)
  repair.pressed.connect(_toggle_repair_selected)
  column.add_child(repair)
  repair_button=repair
  var sell=Button.new()
  sell.text="SELL SELECTED (CONFIRM)"
- sell.custom_minimum_size=Vector2(220,48)
+ sell.custom_minimum_size=Vector2(0,28)
  sell.pressed.connect(_on_sell_selected)
  column.add_child(sell)
  sell_button=sell
@@ -1329,7 +1334,7 @@ func _create_hud() -> void:
  for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["FORMATION","Formation"],["DEPLOY","Deploy"],["RALLY","Rally"],["STAGING","Staging"],["PAUSE","Pause"],["RESET","Restart"]]:
   var button=Button.new()
   button.text=pair[1]
-  button.custom_minimum_size=Vector2(138,52)
+  button.custom_minimum_size=Vector2(82,34)
   button.text="       "+pair[1]
   button.alignment=HORIZONTAL_ALIGNMENT_CENTER
   button.pressed.connect(_on_toolbar.bind(pair[0]))
@@ -1337,8 +1342,8 @@ func _create_hud() -> void:
   row.add_child(button)
   var tool_icon=Control.new()
   tool_icon.set_script(RetroIcon)
-  tool_icon.size=Vector2(42,42)
-  tool_icon.position=Vector2(4,5)
+  tool_icon.size=Vector2(26,26)
+  tool_icon.position=Vector2(3,4)
   button.add_child(tool_icon)
   tool_icon.configure(pair[0])
   action_palette_buttons.append(button)
@@ -1346,8 +1351,8 @@ func _create_hud() -> void:
  result_text.anchor_left=0.5
  result_text.anchor_right=0.5
  result_text.offset_left=-180
- result_text.offset_top=136
- result_text.add_theme_font_size_override("font_size",24)
+ result_text.offset_top=86
+ result_text.add_theme_font_size_override("font_size",14)
  result_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
  root.add_child(result_text)
  _skin_hud()
@@ -1447,8 +1452,9 @@ func _lane_for(id: String) -> String:
 func _update_hud() -> void:
  if not is_instance_valid(hud_text) or states.size()<2: return
  var state: Dictionary=states[0]
- var power_mark="LOW POWER" if not power_ok(0) else "POWER OK"
- hud_text.text="CREDITS %d     POWER %d / %d (%s)     ORE BANKED %d" % [int(state["credits"]),int(state["power"]),int(state["demand"]),power_mark,int(state["total_mined"])]
+ if is_instance_valid(title_text):
+  title_text.text="IRON %d" % int(state["credits"])
+ hud_text.text="POWER %+d     COMMAND RANK 2     ORE %d" % [int(state["power"])-int(state["demand"]),int(state["total_mined"])]
  var details: Array[String]=[]
  for lane in ["build","defense","infantry","vehicle"]:
   var job: Dictionary=state["lanes"][lane]
@@ -1469,7 +1475,7 @@ func _update_hud() -> void:
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
  if is_instance_valid(retro_economy_label):
-  retro_economy_label.text="CREDITS  %06d   POWER  %d/%d" % [int(state["credits"]),int(state["power"]),int(state["demand"])]
+  retro_economy_label.text="IRON  %06d   POWER %+d" % [int(state["credits"]),int(state["power"])-int(state["demand"])]
  if is_instance_valid(retro_powerbar):
   retro_powerbar.value=100.0 if int(state["demand"])<=0 else clampf(100.0*float(state["power"])/float(state["demand"]),0.0,100.0)
  if is_instance_valid(queue_preview_caption):

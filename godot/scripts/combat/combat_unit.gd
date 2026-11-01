@@ -156,7 +156,6 @@ func _physics_process(delta: float) -> void:
         var distance: float = position.distance_to(target.position)
         if distance <= float(weapon.get("range", 0.0)) and distance >= float(weapon.get("min_range", 0.0)) and arena.clear_shot(position, target.position, air, target.air, target):
             moving = false
-            turret_angle = lerp_angle(turret_angle, (target.position - position).angle(), minf(1.0, 8.0 * delta))
             if cooldown <= 0.0:
                 fire(target)
         elif distance > float(weapon.get("range", 0.0)) * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target):
@@ -166,6 +165,10 @@ func _physics_process(delta: float) -> void:
             _begin_route(position + (position - target.position).normalized() * 110.0)
     if moving:
         _step_movement(delta)
+    var desired_turret_angle := facing
+    if target != null and is_instance_valid(target) and target.hp > 0.0:
+        desired_turret_angle = (target.position - position).angle()
+    turret_angle = lerp_angle(turret_angle, desired_turret_angle, minf(1.0, (9.0 if target != null else 4.0) * delta))
     queue_redraw()
 
 func _step_movement(delta: float) -> void:
@@ -260,29 +263,49 @@ func _draw_aircraft(colors: Dictionary) -> void:
         draw_line(Vector2(-12, -8), Vector2(-2, 8), dark, 3.0)
     draw_circle(Vector2.ZERO, 5.0, dark)
 
+func _draw_rotating_turret(colors: Dictionary) -> void:
+    var main: Color = colors["main"]
+    var dark: Color = colors["dark"]
+    var accent: Color = colors["accent"]
+    var signal_color: Color = colors["signal"]
+    draw_set_transform(Vector2.ZERO, turret_angle)
+    if unit_id in ["a_sentinel_aa", "r_flak"]:
+        draw_circle(Vector2.ZERO, 11.0, dark)
+        draw_rect(Rect2(-8, -9, 16, 18), main)
+        draw_line(Vector2(4, -5), Vector2(31, -9), accent, 4.0)
+        draw_line(Vector2(4, 5), Vector2(31, 9), accent, 4.0)
+        draw_circle(Vector2(31, -9), 2.5, signal_color)
+        draw_circle(Vector2(31, 9), 2.5, signal_color)
+    elif unit_id in ["a_striker", "r_hunter"]:
+        draw_colored_polygon(PackedVector2Array([Vector2(-11, -8), Vector2(8, -8), Vector2(14, 0), Vector2(8, 8), Vector2(-11, 8)]), main)
+        draw_line(Vector2(4, 0), Vector2(31, 0), accent, 5.0)
+        draw_line(Vector2(10, -5), Vector2(28, -5), signal_color, 2.0)
+        draw_line(Vector2(10, 5), Vector2(28, 5), signal_color, 2.0)
+    else:
+        draw_circle(Vector2.ZERO, 11.0, dark)
+        draw_colored_polygon(PackedVector2Array([Vector2(-11, -8), Vector2(7, -8), Vector2(13, 0), Vector2(7, 8), Vector2(-11, 8)]), main)
+        draw_line(Vector2(3, 0), Vector2(33, 0), accent, 5.0)
+        draw_line(Vector2(23, 0), Vector2(33, 0), signal_color, 2.0)
+    draw_set_transform(Vector2.ZERO, 0.0)
+
 func _draw_vehicle(colors: Dictionary) -> void:
     var main: Color = colors["main"]
     var dark: Color = colors["dark"]
     var accent: Color = colors["accent"]
+    var signal_color: Color = colors["signal"]
     draw_set_transform(Vector2.ZERO, facing)
-    draw_rect(Rect2(-21, -16, 42, 32), dark)
-    if unit_id in ["a_striker", "r_hunter"]:
-        draw_colored_polygon(PackedVector2Array([Vector2(-15, -13), Vector2(11, -13), Vector2(19, -5), Vector2(19, 10), Vector2(-15, 10)]), main)
-        draw_rect(Rect2(-7, -10, 20, 8), accent)
-        for i in range(2):
-            draw_line(Vector2(2 + i * 8, -8), Vector2(25 + i * 4, -8), colors["signal"], 3.0)
-    elif unit_id in ["a_sentinel_aa", "r_flak"]:
-        draw_rect(Rect2(-15, -13, 30, 26), main)
-        draw_set_transform(Vector2.ZERO, turret_angle)
-        draw_line(Vector2(0, -6), Vector2(30, -6), accent, 5.0)
-        draw_line(Vector2(0, 6), Vector2(30, 6), accent, 5.0)
+    draw_colored_polygon(PackedVector2Array([Vector2(-22, -15), Vector2(14, -15), Vector2(22, -7), Vector2(22, 11), Vector2(12, 16), Vector2(-22, 16)]), dark)
+    if unit_id in ["a_sentinel_aa", "r_flak"]:
+        draw_rect(Rect2(-16, -12, 32, 25), main)
+        draw_line(Vector2(-17, 13), Vector2(17, 13), signal_color, 3.0)
+    elif unit_id in ["a_striker", "r_hunter"]:
+        draw_colored_polygon(PackedVector2Array([Vector2(-16, -12), Vector2(10, -12), Vector2(17, -4), Vector2(17, 10), Vector2(-16, 10)]), main)
+        draw_rect(Rect2(-8, -9, 18, 7), accent)
     else:
-        draw_rect(Rect2(-15, -18, 30, 36), main)
-        draw_rect(Rect2(-10, -10, 20, 20), dark)
-        draw_set_transform(Vector2.ZERO, turret_angle)
-        draw_circle(Vector2.ZERO, 9.0, main)
-        draw_line(Vector2.ZERO, Vector2(32, 0), accent, 5.0)
+        draw_rect(Rect2(-16, -12, 32, 25), main)
+        draw_rect(Rect2(-10, -8, 20, 16), dark)
     draw_set_transform(Vector2.ZERO, 0.0)
+    _draw_rotating_turret(colors)
 
 func _draw() -> void:
     var colors := _faction_colors()
