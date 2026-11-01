@@ -15,6 +15,9 @@ var repairing := false
 var paid_value := 0.0
 var rally_point := Vector2.ZERO
 var rally_custom := false
+var rally_stage_id := ""
+var rally_attack_move := false
+var rally_spawn_index := 0
 var timer := 0.0
 var weapon := {"type":"SMALL_ARMS", "damage":16.0, "interval":0.7, "range":165.0, "projectile_speed":620.0}
 

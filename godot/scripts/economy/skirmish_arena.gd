@@ -12,6 +12,7 @@ const STRUCTURE_DATA := {
  "turret":{"name":"Sentry Turret","cost":550.0,"time":9.0,"power":0,"demand":10,"size":Vector2(66,66),"hp":1350}
 }
 const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES"]
+const STAGING_IDS := ["ALPHA","BRAVO","CHARLIE"]
 var structures: Array = []
 var ore_fields: Array = []
 var static_obstacles: Array[Rect2] = []
@@ -41,6 +42,9 @@ var rally_placing := false
 var rally_source = null
 var activate_producer_button: Button
 var rally_button: Button
+var rally_stage_selector: OptionButton
+var rally_mode_button: Button
+var staging_areas: Array = []
 
 func _ready() -> void:
  super._ready()
@@ -69,6 +73,7 @@ func reset_battle() -> void:
  rally_placing=false
  rally_source=null
  active_producers=[{"infantry":null,"vehicle":null},{"infantry":null,"vehicle":null}]
+ staging_areas=[_new_staging_areas(),_new_staging_areas()]
  states=[_new_state(),_new_state()]
  ore_fields=[
   {"position":Vector2(630,330),"remaining":7200.0,"initial":7200.0},
@@ -293,8 +298,114 @@ func set_producer_rally(side: int, lane: String, target: Vector2) -> bool:
   point=cell_center(cell)
  b.rally_point=point
  b.rally_custom=true
+ b.rally_stage_id=""
+ b.rally_spawn_index=0
  queue_redraw()
  return true
+
+
+# Player-owned staging areas are independent of the active production exit.
+# Several barracks and factories may share a single area, but each producer
+# retains its own move/attack-move behavior.
+func _new_staging_areas() -> Dictionary:
+ return {
+  "ALPHA":{"position":Vector2.ZERO,"enabled":false,"next_slot":0},
+  "BRAVO":{"position":Vector2.ZERO,"enabled":false,"next_slot":0},
+  "CHARLIE":{"position":Vector2.ZERO,"enabled":false,"next_slot":0}
+ }
+
+func _valid_stage_point(target: Vector2) -> Vector2:
+ var point=clamp_point(target)
+ var cell=world_cell(point)
+ if navigation.is_point_solid(cell):
+  cell=_nearby_open_cell(cell)
+  if navigation.is_point_solid(cell): return Vector2.ZERO
+  point=cell_center(cell)
+ return point
+
+func set_staging_area(side: int, stage_id: String, target: Vector2) -> bool:
+ if side<0 or side>=staging_areas.size() or stage_id not in STAGING_IDS: return false
+ var point=_valid_stage_point(target)
+ if point==Vector2.ZERO: return false
+ var area: Dictionary=staging_areas[side][stage_id]
+ area["position"]=point
+ area["enabled"]=true
+ area["next_slot"]=0
+ queue_redraw()
+ return true
+
+func assign_producer_stage(side: int, b, stage_id: String) -> bool:
+ if side<0 or side>=staging_areas.size(): return false
+ if stage_id!="" and stage_id not in STAGING_IDS: return false
+ var lane="infantry" if is_instance_valid(b) and b.kind=="barracks" else "vehicle"
+ if not _set_active_producer(side,lane,b): return false
+ if stage_id!="" and not bool(staging_areas[side][stage_id]["enabled"]):
+  # First assignment starts at the producer's existing personal rally.
+  if not set_staging_area(side,stage_id,b.rally_point): return false
+ b.rally_stage_id=stage_id
+ b.rally_spawn_index=0
+ b.queue_redraw()
+ queue_redraw()
+ return true
+
+func set_producer_attack_move(side: int, b, enabled: bool) -> bool:
+ if b==null or not is_instance_valid(b) or b.team!=side or not structures.has(b) or b.kind not in ["barracks","factory"]: return false
+ b.rally_attack_move=enabled
+ queue_redraw()
+ return true
+
+func _producer_rally_point(side: int, b) -> Vector2:
+ if b==null or not is_instance_valid(b): return Vector2.ZERO
+ var stage_id: String=b.rally_stage_id
+ if stage_id!="" and side>=0 and side<staging_areas.size() and stage_id in STAGING_IDS:
+  var area: Dictionary=staging_areas[side][stage_id]
+  if bool(area["enabled"]): return area["position"]
+ return b.rally_point
+
+func _set_producer_destination(side: int, b, target: Vector2) -> bool:
+ if b==null or not is_instance_valid(b) or b.team!=side or b.kind not in ["barracks","factory"]: return false
+ var lane="infantry" if b.kind=="barracks" else "vehicle"
+ if not _set_active_producer(side,lane,b): return false
+ if b.rally_stage_id!="": return set_staging_area(side,b.rally_stage_id,target)
+ return set_producer_rally(side,lane,target)
+
+func _rally_destination(side: int, b) -> Vector2:
+ var center=_producer_rally_point(side,b)
+ if center==Vector2.ZERO: return center
+ var index=0
+ if b.rally_stage_id!="" and bool(staging_areas[side][b.rally_stage_id]["enabled"]):
+  var area: Dictionary=staging_areas[side][b.rally_stage_id]
+  index=int(area["next_slot"])
+  area["next_slot"]=index+1
+ else:
+  index=b.rally_spawn_index
+  b.rally_spawn_index=index+1
+ # First unit uses exact rally; later arrivals spread into tactical staging slots.
+ if index==0: return center
+ var slot=(index-1)%35
+ var row=slot/7
+ var column=slot%7
+ var spread=Vector2((float(column)-3.0)*34.0,(float(row)-2.0)*35.0)
+ var result=_valid_stage_point(center+spread)
+ return center if result==Vector2.ZERO else result
+
+func _on_stage_selected(index: int) -> void:
+ var b=_rally_candidate()
+ if b==null: return
+ var stage_id="" if index==0 else STAGING_IDS[index-1]
+ if assign_producer_stage(0,b,stage_id):
+  hud_status="Rally destination: "+("PERSONAL" if stage_id=="" else stage_id)+". Use G to reposition."
+ else:
+  hud_status="Cannot assign staging area."
+ _update_hud()
+
+func _toggle_rally_attack_move() -> void:
+ var b=_rally_candidate()
+ if b==null:
+  hud_status="Select a Barracks or War Factory first."
+ elif set_producer_attack_move(0,b,not b.rally_attack_move):
+  hud_status="New combat units will "+("ATTACK-MOVE" if b.rally_attack_move else "MOVE")+" to their rally area."
+ _update_hud()
 
 func _rally_candidate():
  if selected_building!=null and is_instance_valid(selected_building) and selected_building.team==0 and selected_building.kind in ["barracks","factory"]:
@@ -320,7 +431,7 @@ func _set_rally_at(point: Vector2) -> bool:
  var b=rally_source
  var lane="infantry" if b.kind=="barracks" else "vehicle"
  if not _set_active_producer(0,lane,b): return false
- if not set_producer_rally(0,lane,point): return false
+ if not _set_producer_destination(0,b,point): return false
  rally_placing=false
  rally_source=null
  hud_status="Rally point updated; new units will automatically move there."
@@ -440,7 +551,11 @@ func capture_structure(engineer, b) -> bool:
  var old_owner: int=b.team
  b.team=engineer.team
  if b.kind in ["barracks","factory"]:
+  # Captured producers become independent of the previous owner's staging areas.
   b.rally_point=clamp_point(b.position+Vector2(0,240 if b.team==0 else -240))
+  b.rally_stage_id=""
+  b.rally_attack_move=false
+  b.rally_spawn_index=0
   _set_active_producer(b.team,"infantry" if b.kind=="barracks" else "vehicle",b)
  b.name=("Alliance" if b.team==0 else "Republic")+"_"+b.kind
  b.repairing=false
@@ -517,9 +632,12 @@ func _produce_unit(side: int, id: String) -> bool:
  else:
   unit=_spawn(id,side,where)
  if unit==null: return false
- if producer.rally_point!=Vector2.ZERO:
-  if unit.has_method("order_rally"): unit.order_rally(producer.rally_point)
-  elif unit.has_method("order_move"): unit.order_move(producer.rally_point)
+ var waypoint=_rally_destination(side,producer)
+ if waypoint!=Vector2.ZERO:
+  if unit.has_method("order_rally"): unit.order_rally(waypoint)
+  elif unit.has_method("order_move"):
+   var military=id not in ["a_engineer","r_engineer"]
+   unit.order_move(waypoint,producer.rally_attack_move and military)
  return true
 
 func _spawn_engineer(id: String, side: int, where: Vector2):
@@ -681,7 +799,7 @@ func _unhandled_input(event: InputEvent) -> void:
   if selected.is_empty() and selected_building!=null and is_instance_valid(selected_building) and selected_building.kind in ["barracks","factory"]:
    var b=selected_building
    var lane="infantry" if b.kind=="barracks" else "vehicle"
-   if _set_active_producer(0,lane,b) and set_producer_rally(0,lane,get_global_mouse_position()):
+   if _set_producer_destination(0,b,get_global_mouse_position()):
     hud_status="Updated the selected producer rally."
     _update_hud()
     get_viewport().set_input_as_handled()
@@ -699,6 +817,10 @@ func _unhandled_input(event: InputEvent) -> void:
    get_viewport().set_input_as_handled()
    return
  if event is InputEventKey and event.pressed and not event.echo:
+  if event.keycode==KEY_T:
+   _toggle_rally_attack_move()
+   get_viewport().set_input_as_handled()
+   return
   if event.keycode==KEY_G:
    _begin_rally()
    get_viewport().set_input_as_handled()
@@ -795,8 +917,14 @@ func _create_hud() -> void:
  dock.offset_top=12.0
  dock.offset_bottom=620.0
  root.add_child(dock)
+ var scroll=ScrollContainer.new()
+ scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+ scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+ scroll.custom_minimum_size=Vector2(267,0)
+ dock.add_child(scroll)
  var column=VBoxContainer.new()
- dock.add_child(column)
+ column.custom_minimum_size=Vector2(256,0)
+ scroll.add_child(column)
  var header=Label.new()
  header.text="CONSTRUCTION + RALLY"
  column.add_child(header)
@@ -866,6 +994,23 @@ func _create_hud() -> void:
  rally.pressed.connect(_begin_rally)
  column.add_child(rally)
  rally_button=rally
+ var rally_header=Label.new()
+ rally_header.text="PRODUCTION DESTINATION / STAGING"
+ column.add_child(rally_header)
+ var stage=OptionButton.new()
+ stage.custom_minimum_size=Vector2(240,36)
+ stage.add_item("Personal rally",0)
+ for i in range(STAGING_IDS.size()):
+  stage.add_item("Stage "+STAGING_IDS[i],i+1)
+ stage.item_selected.connect(_on_stage_selected)
+ column.add_child(stage)
+ rally_stage_selector=stage
+ var mode_button=Button.new()
+ mode_button.text="RALLY MODE: MOVE (T)"
+ mode_button.custom_minimum_size=Vector2(240,36)
+ mode_button.pressed.connect(_toggle_rally_attack_move)
+ column.add_child(mode_button)
+ rally_mode_button=mode_button
  var bottom=PanelContainer.new()
  bottom.anchor_top=1.0
  bottom.anchor_bottom=1.0
@@ -975,7 +1120,9 @@ func _update_hud() -> void:
  for lane in ["infantry","vehicle"]:
   var b=_active_producer(0,lane)
   if b!=null:
-   details.append("%s EXIT (%d,%d) RALLY (%d,%d)" % [lane.to_upper(),int(b.position.x),int(b.position.y),int(b.rally_point.x),int(b.rally_point.y)])
+   var endpoint=_producer_rally_point(0,b)
+   var label="PERSONAL" if b.rally_stage_id=="" else b.rally_stage_id
+   details.append("%s EXIT (%d,%d) %s (%d,%d) %s" % [lane.to_upper(),int(b.position.x),int(b.position.y),label,int(endpoint.x),int(endpoint.y),"ATTACK-MOVE" if b.rally_attack_move else "MOVE"])
  info_text.text=" | ".join(details)+" | "+hud_status if not details.is_empty() else hud_status
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
@@ -999,18 +1146,37 @@ func _update_hud() -> void:
  if is_instance_valid(rally_button):
   rally_button.disabled=_rally_candidate()==null
   rally_button.text="PICK RALLY ON MAP (Esc cancels)" if rally_placing else "SET RALLY POINT (G)"
+ var source=_rally_candidate()
+ if is_instance_valid(rally_stage_selector):
+  rally_stage_selector.disabled=source==null
+  if source!=null:
+   var idx=0 if source.rally_stage_id=="" else STAGING_IDS.find(source.rally_stage_id)+1
+   rally_stage_selector.select(maxi(0,idx))
+ if is_instance_valid(rally_mode_button):
+  rally_mode_button.disabled=source==null
+  rally_mode_button.text="RALLY MODE: "+("ATTACK-MOVE" if source!=null and source.rally_attack_move else "MOVE")+" (T)"
  queue_redraw()
 
 func _draw() -> void:
  super._draw()
- for lane in ["infantry","vehicle"]:
-  var b=_active_producer(0,lane)
-  if b!=null and b.rally_point!=Vector2.ZERO:
-   var marker_color=Color("#79d7ff") if lane=="infantry" else Color("#f8c878")
-   draw_line(b.position,b.rally_point,Color(marker_color,0.3),2.0)
-   draw_arc(b.rally_point,15.0,0.0,TAU,24,marker_color,2.5)
-   draw_line(b.rally_point+Vector2(-7,0),b.rally_point+Vector2(7,0),marker_color,1.5)
-   draw_line(b.rally_point+Vector2(0,-7),b.rally_point+Vector2(0,7),marker_color,1.5)
+ for b in structures:
+  if not is_instance_valid(b) or b.team!=0 or b.hp<=0.0 or b.kind not in ["barracks","factory"]: continue
+  var endpoint=_producer_rally_point(0,b)
+  if endpoint==Vector2.ZERO: continue
+  var is_active=b==_active_producer(0,"infantry" if b.kind=="barracks" else "vehicle")
+  var line_color=Color("#75d9ff") if b.kind=="barracks" else Color("#f9c474")
+  draw_line(b.position,endpoint,Color(line_color,0.38 if is_active else 0.12),2.5 if is_active else 1.0)
+  if b.rally_stage_id=="":
+   draw_arc(endpoint,10.0,0.0,TAU,18,line_color,2.0 if is_active else 1.0)
+ for i in range(STAGING_IDS.size()):
+  var id=STAGING_IDS[i]
+  var stage: Dictionary=staging_areas[0][id]
+  if not bool(stage["enabled"]): continue
+  var point: Vector2=stage["position"]
+  var stage_color=[Color("#9becff"),Color("#f4d582"),Color("#dcadfa")][i]
+  draw_arc(point,21.0,0.0,TAU,30,stage_color,3.0)
+  draw_circle(point,5.0,stage_color)
+  draw_string(ThemeDB.fallback_font,point+Vector2(24,-10),id,HORIZONTAL_ALIGNMENT_LEFT,-1,16,stage_color)
  for field in ore_fields:
   if float(field["remaining"])<=0: continue
   var amount=float(field["remaining"])/maxf(1.0,float(field["initial"]))

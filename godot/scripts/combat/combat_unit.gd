@@ -22,6 +22,9 @@ var target
 var destination := Vector2.ZERO
 var moving := false
 var aggressive := false
+# Attack-move retains the intended rally destination while targets are engaged.
+var attack_move_goal := Vector2.ZERO
+var has_attack_move_goal := false
 var route := PackedVector2Array()
 var route_index := 0
 var profile_name := "infantry"
@@ -60,6 +63,8 @@ func order_move(point: Vector2, attack_move: bool = false) -> void:
 	capture_progress = 0.0
 	target = null
 	aggressive = attack_move
+	has_attack_move_goal = attack_move
+	attack_move_goal = arena.clamp_point(point) if attack_move else Vector2.ZERO
 	_begin_route(point)
 
 func order_attack(enemy) -> void:
@@ -68,6 +73,7 @@ func order_attack(enemy) -> void:
 	if not can_hit(enemy):
 		return
 	target = enemy
+	has_attack_move_goal = false
 	moving = false
 	route.clear()
 	route_index = 0
@@ -79,12 +85,14 @@ func order_stop() -> void:
 	target = null
 	moving = false
 	aggressive = false
+	has_attack_move_goal = false
 	route.clear()
 
 func order_capture(building) -> void:
 	if unit_id not in ["a_engineer", "r_engineer"] or not is_instance_valid(building) or building.team == team:
 		return
 	capture_target = building
+	has_attack_move_goal = false
 	capture_progress = 0.0
 	capture_pause = 0.0
 	target = null
@@ -142,6 +150,8 @@ func _physics_process(delta: float) -> void:
 			var new_target = arena.find_target(self, 330.0)
 			if new_target != null and (target == null or position.distance_to(new_target.position) + 35.0 < position.distance_to(target.position)):
 				target = new_target
+	if target == null and has_attack_move_goal and not moving and position.distance_to(attack_move_goal) > 18.0:
+		_begin_route(attack_move_goal)
 	if target != null:
 		var distance: float = position.distance_to(target.position)
 		if distance <= float(weapon.get("range", 0.0)) and distance >= float(weapon.get("min_range", 0.0)) and arena.clear_shot(position, target.position, air, target.air, target):

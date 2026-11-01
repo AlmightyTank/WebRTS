@@ -39,5 +39,11 @@ jobs:
           set -o pipefail
           timeout 45s godot --headless --path godot --script res://tests/ra2_systems_smoke.gd 2>&1 | tee ra2-smoke.log
           grep -q RA2_SYSTEMS_SMOKE_PASS ra2-smoke.log
+      - name: Test shared rally staging areas and attack-move orders
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path godot --script res://tests/rally_staging_smoke.gd 2>&1 | tee rally-smoke.log
+          grep -q RALLY_STAGING_SMOKE_PASS rally-smoke.log
       - name: Launch the playable skirmish
         run: godot --headless --path godot --quit-after 180

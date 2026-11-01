@@ -16,7 +16,7 @@
 
 - Left click: select one unit; drag: select several; right click: move, target, or attack.
 - Arrow keys / Q,W,D: camera movement; middle drag and mouse wheel: pan / zoom. Touch pan and pinch are supported through the existing camera input.
-- H: deploy an idle MCV. 1–4: Buildings, Defense, Infantry, Vehicles tabs.
+- H: deploy an idle MCV. 1–4: Buildings, Defense, Infantry, Vehicles tabs. G: place selected producer rally/staging area. T: toggle selected producer's Move/Attack-Move rally mode.
 - A then click: attack move; M then click: move; S: stop; F: line/wedge formation.
 - Space: pause; R: restart skirmish; Esc or right click while placing: exit placement mode.
 - Bottom toolbar provides corresponding actions for touch. **AUTO-HARVEST SELECTED** reactivates a harvester after a manual move.
@@ -44,6 +44,16 @@
 - **Expansion MCV:** after building a **Service Depot**, purchase an MCV in the VEHICLES tab. Select it, move it to clear ground and press H to deploy an additional Yard and base-building anchor.
 - **Engineer capture:** train a **Field Engineer** at the Barracks, select it and right-click an enemy structure or the neutral relay in the north-center of the map. Neutral capture takes 0.7s; enemy takeover requires 3 uninterrupted seconds near the target. Engineers are consumed after success; damage interrupts capture progress. No refinery harvesting vehicle is spawned by capture.
 
+## Shared staging areas and attack-move rally (v0.8.3)
+
+- Each Barracks and War Factory can choose **Personal**, **Alpha**, **Bravo**, or **Charlie** from the new staging selector. A producer's selected staging area is independent of which physical factory is active for the shared unit-production queue.
+- Set a shared area's location by selecting a producer assigned to it, pressing **G / SET RALLY POINT**, and clicking or tapping the battlefield. Changing that location changes the destination of **every producer linked to the same stage**, but only for subsequently produced units. Alpha, Bravo, and Charlie appear as labeled map markers.
+- Different producers may use the same named stage (for example, Barracks and War Factory converging on Alpha), or independent stages to organize separate fronts. Incoming units receive deterministic staging slots to reduce pile-ups.
+- **RALLY MODE: MOVE / ATTACK-MOVE (T)** toggles for the selected producer. New combat units set to ATTACK-MOVE engage threats along the route and resume toward their assigned rally destination after an engagement. A Barracks and War Factory sharing Alpha can still have different modes.
+- Engineers never attack-move (unarmed). Purchased harvesters move to their staging area and then resume automatic ore collection. MCVs move there normally.
+- Existing **right-click rally placement**, manual active factory selection, multiple-factory speed bonuses, and direct personal rally points still work. The panel scrolls so the new controls remain accessible on smaller screens.
+- Cancelling rally placement with **Esc / right-click** keeps the previous destination. A fresh skirmish resets the stage locations and producer assignments.
+
 ## Current limits / intentionally not implemented
 
 - This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. No upgrades, general-specific trees, naval, aircraft factories, saving, networking, or refined audio yet.
@@ -59,6 +69,7 @@ godot --headless --editor --path godot --import --quit
 godot --headless --path godot --script res://tests/combat_smoke.gd
 godot --headless --path godot --script res://tests/skirmish_smoke.gd
 godot --headless --path godot --script res://tests/ra2_systems_smoke.gd
+godot --headless --path godot --script res://tests/rally_staging_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 
