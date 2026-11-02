@@ -1177,7 +1177,8 @@ static func _harvester(c: CanvasItem, color: Color, heading: float, cargo: float
  box(c,Vector3(-28,-14,16),Vector3(36,28,2),INK,heading)
  if cargo>0:
   for x in [-20.0,-7.0]:
-   box(c,Vector3(x,-8,18),Vector3(9,16,clampf(cargo,0,1)*9),YELLOW.darkened(0.2),heading)
+   var lump := Color("#7a4a3a") if x<-10.0 else Color("#5c656e")
+   box(c,Vector3(x,-8,18),Vector3(9,16,clampf(cargo,0,1)*9),lump,heading)
  for y in [-15.0,12.0]:
   box(c,Vector3(-29,y,16),Vector3(38,3,10),YELLOW,heading)
  box(c,Vector3(-30,-12,16),Vector3(3,24,10),YELLOW,heading)
