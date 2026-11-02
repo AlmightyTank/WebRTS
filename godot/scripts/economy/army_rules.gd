@@ -36,6 +36,8 @@ static func structure_ids(choice: String) -> Array:
  ids.append("salvaged_aa" if faction(choice)=="gia" else "sam")
  if faction(choice)=="republic": ids.append("foundry")
  if faction(choice)=="gia": ids.append("silo")
+ elif faction(choice)=="alliance": ids.append("beam_array")
+ elif faction(choice)=="republic": ids.append("ironstorm")
  var mapping: Dictionary = REPLACEMENTS.get(choice,{})
  return ids.map(func(id): return mapping.get(id,id)).filter(func(id): return id not in DISABLED.get(choice,[]))
 const PROFILES := {

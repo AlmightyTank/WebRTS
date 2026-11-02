@@ -20,7 +20,9 @@ const STRUCTURE_DATA := {
  "missile_nest":{"name":"Missile Defense Nest","cost":800.0,"time":14.0,"power":0,"demand":20,"size":Vector2(66,66),"hp":1100},
  "foundry":{"name":"Heavy Foundry","cost":1600.0,"time":30.0,"power":0,"demand":35,"size":Vector2(130,110),"hp":1600},
  "vanguard_foundry":{"name":"Vanguard Foundry","cost":1600.0,"time":30.0,"power":0,"demand":35,"size":Vector2(130,110),"hp":1600},
- "silo":{"name":"Ballistic Missile Silo","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(110,100),"hp":1800}
+ "silo":{"name":"Ballistic Missile Silo","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(110,100),"hp":1800},
+ "beam_array":{"name":"Particle Beam Array","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(120,108),"hp":1800},
+ "ironstorm":{"name":"Ironstorm Artillery Array","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(124,108),"hp":1800}
 }
 const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES","UPGRADES"]
 const PRODUCER_KINDS := ["barracks","factory","airfield"]
@@ -688,7 +690,7 @@ func _tech_ready(side: int, id: String) -> bool:
   "depot": return has_structure(side,"factory")
   "turret","beam_bastion","sam","salvaged_aa","missile_nest": return has_structure(side,"barracks")
   "foundry","vanguard_foundry": return has_structure(side,"factory") and has_structure(side,"depot")
-  "silo": return has_structure(side,"factory") and has_structure(side,"depot")
+  "silo","beam_array","ironstorm": return has_structure(side,"factory") and has_structure(side,"depot")
   "a_ranger","r_line","a_engineer","r_engineer": return has_structure(side,"barracks")
   "a_javelin","r_hunter": return has_structure(side,"barracks") and has_structure(side,"refinery")
   "a_sentinel","r_bastion","a_harvester","r_hauler": return has_structure(side,"factory")
@@ -1089,7 +1091,7 @@ func _ai_economy(side: int = 1) -> void:
   if not wings.is_empty(): queue_production(side,"air",wings[ai_build_tick%wings.size()])
  if state.lanes.build.is_empty() and float(state.credits)>2500:
   for id in ArmyRules.structure_ids(army_choices[side]):
-   if id in ["vanguard_foundry","silo"] and not has_structure(side,id) and _tech_ready(side,id):
+   if id in ["vanguard_foundry","silo","beam_array","ironstorm"] and not has_structure(side,id) and _tech_ready(side,id):
     queue_production(side,"build",id)
     break
 
@@ -1135,7 +1137,7 @@ func _unhandled_input(event: InputEvent) -> void:
    point=_screen_to_world(event.position)
    picked=true
   if picked:
-   var ok: bool=commander.launch_silo(0,point) if commander.pending_power=="silo" else commander.cast(0,commander.pending_power,point)
+   var ok: bool=commander.launch_superweapon(0,point) if commander.is_superweapon(commander.pending_power) else commander.cast(0,commander.pending_power,point)
    if ok: commander.pending_power=""
    hud_status="Support ordered." if ok else "Invalid target, locked power or cooldown. Choose another location."
    get_viewport().set_input_as_handled()
@@ -2004,6 +2006,7 @@ func _update_hud() -> void:
   var ready=not job.is_empty() and str(job["id"])==id and bool(job["ready"])
   var short_label={
    "refinery":"ORE REFINERY","factory":"WAR FACTORY","airfield":"AIRFIELD","depot":"SERVICE DEPOT",
+   "beam_array":"BEAM ARRAY","ironstorm":"IRONSTORM","silo":"MISSILE SILO",
    "a_ranger":"RANGER","a_javelin":"JAVELIN","a_engineer":"ENGINEER",
    "a_sentinel":"SENTINEL","a_sentinel_aa":"MOBILE AA",
    "a_harvester":"HARVESTER","a_mcv":"MCV",

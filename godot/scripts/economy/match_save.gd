@@ -511,6 +511,8 @@ static func _areas(list: Array, named: bool) -> Array:
 			row["mark"] = bool(area.mark)
 		if area.has("wide"):
 			row["wide"] = bool(area.wide)
+		if area.has("pulse"):
+			row["pulse"] = int(area.pulse)
 		out.append(row)
 	return out
 
@@ -535,6 +537,8 @@ static func _restore_areas(list) -> Array:
 			area["mark"] = bool(row.mark)
 		if row.has("wide"):
 			area["wide"] = bool(row.wide)
+		if row.has("pulse"):
+			area["pulse"] = int(row.pulse)
 		out.append(area)
 	return out
 

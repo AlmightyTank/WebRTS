@@ -38,6 +38,18 @@ const POWERS := {
  "roadside_reinforcements":{"name":"Roadside Reinforcements","army":"gia_salvage","rank":3,"cooldown":140.0,"radius":110.0,"delay":3.0},
  "scavenger_convoy":{"name":"Scavenger Convoy","army":"gia_salvage","rank":5,"cooldown":150.0,"radius":200.0,"delay":0.0}
 }
+# One strategic weapon per faction. Same charge, warning, power, and single timer as the silo.
+const SUPERWEAPONS := {
+ "silo":{"structure":"silo","name":"Ballistic Missile Silo","charge":240.0,"warning":7.0,"radius":100.0},
+ "beam_array":{"structure":"beam_array","name":"Particle Beam Array","charge":240.0,"warning":7.0,"radius":70.0},
+ "ironstorm":{"structure":"ironstorm","name":"Ironstorm Artillery Array","charge":240.0,"warning":7.0,"radius":145.0}
+}
+const BEAM_PULSES := 4
+const BEAM_GAP := 0.65
+const BEAM_DAMAGE := 220.0
+const IRON_VOLLEYS := 3
+const IRON_GAP := 1.8
+const IRON_DAMAGE := 180.0
 const THRESHOLDS := [0.0,400.0,1000.0,2000.0,3500.0]
 var world
 var teams: Array = []
@@ -50,6 +62,7 @@ var research_buttons: Dictionary = {}
 var power_buttons: Dictionary = {}
 var rank_label: Label
 var silo_button: Button
+var strategic_id := ""
 var power_column: VBoxContainer
 var strip_label: Label
 var countdown_labels: Dictionary = {}
@@ -87,6 +100,15 @@ func research_ids(side: int) -> Array:
 
 func power_ids(side: int) -> Array:
  return POWERS.keys().filter(func(id): return POWERS[id].army==world.army_choices[side])
+
+func superweapon_id(side: int) -> String:
+ match Rules.faction(world.army_choices[side]):
+  "alliance": return "beam_array"
+  "republic": return "ironstorm"
+  _: return "silo"
+
+func is_superweapon(id: String) -> bool:
+ return SUPERWEAPONS.has(id)
 
 func start_research(side: int, id: String) -> bool:
  if side<0 or side>1 or world.paused or world.battle_over or not id in research_ids(side): return false
@@ -145,6 +167,7 @@ func cast(side: int, id: String, point: Vector2) -> bool:
 
 func _queue_warning(event: Dictionary) -> void:
  events.append(event)
+ if bool(event.get("quiet",false)): return
  if float(event.get("remaining",0.0))>=0.5 and world!=null and world.has_method("play_cue"): world.play_cue("superweapon")
 
 func living_count(side: int) -> int:
@@ -153,14 +176,24 @@ func living_count(side: int) -> int:
   if is_instance_valid(unit) and unit.hp>0 and unit.team==side: count+=1
  return count
 
-func launch_silo(side: int, point: Vector2) -> bool:
+func launch_superweapon(side: int, point: Vector2) -> bool:
  if side<0 or side>1 or world.paused or world.battle_over or not world.BOARD.has_point(point): return false
- if not world.has_structure(side,"silo") or not world.power_ok(side) or teams[side].silo>0.0 or not sees(side,point): return false
- teams[side].silo=240.0
- _queue_warning({"id":"silo","side":side,"point":point,"radius":230.0 if has_research(side,"saturation_payload") else 100.0,"remaining":7.0,"level":1,"wide":has_research(side,"saturation_payload")})
+ var id := superweapon_id(side)
+ var spec: Dictionary=SUPERWEAPONS[id]
+ if not world.has_structure(side,spec.structure) or not world.power_ok(side) or teams[side].silo>0.0 or not sees(side,point): return false
+ teams[side].silo=float(spec.charge)
+ var event := {"id":id,"side":side,"point":point,"radius":float(spec.radius),"remaining":float(spec.warning),"level":1,"pulse":0}
+ if id=="silo":
+  event["wide"]=has_research(side,"saturation_payload")
+  event["radius"]=230.0 if event["wide"] else 100.0
+ _queue_warning(event)
  queue_redraw()
  if is_instance_valid(rank_label): refresh_ui()
  return true
+
+func launch_silo(side: int, point: Vector2) -> bool:
+ if superweapon_id(side)!="silo": return false
+ return launch_superweapon(side,point)
 
 func blast(event: Dictionary, point: Vector2, kind: String, damage: float, radius: float) -> void:
  var side: int=event.side
@@ -209,11 +242,39 @@ func resolve(event: Dictionary) -> void:
  elif id=="rolling_barrage":
   for step in range(3):
    blast(event, point+Vector2((step-1)*90.0,0.0), "AP", 120.0*scale, 70.0)
+ elif id=="beam_array":
+  _continue_beam(event)
+ elif id=="ironstorm":
+  _continue_ironstorm(event)
  else:
   var kind: String="ENERGY" if id=="orbital_pulse" else ("AP" if id=="fire_mission" else "ROCKET")
   var damage: float={"orbital_pulse":260.0,"harassing_salvo":100.0,"saturation_strike":190.0,"interdiction_flight":140.0,"sky_supremacy":210.0,"fire_mission":170.0,"silo":380.0 if bool(event.get("wide",false)) else 900.0}.get(id,0.0)*scale
   # Missile support is finite and interceptable. One ready lattice reduces one local blast.
   blast(event, point, kind, damage, event.radius)
+
+func _continue_beam(event: Dictionary) -> void:
+ var side: int=event.side
+ # The beam is energy from the array. A brownout or a wrecked array cuts it off.
+ if not world.power_ok(side) or not world.has_structure(side,"beam_array"): return
+ blast(event, event.point, "ENERGY", BEAM_DAMAGE, float(event.radius))
+ var pulse: int = int(event.get("pulse",0))+1
+ if pulse>=BEAM_PULSES: return
+ var follow: Dictionary = event.duplicate()
+ follow["pulse"]=pulse
+ follow["remaining"]=BEAM_GAP
+ follow["quiet"]=true
+ _queue_warning(follow)
+
+func _continue_ironstorm(event: Dictionary) -> void:
+ # Shells already in the air still land if the array is lost.
+ blast(event, event.point, "ARTILLERY", IRON_DAMAGE, float(event.radius))
+ var pulse: int = int(event.get("pulse",0))+1
+ if pulse>=IRON_VOLLEYS: return
+ var follow: Dictionary = event.duplicate()
+ follow["pulse"]=pulse
+ follow["remaining"]=IRON_GAP
+ follow["quiet"]=true
+ _queue_warning(follow)
 
 func buff_at(side: int, id: String, point: Vector2) -> bool:
  for effect in buffs:
@@ -302,9 +363,11 @@ func tick(delta: float) -> void:
  for side in range(2):
   var state: Dictionary=teams[side]
   for id in state.cooldowns: state.cooldowns[id]=maxf(0.0,state.cooldowns[id]-delta)
-  # Strategic charge exists only while a powered, living silo exists.
-  if world.has_structure(side,"silo") and world.power_ok(side): state.silo=maxf(0.0,state.silo-delta)
-  elif not world.has_structure(side,"silo"): state.silo=240.0
+  # One charge timer for the faction weapon. Brownout pauses it. Losing the building resets it.
+  var weapon := superweapon_id(side)
+  var structure: String=SUPERWEAPONS[weapon].structure
+  if world.has_structure(side,structure) and world.power_ok(side): state.silo=maxf(0.0,state.silo-delta)
+  elif not world.has_structure(side,structure): state.silo=240.0
   var job: Dictionary=state.job
   if not job.is_empty():
    var data: Dictionary=RESEARCH[job.id]
@@ -353,10 +416,11 @@ func ai_tick(side: int = 1) -> void:
    for enemy in world.projectile_targets():
     if is_instance_valid(enemy) and enemy.team==1-side and sees(side,enemy.position): point=enemy.position; break
   if point.x>=0: cast(side,id,point)
- if world.has_structure(side,"silo"):
+ var weapon := superweapon_id(side)
+ if world.has_structure(side,SUPERWEAPONS[weapon].structure):
   for enemy in world.projectile_targets():
    if is_instance_valid(enemy) and enemy.team==1-side and sees(side,enemy.position):
-    launch_silo(side,enemy.position)
+    launch_superweapon(side,enemy.position)
     break
 
 func build_ui(column: VBoxContainer) -> void:
@@ -383,8 +447,8 @@ func build_ui(column: VBoxContainer) -> void:
  power_column.add_child(strip_label)
  for id in power_ids(0):
   _add_cameo(id,true)
- if Rules.faction(world.army_choices[0])=="gia":
-  _add_cameo("silo",false)
+ strategic_id=superweapon_id(0)
+ _add_cameo(strategic_id,false)
  _show_column()
  refresh_ui()
 
@@ -395,7 +459,10 @@ func _player_tint() -> Color:
   _: return Color("#7ec8d4")
 
 func _show_column() -> void:
- var show: bool=not power_ids(0).is_empty() or Rules.faction(world.army_choices[0])=="gia"
+ var owns := false
+ if strategic_id!="" and world!=null:
+  owns=world.has_structure(0,SUPERWEAPONS[strategic_id].structure)
+ var show: bool=not power_ids(0).is_empty() or Rules.faction(world.army_choices[0])=="gia" or owns
  if world.get("hud_powers")!=null and is_instance_valid(world.hud_powers):
   world.hud_powers.visible=show
 
@@ -453,8 +520,8 @@ func _arm_power(id: String) -> void:
  pending_power=id
  world.placement_lane=""
  world.rally_placing=false
- if id=="silo":
-  world.hud_status="Choose the silo impact. Right-click or Esc cancels."
+ if is_superweapon(id):
+  world.hud_status="Choose the "+str(SUPERWEAPONS[id].name)+" impact. Right-click or Esc cancels."
  else:
   world.hud_status="Choose target for "+str(POWERS[id].name)+". Right-click or Esc cancels."
  refresh_ui()
@@ -481,13 +548,14 @@ func refresh_ui() -> void:
   power_buttons[id].use.disabled=level==0 or cooldown>0.0
   power_buttons[id].use.tooltip_text="%s. Rank %d. 1 GP per level, up to 3. Radius %d. Cooldown %ds. Warning %.1fs. Offensive powers need shared sight. Recon can target shroud." % [data.name,data.rank,data.radius,data.cooldown,data.delay]
   _present_cameo(id,level,cooldown,float(data.cooldown),rank(0)<int(data.rank) and level==0,"R%d" % int(data.rank))
- if is_instance_valid(silo_button):
-  var owns_silo: bool=world.has_structure(0,"silo")
-  var charge: float=float(s.silo) if owns_silo else 0.0
-  var silo_ready: bool=owns_silo and world.power_ok(0) and charge<=0.0
-  silo_button.disabled=not silo_ready
-  silo_button.tooltip_text="Ballistic missile. 240s charge. A powered silo is required."
-  _present_cameo("silo",1 if owns_silo else 0,charge,240.0,not owns_silo or not world.power_ok(0),"")
+ if is_instance_valid(silo_button) and strategic_id!="":
+  var spec: Dictionary=SUPERWEAPONS[strategic_id]
+  var owns_weapon: bool=world.has_structure(0,spec.structure)
+  var charge: float=float(s.silo) if owns_weapon else 0.0
+  var weapon_ready: bool=owns_weapon and world.power_ok(0) and charge<=0.0
+  silo_button.disabled=not weapon_ready
+  silo_button.tooltip_text="%s. %.0fs charge. Warning %.0fs. A powered structure is required." % [spec.name,spec.charge,spec.warning]
+  _present_cameo(strategic_id,1 if owns_weapon else 0,charge,float(spec.charge),not owns_weapon or not world.power_ok(0),"")
  _show_column()
 
 func _present_cameo(id: String, level: int, remaining: float, duration: float, locked: bool, locked_text: String) -> void:
@@ -506,6 +574,8 @@ func _present_cameo(id: String, level: int, remaining: float, duration: float, l
 func _draw() -> void:
  for event in events:
   var tint:=Color("#ffb460") if event.side==0 else Color("#ff6258")
+  if str(event.get("id",""))=="beam_array": tint=Color("#9ae7ff") if event.side==0 else Color("#7eb6ff")
+  elif str(event.get("id",""))=="ironstorm": tint=Color("#e2b15a") if event.side==0 else Color("#d98a45")
   draw_arc(event.point,event.radius,0,TAU,48,tint,3.0)
   draw_line(event.point-Vector2(12,0),event.point+Vector2(12,0),tint,2)
   draw_line(event.point-Vector2(0,12),event.point+Vector2(0,12),tint,2)
