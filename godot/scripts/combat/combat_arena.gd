@@ -96,6 +96,7 @@ var hud_text: Label
 var info_text: Label
 var result_text: Label
 var selected: Array = []
+var control_groups: Dictionary = {}
 var paused := false
 var scenario_index := 0
 var mode := "MOVE"
@@ -103,6 +104,7 @@ var formation := "GROUP"
 var drag_start := Vector2.ZERO
 var drag_end := Vector2.ZERO
 var dragging_selection := false
+var selection_double_click := false
 var touch_start := Vector2.ZERO
 var touch_start_world := Vector2.ZERO
 var touch_dragged := false
@@ -182,7 +184,7 @@ func world_cell(point: Vector2) -> Vector2i:
 func clamp_point(point: Vector2) -> Vector2:
  return Vector2(clampf(point.x, 24, BOARD.size.x - 24), clampf(point.y, 24, BOARD.size.y - 24))
 
-func can_occupy(point: Vector2, radius: float, is_air: bool, actor = null) -> bool:
+func can_occupy(point: Vector2, radius: float, is_air: bool, actor = null, neighbors = null) -> bool:
  if not BOARD.grow(-radius).has_point(point):
   return false
  if is_air:
@@ -190,7 +192,8 @@ func can_occupy(point: Vector2, radius: float, is_air: bool, actor = null) -> bo
  for box in obstacles:
   if box.grow(radius).has_point(point):
    return false
- for unit in nearby_units(point, point, radius + 1.0):
+ var candidates: Array = nearby_units(point, point, radius + 1.0) if neighbors == null else neighbors
+ for unit in candidates:
   if not is_instance_valid(unit) or unit == actor or unit.hp <= 0.0 or unit.air:
    continue
   if point.distance_squared_to(unit.position) < pow(radius + unit.radius + 1.0, 2.0):
@@ -238,16 +241,20 @@ func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = nul
   result.append(end)
  return result
 
-func can_traverse(origin: Vector2, finish: Vector2, radius: float, is_air: bool, actor = null) -> bool:
+func can_traverse(origin: Vector2, finish: Vector2, radius: float, is_air: bool, actor = null, neighbors = null) -> bool:
  # Sweep the whole step: endpoint-only checks permit tunneling at low frame rates.
- if not can_occupy(finish, radius, is_air, actor):
+ # One conservative candidate set serves both endpoint and swept collision.
+ var candidates: Array = []
+ if not is_air:
+  candidates = nearby_units(origin, finish, radius + 1.0) if neighbors == null else neighbors
+ if not can_occupy(finish, radius, is_air, actor, candidates):
   return false
  if is_air:
   return true
  for box in obstacles:
   if _segment_hits_rect(origin, finish, box.grow(radius)):
    return false
- for unit in nearby_units(origin, finish, radius + 1.0):
+ for unit in candidates:
   if not is_instance_valid(unit) or unit == actor or unit.hp <= 0.0 or unit.air:
    continue
   var nearest := Geometry2D.get_closest_point_to_segment(unit.position, origin, finish)
@@ -317,6 +324,7 @@ func reset_battle() -> void:
  invalidate_occupancy()
  projectiles.clear()
  selected.clear()
+ control_groups.clear()
  shots = 0
  hits = 0
  kills = [0, 0]
@@ -404,7 +412,9 @@ func find_target(seeker, search_radius: float):
  var best
  var best_score := INF
  for u in units:
-  if not is_instance_valid(u) or u.hp <= 0.0 or not seeker.can_hit(u):
+  if not is_instance_valid(u) or u.hp <= 0.0 or u.team == seeker.team:
+   continue
+  if seeker.position.distance_squared_to(u.position) > search_radius * search_radius or not seeker.can_hit(u):
    continue
   var distance: float = seeker.position.distance_to(u.position)
   if distance > search_radius:
@@ -426,10 +436,13 @@ func entity_visible_to(_side: int, entity) -> bool:
  return is_instance_valid(entity)
 
 func _ai_decide() -> void:
+ _ai_decide_side(1)
+
+func _ai_decide_side(side: int) -> void:
  if battle_over:
   return
  for unit in units:
-  if not is_instance_valid(unit) or unit.hp <= 0.0 or unit.team != 1:
+  if not is_instance_valid(unit) or unit.hp <= 0.0 or unit.team != side:
    continue
   var enemy = find_target(unit, 1400.0)
   if enemy == null:
@@ -513,11 +526,15 @@ func column_route(origin: Vector2, spine: PackedVector2Array, slot: Vector2, is_
    join = i
  var route := PackedVector2Array()
  var approach := find_route(origin, spine[join], false)
+ if approach.is_empty() and origin.distance_to(spine[join]) > 2.0:
+  return find_route(origin, slot, false)
  for point in approach:
   _append_corner(route, point)
  for i in range(join, spine.size()):
   _append_corner(route, spine[i])
  var branch := find_route(goal, slot, false)
+ if branch.is_empty() and goal.distance_to(slot) > 2.0:
+  return find_route(origin, slot, false)
  for point in branch:
   _append_corner(route, point)
  if route.is_empty():
@@ -629,20 +646,57 @@ func _hit_unit(point: Vector2, side: int = -1):
 func _set_selected(items: Array, additive: bool = false) -> void:
  if not additive:
   for u in selected:
-   if is_instance_valid(u): u.selected = false
+   if is_instance_valid(u):
+    u.selected = false
+    u.queue_redraw()
   selected.clear()
  for u in items:
-  if is_instance_valid(u) and u.team == 0 and not selected.has(u):
+  if is_instance_valid(u) and u.hp > 0.0 and u.team == 0 and not selected.has(u):
    selected.append(u)
    u.selected = true
    u.queue_redraw()
  _update_hud()
+
+func _click_select(unit, additive: bool, same_type: bool = false) -> void:
+ if same_type:
+  var matching: Array = []
+  var viewport_rect := get_viewport_rect()
+  for candidate in units:
+   if is_instance_valid(candidate) and candidate.team == 0 and candidate.hp > 0.0 and candidate.unit_id == unit.unit_id and viewport_rect.has_point(get_global_transform_with_canvas() * candidate.position):
+    matching.append(candidate)
+  _set_selected(matching, additive)
+ elif additive and selected.has(unit):
+  selected.erase(unit)
+  unit.selected = false
+  unit.queue_redraw()
+  _update_hud()
+ else:
+  _set_selected([unit], additive)
+
+func _control_group_key(event: InputEventKey) -> bool:
+ if not event.pressed or event.echo or event.keycode < KEY_0 or event.keycode > KEY_9:
+  return false
+ var number: int = event.keycode - KEY_0
+ if event.ctrl_pressed:
+  control_groups[number] = selected.duplicate()
+  return true
+ if event.alt_pressed:
+  if control_groups.has(number):
+   var alive: Array = []
+   for unit in control_groups[number]:
+    if is_instance_valid(unit) and unit.hp > 0 and unit.team == 0:
+     alive.append(unit)
+   control_groups[number] = alive
+   _set_selected(alive)
+  return true
+ return false
 
 func _unhandled_input(event: InputEvent) -> void:
  if event is InputEventMouseButton:
   if event.button_index == MOUSE_BUTTON_LEFT:
    if event.pressed:
     drag_start = _screen_to_world(event.position)
+    selection_double_click = event.double_click
     drag_end = drag_start
     dragging_selection = true
    elif dragging_selection:
@@ -660,12 +714,17 @@ func _unhandled_input(event: InputEvent) -> void:
     else:
      var picked = _hit_unit(point,0)
      if picked != null:
-      _set_selected([picked],event.shift_pressed)
-     else:
+      _click_select(picked,event.shift_pressed,selection_double_click)
+     elif not event.shift_pressed:
       _set_selected([])
     queue_redraw()
   elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-   issue_order(_screen_to_world(event.position),Input.is_key_pressed(KEY_A),event.shift_pressed)
+   if mode != "MOVE":
+    mode = "MOVE"
+    dragging_selection = false
+    _update_hud()
+   else:
+    issue_order(_screen_to_world(event.position),Input.is_key_pressed(KEY_A),event.shift_pressed)
  elif event is InputEventMouseMotion and dragging_selection:
   drag_end = _screen_to_world(event.position)
   queue_redraw()
@@ -687,9 +746,13 @@ func _unhandled_input(event: InputEvent) -> void:
   if event.index == 0 and event.position.distance_to(touch_start) > 14.0:
    touch_dragged = true
  elif event is InputEventKey and event.pressed and not event.echo:
+  if _control_group_key(event): return
   match event.keycode:
    KEY_A: mode = "ATTACK_MOVE"
    KEY_M: mode = "COMMAND"
+   KEY_J:
+    for u in selected:
+     if is_instance_valid(u) and u.has_method("order_hold"): u.order_hold()
    KEY_S:
     for u in selected:
      if is_instance_valid(u): u.order_stop()

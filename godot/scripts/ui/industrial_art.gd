@@ -17,6 +17,7 @@ static var _vehicle_mesh_cache: Dictionary = {}
 const BUILDING_CACHE_LIMIT = 128
 const VEHICLE_CACHE_LIMIT = 512
 const VEHICLE_ANGLE_STEPS = 64
+const DRAW_MESHES_META = &"industrial_draw_meshes"
 const UNIT_MESH_KINDS = [
  "mcv","harvester","rifleman","missile_team","engineer",
  "tank","heavy_tank","aa","flak","gunship","helicopter",
@@ -43,6 +44,19 @@ static func _line(c: CanvasItem, a: Vector2, b: Vector2, color: Color, width: fl
  var normal = (b-a).orthogonal().normalized()*width*0.5
  _polygon(c,PackedVector2Array([a-normal,b-normal,b+normal,a+normal]),color)
 
+static func _draw_retained_mesh(c: CanvasItem, mesh: ArrayMesh) -> void:
+ # Canvas draw commands store a RID, not a Resource reference. Cache eviction
+ # must not destroy meshes still used by a canvas that has not redrawn (icons,
+ # off-screen units, and paused buildings). The draw signal precedes _draw()
+ # and runs after Godot clears the old command list, so release refs there.
+ if not c.has_meta(DRAW_MESHES_META):
+  var retained: Array[ArrayMesh] = []
+  c.set_meta(DRAW_MESHES_META,retained)
+  c.draw.connect(func(): retained.clear())
+ var meshes: Array = c.get_meta(DRAW_MESHES_META)
+ meshes.append(mesh)
+ c.draw_mesh(mesh,null)
+
 static func _finish_building_batch(c: CanvasItem, key: String, vehicle: bool = false) -> void:
  var arrays: Array = []
  arrays.resize(Mesh.ARRAY_MAX)
@@ -56,7 +70,7 @@ static func _finish_building_batch(c: CanvasItem, key: String, vehicle: bool = f
  if cache.size()>=limit:
   cache.erase(cache.keys()[0])
  cache[key]=mesh
- c.draw_mesh(mesh,null)
+ _draw_retained_mesh(c,mesh)
  _batch_building=false
  _mesh_vertices=PackedVector2Array()
  _mesh_colors=PackedColorArray()
@@ -166,7 +180,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   vehicle_key = "%s:%d:%d:%d:%d" % [kind, team, hull_frame, aim_frame, cargo_frame]
   if kind in ["rifleman","missile_team","engineer"]: vehicle_key += ":%d" % style
   if _vehicle_mesh_cache.has(vehicle_key):
-   c.draw_mesh(_vehicle_mesh_cache[vehicle_key], null)
+    _draw_retained_mesh(c,_vehicle_mesh_cache[vehicle_key])
    return
   heading = hull_frame * TAU / VEHICLE_ANGLE_STEPS
   aim = aim_frame * TAU / VEHICLE_ANGLE_STEPS
@@ -186,7 +200,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
    aim = aim_frame * TAU / 64.0
    building_key += ":%d" % aim_frame
   if _building_mesh_cache.has(building_key):
-   c.draw_mesh(_building_mesh_cache[building_key],null)
+    _draw_retained_mesh(c,_building_mesh_cache[building_key])
    return
   animation=animation.duplicate()
   animation["time"]=frame/20.0

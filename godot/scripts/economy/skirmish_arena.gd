@@ -40,6 +40,7 @@ var economy_ai_timer := 0.0
 var skirmish_time := 0.0
 var ai_build_tick := 0
 var cheat_test := false
+var ai_vs_ai := false
 var selected_building = null
 var pending_sale = null
 var repair_button: Button
@@ -133,10 +134,11 @@ func _refresh_fog() -> void:
 
 func _ai_decide() -> void:
  super._ai_decide()
+ if ai_vs_ai: _ai_decide_side(0)
  if not fog_enabled or battle_over: return
  # Idle combat units explore using their team's knowledge, not enemy coordinates.
  for unit in units:
-  if is_instance_valid(unit) and unit.team == 1 and unit.hp > 0 and not unit.weapon.is_empty() and not unit.moving and unit.target == null:
+  if is_instance_valid(unit) and (unit.team == 1 or (ai_vs_ai and unit.team == 0)) and unit.hp > 0 and not unit.weapon.is_empty() and not unit.moving and unit.target == null:
    if not scouting.orders.has(unit): scouting.start(self, unit)
 
 func _ready() -> void:
@@ -171,6 +173,7 @@ func reset_battle() -> void:
  projectiles.clear()
  structures.clear()
  selected.clear()
+ control_groups.clear()
  selected_building=null
  pending_sale=null
  sale_confirm_deadline=0.0
@@ -203,9 +206,10 @@ func reset_battle() -> void:
  _spawn_economy(ArmyRules.economic_id(army_choices[1]),1,Vector2(1600,610),false)
  # An AI follows the same construction/credit rules, but deploys its MCV immediately.
  _deploy_mcv(1)
+ if ai_vs_ai: _deploy_mcv(0)
  # A capturable neutral structure provides a tactical expansion objective.
  _place_structure("relay",-1,Vector2(1080,225),0.0)
- if ally!=null:
+ if ally!=null and not ai_vs_ai:
   ally.selected=true
   selected=[ally]
  if is_instance_valid(result_text): result_text.text=""
@@ -356,7 +360,9 @@ func find_target(seeker, search_radius: float):
  var winner
  var best=INF
  for entity in projectile_targets():
-  if not is_instance_valid(entity) or entity.hp<=0 or not entity_visible_to(seeker.team, entity) or not seeker.can_hit(entity): continue
+  if not is_instance_valid(entity) or entity.hp<=0 or entity.team==seeker.team: continue
+  if seeker.position.distance_squared_to(entity.position)>search_radius*search_radius: continue
+  if not entity_visible_to(seeker.team,entity) or not seeker.can_hit(entity): continue
   var distance=seeker.position.distance_to(entity.position)
   if distance>search_radius: continue
   var score=distance
@@ -739,7 +745,7 @@ func _tick_production(side: int, delta: float) -> void:
   if bool(job.get("ready",false)):
    if lane in ["infantry","vehicle"]:
     if _has_producer(side,lane) and _produce_unit(side,str(job["id"])): lanes[lane]={}
-   elif side==1: _ai_place_ready(lane,str(job["id"]))
+   elif side==1 or ai_vs_ai: _ai_place_ready(lane,str(job["id"]),side)
    continue
   if not _has_producer(side,lane): continue
   var recipe=_recipe(str(job["id"]),side)
@@ -806,14 +812,14 @@ func _spawn_engineer(id: String, side: int, where: Vector2):
  invalidate_occupancy()
  return u
 
-func _ai_place_ready(lane: String, id: String) -> void:
+func _ai_place_ready(lane: String, id: String, side: int = 1) -> void:
  var sites=[Vector2(-235,-205),Vector2(-225,-10),Vector2(-225,190),Vector2(80,-225),Vector2(200,15),Vector2(170,195),Vector2(-400,110),Vector2(40,360),Vector2(-400,-230),Vector2(340,-250)]
  for offset in sites:
-  var place=Vector2(1600,610)+offset
+  var place=(Vector2(1600,610)+offset) if side==1 else (Vector2(310,620)+Vector2(-offset.x,offset.y))
   place=Vector2(roundf(place.x/24.0)*24.0,roundf(place.y/24.0)*24.0)
-  if can_place(place,id,1):
-   _place_structure(id,1,place)
-   states[1]["lanes"][lane]={}
+  if can_place(place,id,side):
+   _place_structure(id,side,place)
+   states[side]["lanes"][lane]={}
    return
 
 func can_place(point: Vector2, id: String, side: int) -> bool:
@@ -884,38 +890,47 @@ func find_refinery(point: Vector2, side: int):
    if d<best: best=d; refinery=b
  return refinery
 
-func _ai_economy() -> void:
- commander.ai_tick()
+func _ai_economy(side: int = 1) -> void:
+ commander.ai_tick(side)
  # The opponent pays actual costs, obeys prerequisites, and receives ore only
  # when its harvester physically unloads; no hidden AI resource grants.
- var state: Dictionary=states[1]
+ var state: Dictionary=states[side]
+ if not has_structure(side,"yard"): _deploy_mcv(side)
+ if state.lanes.build.is_empty() and not power_ok(side):
+  queue_production(side,"build","power")
+ # Replace lost collectors before buying another combat vehicle. Avoid filling
+ # the paid FIFO with speculative orders that compete with economic recovery.
+ var collector_id: String = ArmyRules.economic_id(army_choices[side],true)
+ var has_collector: bool = units.any(func(u): return is_instance_valid(u) and u.hp>0 and u.team==side and u.unit_id==collector_id)
+ if not has_collector and has_structure(side,"refinery") and has_structure(side,"factory"):
+  if state.lanes.vehicle.is_empty(): queue_production(side,"vehicle",collector_id)
+  return
  if state["lanes"]["build"].is_empty():
   for id in ["power","refinery","barracks","factory"]:
-   if not has_structure(1,id) and _tech_ready(1,id):
-    queue_production(1,"build",id)
+   if not has_structure(side,id) and _tech_ready(side,id):
+    queue_production(side,"build",id)
     break
-  if has_structure(1,"factory") and not has_structure(1,"depot") and float(state["credits"])>1700.0:
-   queue_production(1,"build","depot")
-  elif has_structure(1,"factory") and float(state["credits"])>4000.0 and ai_build_tick%6==0:
-   queue_production(1,"build","factory" if _building_count(1,"factory")<2 else "power")
- if state["lanes"]["defense"].is_empty() and has_structure(1,"barracks") and ai_build_tick%5==0:
-  var defense_id: String=ArmyRules.REPLACEMENTS.get(army_choices[1],{}).get("turret","turret")
-  if _building_count(1,defense_id)<2: queue_production(1,"defense",defense_id)
- if has_structure(1,"barracks") and float(state["credits"])>800.0 and ai_build_tick%2==0:
-   var ids=ArmyRules.roster_ids(army_choices[1])
-   queue_production(1,"infantry",ids[1] if has_structure(1,"refinery") and ai_build_tick%4==0 else ids[0])
- if has_structure(1,"factory") and float(state["credits"])>1700.0:
-  if not has_structure(1,"yard") and has_structure(1,"depot"):
-   queue_production(1,"vehicle",ArmyRules.economic_id(army_choices[1]))
+  if has_structure(side,"factory") and not has_structure(side,"depot") and float(state["credits"])>1700.0:
+   queue_production(side,"build","depot")
+  elif has_structure(side,"factory") and float(state["credits"])>4000.0 and ai_build_tick%6==0:
+   queue_production(side,"build","factory" if _building_count(side,"factory")<2 else "power")
+ if state["lanes"]["defense"].is_empty() and has_structure(side,"barracks") and ai_build_tick%5==0:
+  var defense_id: String=ArmyRules.REPLACEMENTS.get(army_choices[side],{}).get("turret","turret")
+  if _building_count(side,defense_id)<2: queue_production(side,"defense",defense_id)
+ if has_structure(side,"barracks") and state.lanes.infantry.is_empty() and float(state["credits"])>800.0 and ai_build_tick%2==0:
+   var ids=ArmyRules.roster_ids(army_choices[side])
+   queue_production(side,"infantry",ids[1] if has_structure(side,"refinery") and ai_build_tick%4==0 else ids[0])
+ if has_structure(side,"factory") and state.lanes.vehicle.is_empty() and float(state["credits"])>1700.0:
+  if not has_structure(side,"yard") and has_structure(side,"depot"):
+   queue_production(side,"vehicle",ArmyRules.economic_id(army_choices[side]))
   else:
-   var options=ArmyRules.roster_ids(army_choices[1]).filter(func(id): return _lane_for(id)=="vehicle" and not ArmyRules.economic(id) and _tech_ready(1,id))
-   if not options.is_empty(): queue_production(1,"vehicle",options[ai_build_tick%options.size()])
+   var options=ArmyRules.roster_ids(army_choices[side]).filter(func(id): return _lane_for(id)=="vehicle" and not ArmyRules.economic(id) and _tech_ready(side,id))
+   if not options.is_empty(): queue_production(side,"vehicle",options[ai_build_tick%options.size()])
  if state.lanes.build.is_empty() and float(state.credits)>2500:
-  for id in ArmyRules.structure_ids(army_choices[1]):
-   if id in ["vanguard_foundry","silo"] and not has_structure(1,id) and _tech_ready(1,id):
-    queue_production(1,"build",id)
+  for id in ArmyRules.structure_ids(army_choices[side]):
+   if id in ["vanguard_foundry","silo"] and not has_structure(side,id) and _tech_ready(side,id):
+    queue_production(side,"build",id)
     break
- ai_build_tick+=1
 
 func _building_count(side: int, id: String) -> int:
  var count=0
@@ -940,6 +955,8 @@ func _physics_process(delta: float) -> void:
  if economy_ai_timer<=0:
   economy_ai_timer=2.1
   _ai_economy()
+  if ai_vs_ai: _ai_economy(0)
+  ai_build_tick+=1
 
 func _unhandled_input(event: InputEvent) -> void:
  if commander.pending_power!="":
@@ -980,7 +997,7 @@ func _unhandled_input(event: InputEvent) -> void:
     rally_source=null
     hud_status="Rally placement canceled."
    elif event.button_index==MOUSE_BUTTON_LEFT:
-    _set_rally_at(get_global_mouse_position())
+    _set_rally_at(_screen_to_world(event.position))
    else: return
    _update_hud()
    get_viewport().set_input_as_handled()
@@ -993,13 +1010,13 @@ func _unhandled_input(event: InputEvent) -> void:
   if selected.is_empty() and selected_building!=null and is_instance_valid(selected_building) and selected_building.kind in ["barracks","factory"]:
    var b=selected_building
    var lane="infantry" if b.kind=="barracks" else "vehicle"
-   if _set_producer_destination(0,b,get_global_mouse_position()):
+   if _set_producer_destination(0,b,_screen_to_world(event.position)):
     hud_status="Updated the selected producer rally."
     _update_hud()
     get_viewport().set_input_as_handled()
     return
- if placement_lane=="" and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
-  var picked=_hit_building(get_global_mouse_position(),0)
+ if placement_lane=="" and mode=="MOVE" and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+  var picked=_hit_building(_screen_to_world(event.position),0)
   _select_building(picked)
   if picked!=null:
    get_viewport().set_input_as_handled()
@@ -1011,6 +1028,9 @@ func _unhandled_input(event: InputEvent) -> void:
    get_viewport().set_input_as_handled()
    return
  if event is InputEventKey and event.pressed and not event.echo:
+  if _control_group_key(event):
+   get_viewport().set_input_as_handled()
+   return
   if event.keycode==KEY_T:
    _toggle_rally_attack_move()
    get_viewport().set_input_as_handled()
@@ -1029,7 +1049,7 @@ func _unhandled_input(event: InputEvent) -> void:
    get_viewport().set_input_as_handled()
    return
  if placement_lane!="" and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
-  _place_player_ready(get_global_mouse_position())
+  _place_player_ready(_screen_to_world(event.position))
   _update_hud()
   get_viewport().set_input_as_handled()
   return

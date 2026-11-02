@@ -67,6 +67,8 @@ func _run() -> void:
   for id in Rules.roster_ids(choice): expect(world.action_buttons.has(id), "Production tile matches resolved roster: " + id)
   var ai_used_signature := not Rules.REPLACEMENTS.has(choice)
   for tick in range(12):
+   # The match loop advances this once for both sides, not _ai_economy().
+   world.ai_build_tick = tick
    world._ai_economy()
    var job: Dictionary = world.states[1].lanes.vehicle
    if not job.is_empty():

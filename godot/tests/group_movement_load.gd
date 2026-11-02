@@ -9,7 +9,8 @@ func _run() -> void:
  # Isolate real movement/collision code from rendering, AI, and building updates.
  for count in [32,96,192]:
   for crowded in [false,true]:
-   var arena = Arena.new()
+   var profiling := "--profile" in OS.get_cmdline_user_args()
+   var arena = load("res://tests/movement_profile_arena.gd").new() if profiling else Arena.new()
    arena._create_navigation()
    for index in range(count):
     var actor = Unit.new()
@@ -33,6 +34,7 @@ func _run() -> void:
    for sample in samples: total+=sample
    samples.sort()
    print("MOVE count=%d crowded=%s order_ms=%.2f tick_mean_ms=%.2f tick_p95_ms=%.2f" % [count,crowded,order_ms,total/samples.size(),samples[int(samples.size()*0.95)]])
+   if profiling: print("PROFILE inclusive_us=%s calls=%s" % [arena.timings,arena.calls])
    for actor in arena.units: actor.free()
    arena.free()
  quit(0)

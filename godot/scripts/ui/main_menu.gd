@@ -10,6 +10,7 @@ var page := "home"
 var status: Label
 const ArmyRules = preload("res://scripts/economy/army_rules.gd")
 var army_choices: Array = ["alliance", "republic"]
+var ai_vs_ai := false
 
 func _army_picker(side: int) -> void:
  _text("YOUR ARMY" if side == 0 else "AI OPPONENT")
@@ -117,6 +118,11 @@ func _show_page(next_page: String) -> void:
    _text("One battlefield • You vs AI • Starting credits: 10,000\nChoose a standard army or Vale, Korda or Sayegh with replacements, research and commander powers. Mirror matches supported. Stealth, tunnels and salvage remain future systems.")
    _army_picker(0)
    _army_picker(1)
+   var watch := CheckButton.new()
+   watch.text = "AI vs AI (watch western side's vision)"
+   watch.button_pressed = ai_vs_ai
+   content.add_child(watch)
+   watch.toggled.connect(func(enabled): ai_vs_ai = enabled)
    first = _button("DEPLOY TO BATTLEFIELD", _start_game)
   "pause":
    _text("OPERATIONS PAUSED", true)
@@ -145,7 +151,7 @@ func _show_page(next_page: String) -> void:
    _focus_if_active.call_deferred(volume)
   "controls":
    _text("FIELD MANUAL", true)
-   _text("Select: left click / drag selection box\nOrders: right click\nCamera: WASD / arrows; right or middle drag\nZoom: mouse wheel\nDeploy selected MCV: H\nTactical pause: Space\nOpen / close pause menu: F10\nCancel current command: Escape\nTouch camera: drag / pinch (device validation pending)")
+   _text("Select: click / drag; Shift-click toggles; double-click same type\nOrders: right click; Shift queues movement; J holds position\nControl groups: Ctrl+0–9 assign, Alt+0–9 recall\nProduction tabs: 1–4\nCamera: WASD / arrows; right or middle drag\nZoom: mouse wheel\nDeploy selected MCV: H\nTactical pause: Space\nOpen / close pause menu: F10\nCancel current command: Escape or right click\nTouch camera: drag / pinch (device validation pending)")
   "credits":
    _text("Meridian Warfront\nAn original real-time strategy project.\nBuilt with Godot Engine — godotengine.org (MIT license).\nUnits, structures and command UI use the project's procedural artwork.\nDevelopment build: gameplay, artwork and content are still evolving.")
   "leave":
@@ -168,6 +174,7 @@ func _start_game() -> void:
   return
  game = scene.instantiate()
  game.army_choices = army_choices.duplicate()
+ game.ai_vs_ai = ai_vs_ai
  # The front-end runs while paused; the battlefield must not inherit that mode.
  game.process_mode = Node.PROCESS_MODE_PAUSABLE
  add_child(game)

@@ -262,32 +262,32 @@ func tick(delta: float) -> void:
  refresh_ui()
  queue_redraw()
 
-func ai_tick() -> void:
- for id in research_ids(1):
-  if world.states[1].credits>2500 and start_research(1,id): break
- for id in power_ids(1):
-  if not teams[1].powers.has(id): buy_power(1,id)
- if rank(1)==5:
-  for id in power_ids(1):
-   if int(teams[1].powers.get(id,0))<3: buy_power(1,id)
- for id in power_ids(1):
+func ai_tick(side: int = 1) -> void:
+ for id in research_ids(side):
+  if world.states[side].credits>2500 and start_research(side,id): break
+ for id in power_ids(side):
+  if not teams[side].powers.has(id): buy_power(side,id)
+ if rank(side)==5:
+  for id in power_ids(side):
+   if int(teams[side].powers.get(id,0))<3: buy_power(side,id)
+ for id in power_ids(side):
   var point:=Vector2(-1,-1)
   if id in ["target_lattice","rocket_recon"]:
    for unit in world.units:
-    if is_instance_valid(unit) and unit.team==1 and unit.moving: point=unit.destination; break
+    if is_instance_valid(unit) and unit.team==side and unit.moving: point=unit.destination; break
   elif id in ["grid_surge","field_repairs","armor_reserve","breakthrough_order"]:
    for unit in world.units:
-    if is_instance_valid(unit) and unit.team==1 and not Rules.economic(unit.unit_id):
+    if is_instance_valid(unit) and unit.team==side and not Rules.economic(unit.unit_id):
      point=world._find_open_position(unit.position+Vector2(0,80),20.0) if id=="armor_reserve" else unit.position
      break
   else:
    for enemy in world.projectile_targets():
-    if is_instance_valid(enemy) and enemy.team==0 and sees(1,enemy.position): point=enemy.position; break
-  if point.x>=0: cast(1,id,point)
- if world.has_structure(1,"silo"):
+    if is_instance_valid(enemy) and enemy.team==1-side and sees(side,enemy.position): point=enemy.position; break
+  if point.x>=0: cast(side,id,point)
+ if world.has_structure(side,"silo"):
   for enemy in world.projectile_targets():
-   if is_instance_valid(enemy) and enemy.team==0 and sees(1,enemy.position):
-    launch_silo(1,enemy.position)
+   if is_instance_valid(enemy) and enemy.team==1-side and sees(side,enemy.position):
+    launch_silo(side,enemy.position)
     break
 
 func build_ui(column: VBoxContainer) -> void:

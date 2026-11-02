@@ -40,6 +40,7 @@ var capture_approach_point := Vector2.ZERO
 var capture_progress := 0.0
 var capture_pause := 0.0
 var explicit_attack := false
+var hold_position := false
 var blocked_time := 0.0
 var traffic_wait := 0.0
 var column_move := false
@@ -78,6 +79,7 @@ var fire_feedback := 0.0
 var hit_feedback := 0.0
 
 func order_move(point: Vector2, attack_move: bool = false) -> void:
+    hold_position = false
     order_revision += 1
     pending_orders.clear()
     explicit_attack = false
@@ -94,6 +96,7 @@ func order_attack(enemy) -> void:
     if not can_hit(enemy):
         return
     explicit_attack = true
+    hold_position = false
     order_revision += 1
     pending_orders.clear()
     capture_target = null
@@ -108,6 +111,7 @@ func order_attack(enemy) -> void:
     aggressive = true
 
 func order_stop() -> void:
+    hold_position = false
     order_revision += 1
     pending_orders.clear()
     explicit_attack = false
@@ -119,12 +123,17 @@ func order_stop() -> void:
     has_attack_move_goal = false
     route.clear()
 
+func order_hold() -> void:
+    order_stop()
+    hold_position = true
+
 func order_capture(building) -> void:
     if unit_id not in ["a_engineer", "r_engineer", "g_tech"] or not is_instance_valid(building) or building.team == team:
         return
     if not arena.entity_visible_to(team, building):
         return
     capture_target = building
+    hold_position = false
     order_revision += 1
     pending_orders.clear()
     explicit_attack = false
@@ -194,7 +203,7 @@ func _physics_process(delta: float) -> void:
     if scan_timer <= 0.0:
         scan_timer = 0.35 + float(unit_id.length() % 3) * 0.12
         if not explicit_attack and (aggressive or not moving):
-            var new_target = arena.find_target(self, 330.0)
+            var new_target = arena.find_target(self, float(weapon.get("range", 0.0)) if hold_position else 330.0)
             if new_target != null and (target == null or position.distance_to(new_target.position) + 35.0 < position.distance_to(target.position)):
                 target = new_target
     if target == null and has_attack_move_goal and not moving and position.distance_to(attack_move_goal) > 18.0:
@@ -206,13 +215,13 @@ func _physics_process(delta: float) -> void:
             moving = false
             if cooldown <= 0.0 and stationary_time >= float(weapon.get("brace",0.0)):
                 fire(target)
-        elif distance < float(weapon.get("min_range", 0.0)):
+        elif not hold_position and distance < float(weapon.get("min_range", 0.0)):
             var retreat: Vector2 = position - target.position
             if retreat.length_squared() < 0.01:
                 retreat = Vector2.RIGHT
             if not moving or destination.distance_to(target.position) < float(weapon.get("min_range", 0.0)):
                 _begin_route(position + retreat.normalized() * (float(weapon.get("min_range", 0.0)) - distance + 30.0))
-        elif distance > effective_range * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target):
+        elif not hold_position and (distance > effective_range * 0.87 or not arena.clear_shot(position, target.position, air, target.air, target)):
             if not moving or destination.distance_to(target.position) > 60.0:
                 _begin_route(target.position)
     if moving:
@@ -243,8 +252,13 @@ func _step_movement(delta: float) -> void:
         traffic_wait = 0.0
     var direction := (waypoint - position).normalized()
     var separation := Vector2.ZERO
+    var neighbors: Array = []
     if not air:
-        for other in arena.nearby_units(position, position, radius + 5.0):
+        # Cover every steering/lateral endpoint, plus separation/repath checks.
+        # Other actors cannot move during this actor's synchronous step.
+        var reach := Vector2.ONE * minf(move_speed * 1.2 * delta, maxf(8.0,position.distance_to(waypoint)))
+        neighbors = arena.nearby_units(position-reach, position+reach, radius + 8.0)
+        for other in neighbors:
             if other == self or not is_instance_valid(other) or other.hp <= 0.0 or other.air:
                 continue
             var offset: Vector2 = position - other.position
@@ -256,7 +270,7 @@ func _step_movement(delta: float) -> void:
         steering = direction
     var speed_factor := 1.2 if arena.get("commander")!=null and arena.commander.buff_at(team,"breakthrough_order",position) and armor=="HEAVY" else 1.0
     var next_position := position + steering * minf(move_speed * speed_factor * delta, position.distance_to(waypoint))
-    if arena.can_traverse(position, next_position, radius, air, self):
+    if arena.can_traverse(position, next_position, radius, air, self, neighbors):
         position = next_position
         arena.update_unit_occupancy(self)
         blocked_time = 0.0
@@ -274,7 +288,7 @@ func _step_movement(delta: float) -> void:
         for angle in [0.0, 0.52, -0.52, 1.05, -1.05, 1.57, -1.57]:
             var lateral := direction.rotated(angle)
             var candidate := position + lateral * minf(move_speed * delta, 8.0)
-            if arena.can_traverse(position, candidate, radius, air, self):
+            if arena.can_traverse(position, candidate, radius, air, self, neighbors):
                 position = candidate
                 arena.update_unit_occupancy(self)
                 break
@@ -282,7 +296,7 @@ func _step_movement(delta: float) -> void:
             blocked_time = 0.0
             # Keep the route while nearby traffic is still moving; retry later.
             var waiting_for_traffic := false
-            for other in arena.nearby_units(position, position, radius + 8.0):
+            for other in neighbors:
                 if is_instance_valid(other) and other != self and other.hp > 0.0 and other.moving and position.distance_to(other.position) < radius + other.radius + 8.0:
                     waiting_for_traffic = true
                     break
@@ -326,6 +340,8 @@ func _draw() -> void:
     GroundOrders.draw_route(self)
     if selected:
         draw_arc(Vector2.ZERO,radius+8.0,0.0,TAU,36,Color("#e1f39e"),2.2)
+        if hold_position:
+            draw_string(ThemeDB.fallback_font,Vector2(-15,28),"HOLD",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#e1f39e"))
     var artwork = unit_id if IndustrialArt.has_asset(unit_id) else ("gunship" if air else ("rifleman" if profile_name=="infantry" else "tank"))
     # Recoil is visual only: collision, aim and navigation keep their exact transforms.
     draw_set_transform(-Vector2.from_angle(turret_angle) * 3.0 * fire_feedback / 0.12)
