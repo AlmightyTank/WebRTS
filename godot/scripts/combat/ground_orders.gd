@@ -18,7 +18,7 @@ static func advance(actor) -> void:
  actor.pending_orders = remaining
  var spine = next.get("column_spine")
  if spine is PackedVector2Array and actor.get("air") != true:
-  var march: PackedVector2Array = actor.arena.column_route(actor.position, spine, false)
+  var march: PackedVector2Array = actor.arena.column_route(actor.position, spine, false, actor)
   if not march.is_empty():
    actor.route = march
    actor.route_index = 0

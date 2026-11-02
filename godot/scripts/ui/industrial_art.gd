@@ -138,7 +138,7 @@ static func asset_kind(id: String) -> String:
  return {"a_mcv":"mcv","r_mcv":"mcv","a_harvester":"harvester","r_hauler":"harvester","a_ranger":"rifleman","r_line":"rifleman","a_javelin":"missile_team","r_hunter":"missile_team","a_engineer":"engineer","r_engineer":"engineer","a_sentinel":"tank","r_bastion":"heavy_tank","a_sentinel_aa":"aa","r_flak":"flak","a_striker":"gunship","r_siege_heli":"helicopter"}.get(id,id)
 
 static func has_asset(id: String) -> bool:
- if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","airfield"]: return true
+ if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","airfield","wall","gate"]: return true
  if id in ["sam","salvaged_aa"]: return true
  id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return true
@@ -157,6 +157,7 @@ static func asset_bounds(id: String) -> Rect2:
  if kind in ["mcv","harvester","tank","heavy_tank","aa","flak"]: return Rect2(-53,-61,106,98)
  if kind in ["gunship","helicopter"]: return Rect2(-63,-66,126,110)
  if kind=="relay": return Rect2(-65,-128,130,173)
+ if kind in ["wall","gate"]: return Rect2(-22,-36,44,52)
  return Rect2(-104,-115,208,180)
 
 static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: float = 0.0, aim: float = NAN, cargo: float = 0.0, animation: Dictionary = {}) -> void:
@@ -188,11 +189,11 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   if kind == "harvester": cargo = cargo_frame / 16.0
   _batch_building = true
  var building_key := ""
- if kind in ["yard","power","barracks","refinery","factory","airfield","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm"]:
+ if kind in ["yard","power","barracks","refinery","factory","airfield","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","wall","gate"]:
   # Share identical animation frames across instances; bound retained GPU memory.
   var frame = int(float(animation.get("time",0.0))*20.0)
   var door_frame = int(round(float(animation.get("door",0.0))*16.0))
-  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest","silo","beam_array","ironstorm"]:
+  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest","silo","beam_array","ironstorm","wall"]:
    frame=0
    door_frame=0
   building_key="%s:%d:%d:%d:%s:%d" % [kind,team,frame,door_frame,animation.get("working",false),style]
@@ -215,6 +216,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   "mcv": _mcv(c,faction,heading)
   "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket": _commander_unit(c,kind,faction,heading,aim)
   "beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm": _commander_structure(c,kind,faction,aim,animation)
+  "wall","gate": _perimeter(c,kind,faction,style,animation)
   "a_arc_lance": _arc_lance(c,faction,heading,aim)
   "a_tempest": _tempest(c,faction,heading)
   "r_stormrail": _stormrail(c,faction,heading,aim)
@@ -279,6 +281,30 @@ static func _commander_unit(c: CanvasItem, kind: String, color: Color, heading: 
    if kind=="r_armored_scout":
     for y in [-17.0,13.0]: box(c,Vector3(-23,y,11),Vector3(44,4,15),STEEL,heading)
  _flush_depth(c)
+
+static func _perimeter(c: CanvasItem, kind: String, color: Color, style: int, animation: Dictionary = {}) -> void:
+ _collect_depth=false
+ var open: float = float(animation.get("door", 0.0)) if kind=="gate" else 0.0
+ _slab(c, Vector2(18, 14))
+ if style==1:
+  # Thick concrete. The gate's two blocks slide apart for the owner.
+  var gap: float = 4.0+open*10.0
+  box(c, Vector3(-16, -7, 2), Vector3(14-open*6.0, 14, 16), CONCRETE.darkened(0.08))
+  box(c, Vector3(2+gap*0.15, -7, 2), Vector3(14-open*6.0, 14, 16), CONCRETE.darkened(0.08))
+  box(c, Vector3(-14, -5, 16), Vector3(28-open*8.0, 3, 2), YELLOW)
+ elif style==2:
+  # Low uneven scrap. The checkpoint leaves a wider hole as it opens.
+  box(c, Vector3(-16, -8, 1), Vector3(12, 6, 8), Color("#8a6242"))
+  box(c, Vector3(-14, -2, 1), Vector3(10, 10, 11), Color("#6e5138"))
+  box(c, Vector3(4+open*6.0, -7, 1), Vector3(12, 8, 7), Color("#7b5a3c"))
+  box(c, Vector3(2+open*6.0, 1, 1), Vector3(14, 7, 10), STEEL.darkened(0.25))
+ else:
+  # Two posts and a rail. The rail pulls aside when the security gate opens.
+  box(c, Vector3(-15, -4, 1), Vector3(4, 8, 18), STEEL)
+  box(c, Vector3(11, -4, 1), Vector3(4, 8, 18), STEEL)
+  var span: float = 22.0-open*16.0
+  beam(c, Vector3(-11, 0, 14), Vector3(-11+span, 0, 14), Color("#9ae7ff"), 3)
+  box(c, Vector3(-12, -2, 12), Vector3(4, 4, 4), color)
 
 static func _commander_structure(c: CanvasItem, kind: String, color: Color, aim: float, animation: Dictionary = {}) -> void:
  _collect_depth=false
