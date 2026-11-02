@@ -61,6 +61,19 @@ var skirmish_time := 0.0
 var ai_build_tick := 0
 var cheat_test := false
 var ai_vs_ai := false
+# Recruit waits, Regular plays the published build, Veteran scouts and pushes earlier.
+# None of the three adds credits. A second harvester is a paid Veteran build, not a grant.
+const AI_PROFILES := {
+ "recruit": {"label":"RECRUIT", "period":3.8, "build_gap":8.0, "attack_after":160.0, "attack_count":6, "chase":280.0, "scout":"late", "scout_after":75.0, "factory_after":120.0, "depot":false, "expand":false, "airfield":false, "superweapon":false, "second_harvester":false, "defense_cap":1, "vehicle_credits":2800.0, "vehicles":"cheap"},
+ "regular": {"label":"REGULAR", "period":2.1, "build_gap":0.0, "attack_after":90.0, "attack_count":4, "chase":720.0, "scout":"idle", "scout_after":0.0, "factory_after":0.0, "depot":true, "depot_credits":1700.0, "expand":true, "airfield":true, "airfield_credits":3500.0, "superweapon":true, "second_harvester":false, "defense_cap":2, "vehicle_credits":1700.0, "vehicles":"mix"},
+ "veteran": {"label":"VETERAN", "period":1.4, "build_gap":0.0, "attack_after":36.0, "attack_count":2, "chase":1100.0, "scout":"early", "scout_after":0.0, "factory_after":0.0, "depot":true, "depot_credits":1100.0, "expand":true, "airfield":true, "airfield_credits":2200.0, "superweapon":true, "second_harvester":true, "defense_cap":2, "vehicle_credits":1400.0, "vehicles":"best"}
+}
+var ai_difficulty := "regular"
+var ai_clock: Array = [{"ore":-1.0,"tank":-1.0,"attack":-1.0},{"ore":-1.0,"tank":-1.0,"attack":-1.0}]
+var ai_pushed: Array = [false, false]
+var ai_next_build: Array = [0.0, 0.0]
+var ai_scout: Array = [null, null]
+var retro_ai_label: Label
 var selected_building = null
 var pending_sale = null
 var repair_button: Button
@@ -194,15 +207,11 @@ func _refresh_fog() -> void:
   fog.refresh()
 
 func _ai_decide() -> void:
- super._ai_decide()
- if ai_vs_ai: _ai_decide_side(0)
- if not fog_enabled or battle_over: return
- # Idle combat units explore using their team's knowledge, not enemy coordinates.
- for unit in units:
-  if is_instance_valid(unit) and (unit.team == 1 or (ai_vs_ai and unit.team == 0)) and unit.hp > 0 and not unit.weapon.is_empty() and not unit.moving and unit.target == null:
-   if not scouting.orders.has(unit): scouting.start(self, unit)
+ _ai_opening(1)
+ if ai_vs_ai: _ai_opening(0)
 
 func _ready() -> void:
+ ai_difficulty = _valid_difficulty(ai_difficulty)
  army_choices = [ArmyRules.valid_choice(str(army_choices[0])), ArmyRules.valid_choice(str(army_choices[1]))]
  _fit_board(SkirmishMaps.get_map(map_id))
  audio = preload("res://scripts/audio/match_audio.gd").new()
@@ -226,6 +235,10 @@ func clear_for_restore() -> void:
   combat_feedback.effects.clear()
   combat_feedback.queue_redraw()
  scouting.orders.clear()
+ ai_clock=[{"ore":-1.0,"tank":-1.0,"attack":-1.0},{"ore":-1.0,"tank":-1.0,"attack":-1.0}]
+ ai_pushed=[false,false]
+ ai_next_build=[0.0,0.0]
+ ai_scout=[null,null]
  for u in units:
   if is_instance_valid(u):
    u.set_physics_process(false)
@@ -316,7 +329,7 @@ func reset_battle() -> void:
  for site in battlefield["ore"]:
   ore_fields.append({"position":site["position"],"remaining":float(site["amount"]),"initial":float(site["amount"])})
  skirmish_time=0.0
- economy_ai_timer=2.0
+ economy_ai_timer=float(_ai_profile().period)
  ai_build_tick=0
  hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
  if audio != null and is_instance_valid(audio): audio.reset_cues()
@@ -1066,6 +1079,8 @@ func _produce_unit(side: int, id: String) -> bool:
  else:
   unit=_spawn(id,side,where)
  if unit==null: return false
+ if lane=="vehicle" and not ArmyRules.economic(id) and not ArmyRules.engineer(id):
+  _stamp_clock(side, "tank")
  producer.notify_unit_exit()
  var waypoint=_rally_destination(side,producer)
  if waypoint!=Vector2.ZERO:
@@ -1158,6 +1173,8 @@ func _ai_place_ready(lane: String, id: String, side: int = 1) -> void:
   if can_place(place,id,side):
    _place_structure(id,side,place)
    states[side]["lanes"][lane]={}
+   if lane=="build":
+    ai_next_build[side]=skirmish_time+float(_ai_profile().build_gap)
    return
 
 func _snap_build_point(id: String, point: Vector2) -> Vector2:
@@ -1240,6 +1257,7 @@ func deliver_ore(side: int, amount: float) -> void:
  if amount<=0.0: return
  states[side]["credits"]=float(states[side]["credits"])+amount
  states[side]["total_mined"]=float(states[side]["total_mined"])+amount
+ _stamp_clock(side, "ore")
 
 func find_refinery(point: Vector2, side: int):
  var refinery
@@ -1250,49 +1268,161 @@ func find_refinery(point: Vector2, side: int):
    if d<best: best=d; refinery=b
  return refinery
 
+func _valid_difficulty(id: String) -> String:
+ if AI_PROFILES.has(id): return id
+ return "regular"
+
+func _ai_profile() -> Dictionary:
+ return AI_PROFILES[_valid_difficulty(ai_difficulty)]
+
+func _stamp_clock(side: int, key: String) -> void:
+ if side<0 or side>1: return
+ if float(ai_clock[side][key])>=0.0: return
+ ai_clock[side][key]=skirmish_time
+
+func _ai_collector_count(side: int) -> int:
+ var collector_id: String=ArmyRules.economic_id(army_choices[side],true)
+ var count:=0
+ for unit in units:
+  if is_instance_valid(unit) and unit.hp>0 and unit.team==side and str(unit.unit_id)==collector_id: count+=1
+ return count
+
+func _ai_combat_units(side: int) -> Array:
+ var result: Array=[]
+ for unit in units:
+  if not is_instance_valid(unit) or unit.hp<=0.0 or unit.team!=side: continue
+  if unit.get("order_revision")==null: continue
+  if ArmyRules.economic(str(unit.unit_id)) or ArmyRules.engineer(str(unit.unit_id)): continue
+  if unit.weapon.is_empty(): continue
+  result.append(unit)
+ return result
+
+func _enemy_anchor(side: int) -> Vector2:
+ var best:=Vector2.ZERO
+ var nearest:=INF
+ var found:=false
+ var home: Vector2=_base_anchor(side)
+ for building in structures:
+  if not is_instance_valid(building) or building.hp<=0.0 or building.team==side or building.team<0: continue
+  if not entity_visible_to(side, building): continue
+  var distance: float=home.distance_squared_to(building.position)
+  if distance<nearest:
+   nearest=distance
+   best=building.position
+   found=true
+ if found: return best
+ var resolved: Array=SkirmishMaps.resolve_slots(start_slots)
+ return SkirmishMaps.point(map_id, str(resolved[1-side]))
+
+func _ai_pick_vehicle(side: int, options: Array) -> String:
+ var mode: String=str(_ai_profile().get("vehicles","mix"))
+ var cheapest: String=str(options[0])
+ var cheap_cost: float=float(_recipe(cheapest, side).get("cost",0.0))
+ var affordable: String=""
+ var afford_cost:=-1.0
+ var credits: float=float(states[side]["credits"])
+ for id in options:
+  var cost: float=float(_recipe(str(id), side).get("cost",0.0))
+  if cost<cheap_cost:
+   cheapest=str(id)
+   cheap_cost=cost
+  if cost<=credits and cost>afford_cost:
+   affordable=str(id)
+   afford_cost=cost
+ if mode=="cheap": return cheapest
+ if mode=="best": return affordable if affordable!="" else cheapest
+ return str(options[ai_build_tick%options.size()])
+
+func _ai_scout(side: int, combat: Array) -> void:
+ var profile: Dictionary=_ai_profile()
+ var mode: String=str(profile.scout)
+ if not fog_enabled or combat.is_empty(): return
+ if mode=="late" and skirmish_time+0.001<float(profile.scout_after): return
+ var limit: int=combat.size() if mode=="idle" else 1
+ var assigned:=0
+ for unit in combat:
+  if assigned>=limit: break
+  if mode=="early":
+   var goal: Vector2=_enemy_anchor(side)
+   if unit.target==null and (not unit.moving or unit.destination.distance_to(goal)>80.0) and unit.position.distance_to(goal)>80.0:
+    unit.order_move(goal, false)
+   assigned+=1
+   break
+  if not scouting.orders.has(unit) and not unit.moving and unit.target==null:
+   scouting.start(self, unit)
+  if scouting.orders.has(unit) or unit.moving: assigned+=1
+
+func _ai_push(side: int, combat: Array) -> void:
+ ai_pushed[side]=true
+ _stamp_clock(side, "attack")
+ var anchor: Vector2=_enemy_anchor(side)
+ for unit in combat:
+  unit.order_move(anchor, true)
+
+func _ai_opening(side: int) -> void:
+ if battle_over: return
+ var profile: Dictionary=_ai_profile()
+ var combat: Array=_ai_combat_units(side)
+ if ai_pushed[side]:
+  var chase: float=float(profile.chase)
+  var anchor: Vector2=_enemy_anchor(side)
+  for unit in combat:
+   var threat=find_target(unit, chase)
+   if threat!=null: unit.order_attack(threat)
+   elif unit.target==null and not unit.moving and not bool(unit.get("has_attack_move_goal")):
+    unit.order_move(anchor, true)
+  return
+ _ai_scout(side, combat)
+ for unit in combat:
+  var threat=find_target(unit, 220.0)
+  if threat!=null: unit.order_attack(threat)
+ if skirmish_time+0.001>=float(profile.attack_after) and combat.size()>=int(profile.attack_count):
+  _ai_push(side, combat)
+
 func _ai_economy(side: int = 1) -> void:
  commander.ai_tick(side)
- # The opponent pays actual costs, obeys prerequisites, and receives ore only
- # when its harvester physically unloads; no hidden AI resource grants.
+ # Every difficulty pays the same prices and receives ore only when a harvester unloads.
+ var profile: Dictionary=_ai_profile()
  var state: Dictionary=states[side]
  if not has_structure(side,"yard"): _deploy_mcv(side)
  if state.lanes.build.is_empty() and not power_ok(side):
   queue_production(side,"build","power")
- # Replace lost collectors before buying another combat vehicle. Avoid filling
- # the paid FIFO with speculative orders that compete with economic recovery.
- var collector_id: String = ArmyRules.economic_id(army_choices[side],true)
- var has_collector: bool = units.any(func(u): return is_instance_valid(u) and u.hp>0 and u.team==side and u.unit_id==collector_id)
- if not has_collector and has_structure(side,"refinery") and has_structure(side,"factory"):
+ # Replace a lost collector before any combat vehicle. Do not stack a second order behind it.
+ var collector_id: String=ArmyRules.economic_id(army_choices[side],true)
+ if _ai_collector_count(side)==0 and has_structure(side,"refinery") and has_structure(side,"factory"):
   if state.lanes.vehicle.is_empty(): queue_production(side,"vehicle",collector_id)
   return
- if state["lanes"]["build"].is_empty():
+ if state["lanes"]["build"].is_empty() and skirmish_time+0.001>=float(ai_next_build[side]):
   for id in ["power","refinery","barracks","factory"]:
+   if id=="factory" and float(profile.factory_after)>0.0 and skirmish_time+0.001<float(profile.factory_after): continue
    if not has_structure(side,id) and _tech_ready(side,id):
     queue_production(side,"build",id)
     break
   var depot_id: String=str(ArmyRules.REPLACEMENTS.get(army_choices[side],{}).get("depot","depot"))
-  if has_structure(side,"factory") and not has_structure(side,depot_id) and float(state["credits"])>1700.0 and _tech_ready(side,depot_id):
+  if bool(profile.depot) and has_structure(side,"factory") and not has_structure(side,depot_id) and float(state["credits"])>float(profile.get("depot_credits",1700.0)) and _tech_ready(side,depot_id):
    queue_production(side,"build",depot_id)
-  elif has_structure(side,"factory") and float(state["credits"])>4000.0 and ai_build_tick%6==0:
+  elif bool(profile.expand) and has_structure(side,"factory") and float(state["credits"])>4000.0 and ai_build_tick%6==0:
    queue_production(side,"build","factory" if _building_count(side,"factory")<2 else "power")
-  elif has_structure(side,"power") and has_structure(side,"refinery") and has_structure(side,"barracks") and has_structure(side,"factory") and not has_structure(side,"airfield") and float(state["credits"])>3500.0 and ai_build_tick%7==0:
+  elif bool(profile.airfield) and has_structure(side,"power") and has_structure(side,"refinery") and has_structure(side,"barracks") and has_structure(side,"factory") and not has_structure(side,"airfield") and float(state["credits"])>float(profile.get("airfield_credits",3500.0)) and ai_build_tick%7==0:
    queue_production(side,"build","airfield")
  if state["lanes"]["defense"].is_empty() and has_structure(side,"barracks") and ai_build_tick%5==0:
   var defense_id: String=ArmyRules.REPLACEMENTS.get(army_choices[side],{}).get("turret","turret")
-  if _building_count(side,defense_id)<2: queue_production(side,"defense",defense_id)
+  if _building_count(side,defense_id)<int(profile.defense_cap): queue_production(side,"defense",defense_id)
  if has_structure(side,"barracks") and state.lanes.infantry.is_empty() and float(state["credits"])>800.0 and ai_build_tick%2==0:
-   var ids=ArmyRules.roster_ids(army_choices[side])
-   queue_production(side,"infantry",ids[1] if has_structure(side,"refinery") and ai_build_tick%4==0 else ids[0])
- if has_structure(side,"factory") and state.lanes.vehicle.is_empty() and float(state["credits"])>1700.0:
-  if not has_structure(side,"yard") and has_structure(side,"depot"):
+  var ids=ArmyRules.roster_ids(army_choices[side])
+  queue_production(side,"infantry",ids[1] if has_structure(side,"refinery") and ai_build_tick%4==0 else ids[0])
+ if has_structure(side,"factory") and state.lanes.vehicle.is_empty() and float(state["credits"])>float(profile.vehicle_credits):
+  if not has_structure(side,"yard") and (has_structure(side,"depot") or has_structure(side,"ghost_node")):
    queue_production(side,"vehicle",ArmyRules.economic_id(army_choices[side]))
+  elif bool(profile.second_harvester) and _ai_collector_count(side)==1 and float(state["credits"])>1800.0:
+   queue_production(side,"vehicle",collector_id)
   else:
    var options=ArmyRules.roster_ids(army_choices[side]).filter(func(id): return _lane_for(id)=="vehicle" and not ArmyRules.economic(id) and _tech_ready(side,id))
-   if not options.is_empty(): queue_production(side,"vehicle",options[ai_build_tick%options.size()])
- if has_structure(side,"airfield") and power_ok(side) and state["lanes"].get("air",{}).is_empty() and float(state["credits"])>2200.0 and ai_build_tick%4==0:
+   if not options.is_empty(): queue_production(side,"vehicle",_ai_pick_vehicle(side, options))
+ if bool(profile.airfield) and has_structure(side,"airfield") and power_ok(side) and state["lanes"].get("air",{}).is_empty() and float(state["credits"])>2200.0 and ai_build_tick%4==0:
   var wings=ArmyRules.roster_ids(army_choices[side]).filter(func(id): return _lane_for(id)=="air" and _tech_ready(side,id))
   if not wings.is_empty(): queue_production(side,"air",wings[ai_build_tick%wings.size()])
- if state.lanes.build.is_empty() and float(state.credits)>2500:
+ if bool(profile.superweapon) and state.lanes.build.is_empty() and float(state.credits)>2500:
   for id in ArmyRules.structure_ids(army_choices[side]):
    if id in ["vanguard_foundry","silo","beam_array","ironstorm"] and not has_structure(side,id) and _tech_ready(side,id):
     queue_production(side,"build",id)
@@ -1320,7 +1450,7 @@ func _physics_process(delta: float) -> void:
  _tick_relay_income(delta)
  economy_ai_timer-=delta
  if economy_ai_timer<=0:
-  economy_ai_timer=2.1
+  economy_ai_timer=float(_ai_profile().period)
   _ai_economy()
   if ai_vs_ai: _ai_economy(0)
   ai_build_tick+=1
@@ -1754,6 +1884,11 @@ func _create_hud() -> void:
  faction.text=str(ArmyRules.CHOICES[army_choices[0]].name).to_upper()
  badge.add_child(faction)
  RetroSkin.label(faction,false,true)
+ retro_ai_label=Label.new()
+ retro_ai_label.text="COMPUTER  "+str(_ai_profile().label)
+ retro_ai_label.add_theme_font_size_override("font_size",11)
+ column.add_child(retro_ai_label)
+ RetroSkin.label(retro_ai_label,false,true)
  radar_view=Control.new()
  radar_view.set_script(RetroRadar)
  radar_view.custom_minimum_size=Vector2(0,108)
@@ -2140,7 +2275,9 @@ func _update_hud() -> void:
  if is_instance_valid(title_text):
   title_text.text="IRON %d" % int(state["credits"])
  var relay_text: String=("    RELAY +%d/s" % int(RELAY_CREDITS_PER_SECOND)) if _owns_living_relay(0) else ""
- hud_text.text="POWER %+d     COMMAND RANK %d     ORE %d%s" % [int(state["power"])-int(state["demand"]),commander.rank(0),int(state["total_mined"]),relay_text]
+ hud_text.text="POWER %+d     COMMAND RANK %d     ORE %d%s     COMPUTER %s" % [int(state["power"])-int(state["demand"]),commander.rank(0),int(state["total_mined"]),relay_text,str(_ai_profile().label)]
+ if is_instance_valid(retro_ai_label):
+  retro_ai_label.text=("COMPUTERS  " if ai_vs_ai else "COMPUTER  ")+str(_ai_profile().label)
  var details: Array[String]=[]
  for lane in ["build","defense","infantry","vehicle","air"]:
   var job: Dictionary=state["lanes"][lane]
