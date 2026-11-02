@@ -450,8 +450,8 @@ func _ai_decide_side(side: int) -> void:
   if unit.target == null or not is_instance_valid(unit.target) or (unit.position.distance_to(enemy.position) + 100.0 < unit.position.distance_to(unit.target.position)):
    unit.order_attack(enemy)
 
-# Red Alert 2 right-click: pack the group into the nearest free cells around the
-# click, then each vehicle follows the cell path around static terrain.
+# GROUP right-click: one shared path, single file, then these cells at the destination.
+# LINE and WEDGE keep their shape for the whole move.
 func gather_cells(point: Vector2, count: int) -> Array[Vector2]:
  var result: Array[Vector2] = []
  if count <= 0:
@@ -481,15 +481,43 @@ func gather_cells(point: Vector2, count: int) -> Array[Vector2]:
   result.append(result[result.size() - 1] if not result.is_empty() else cell_center(cell))
  return result
 
-# One ground unit occupies a cell. A follower waits while a unit ahead is
-# moving the same way, which is how an RA2 column files through a gap.
+# Single file: yield to the column mate closer to the destination, and keep
+# one unit in a gap cell when someone ahead is already moving through it.
 func same_direction_holds_cell(actor, waypoint: Vector2) -> bool:
  if actor.get("air") == true or actor.get("column_move") != true:
   return false
+ var goal: Vector2 = actor.destination
+ var raw_goal = actor.get("column_goal")
+ if raw_goal is Vector2 and raw_goal != Vector2.ZERO:
+  goal = raw_goal
+ var my_rank: float = actor.position.distance_squared_to(goal)
+ var ahead: Vector2 = waypoint - actor.position
+ if ahead.length_squared() < 4.0:
+  ahead = goal - actor.position
+ if ahead.length_squared() < 4.0:
+  return false
+ var forward: Vector2 = ahead.normalized()
+ var spacing: float = maxf(float(CELL) + 4.0, actor.radius * 2.0 + 8.0)
+ for other in nearby_units(actor.position, waypoint, spacing):
+  if other == actor or not is_instance_valid(other) or other.hp <= 0.0 or other.get("air") == true or other.get("column_move") != true or not other.moving:
+   continue
+  var offset: Vector2 = other.position - actor.position
+  var along: float = offset.dot(forward)
+  if along < -6.0 or along > spacing:
+   continue
+  var lateral_sq: float = offset.length_squared() - along * along
+  if lateral_sq > 42.0 * 42.0:
+   continue
+  var their_goal: Vector2 = goal
+  var raw_their = other.get("column_goal")
+  if raw_their is Vector2 and raw_their != Vector2.ZERO:
+   their_goal = raw_their
+  var their_rank: float = other.position.distance_squared_to(their_goal)
+  if their_rank < my_rank - 4.0 or (absf(their_rank - my_rank) <= 4.0 and other.get_instance_id() < actor.get_instance_id()):
+   return true
  var cell := world_cell(waypoint)
  if world_cell(actor.position) == cell or world_cell(actor.destination) == cell:
   return false
- _ensure_occupancy()
  var my_dir: Vector2 = actor.destination - actor.position
  if my_dir.length_squared() < 4.0:
   return false
@@ -508,11 +536,46 @@ func same_direction_holds_cell(actor, waypoint: Vector2) -> bool:
    return true
  return false
 
-# Join the shared corridor at the first bend that is not behind this unit,
-# follow it through the gap, then branch to this unit's own cell.
-func column_route(origin: Vector2, spine: PackedVector2Array, slot: Vector2, is_air: bool) -> PackedVector2Array:
+func column_path_remaining(actor) -> float:
+ var route: PackedVector2Array = actor.route
+ var index := int(actor.route_index)
+ if index >= route.size():
+  var goal = actor.get("column_goal")
+  var fallback: Vector2 = goal if goal is Vector2 else actor.destination
+  return actor.position.distance_to(fallback)
+ var remaining: float = actor.position.distance_to(route[index])
+ var previous: Vector2 = route[index]
+ for i in range(index + 1, route.size()):
+  remaining += previous.distance_to(route[i])
+  previous = route[i]
+ return remaining
+
+# The file stays intact until about one cell of shared path remains.
+func begin_column_spread(actor, force: bool = false) -> bool:
+ if actor.get("column_move") != true:
+  return false
+ if not force and column_path_remaining(actor) > float(CELL) + 16.0:
+  return false
+ var slot: Vector2 = actor.column_slot
+ actor.column_move = false
+ actor.column_slot = Vector2.ZERO
+ actor.column_goal = Vector2.ZERO
+ if slot != Vector2.ZERO and actor.position.distance_to(slot) > 8.0:
+  if actor.has_method("_begin_route"):
+   actor._begin_route(slot)
+  else:
+   actor._route_to(slot)
+  return true
+ actor.moving = false
+ actor.route.clear()
+ actor.route_index = 0
+ return true
+
+# Join the shared corridor and follow it to the destination. The arrival cell
+# is applied only after the unit gets there.
+func column_route(origin: Vector2, spine: PackedVector2Array, is_air: bool = false) -> PackedVector2Array:
  if is_air or spine.is_empty():
-  return find_route(origin, slot, is_air)
+  return PackedVector2Array()
  var goal: Vector2 = spine[spine.size() - 1]
  var join := spine.size() - 1
  var best := INF
@@ -527,18 +590,13 @@ func column_route(origin: Vector2, spine: PackedVector2Array, slot: Vector2, is_
  var route := PackedVector2Array()
  var approach := find_route(origin, spine[join], false)
  if approach.is_empty() and origin.distance_to(spine[join]) > 2.0:
-  return find_route(origin, slot, false)
+  return find_route(origin, goal, false)
  for point in approach:
   _append_corner(route, point)
  for i in range(join, spine.size()):
   _append_corner(route, spine[i])
- var branch := find_route(goal, slot, false)
- if branch.is_empty() and goal.distance_to(slot) > 2.0:
-  return find_route(origin, slot, false)
- for point in branch:
-  _append_corner(route, point)
  if route.is_empty():
-  return find_route(origin, slot, false)
+  return find_route(origin, goal, false)
  return route
 
 func _append_corner(route: PackedVector2Array, point: Vector2) -> void:
@@ -610,17 +668,23 @@ func issue_order(point: Vector2, attack_move: bool = false, queued: bool = false
   var u = ordered[i]
   var slot: Vector2 = targets[i]
   if queued:
-   u.queue_move(slot, attack_move)
+   if formation == "GROUP" and u.get("air") != true and not spine.is_empty():
+    u.queue_move(slot, attack_move, spine, slot)
+   else:
+    u.queue_move(slot, attack_move)
   else:
    u.order_move(slot, attack_move)
    if formation == "GROUP" and u.get("air") != true and not spine.is_empty():
-    var column := column_route(u.position, spine, slot, false)
+    var column := column_route(u.position, spine, false)
     if not column.is_empty():
      u.route = column
      u.route_index = 0
      u.moving = true
-     u.destination = slot
+     u.destination = column[column.size() - 1]
      u.column_move = true
+     u.column_goal = u.destination
+     u.column_slot = slot
+     u.column_spine = spine
 
 func _screen_to_world(screen_point: Vector2) -> Vector2:
  # InputEventScreenTouch coordinates are in viewport space, unlike mouse-world.

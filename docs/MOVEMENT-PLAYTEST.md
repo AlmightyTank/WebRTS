@@ -6,9 +6,12 @@ Launch the repeatable 25-tank chokepoint lab:
 godot --path godot res://scenes/congestion_lab.tscn
 ```
 
-All tanks start selected. Right-click beyond the wall opening to move the army;
-Shift-right-click additional destinations to append waypoints. The selected units
-show gold destination markers and connecting order lines (not the obstacle detour).
+All tanks start selected. Right-click beyond the wall opening to move the army.
+The default GROUP formation stays in single file until that destination, then
+spreads into separate cells. LINE and WEDGE (F cycles the formation) keep their
+shape for the whole move. Shift-right-click additional destinations to append
+waypoints; each queued GROUP leg files there and spreads on arrival. The selected
+units show gold destination markers and connecting order lines (not the obstacle detour).
 Use **A**, then Shift-left-click for a queued attack-move leg. **S** cancels both
 the active order and its queue; an ordinary movement command replaces the queue.
 **R** resets the army. Drag-select a smaller group to try opposing traffic.

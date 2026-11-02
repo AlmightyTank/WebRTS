@@ -4,8 +4,8 @@ const IndustrialArt = preload("res://scripts/ui/industrial_art.gd")
 const GroundOrders = preload("res://scripts/combat/ground_orders.gd")
 var pending_orders: Array = []
 
-func queue_move(point: Vector2, attack_move: bool=false) -> void:
- GroundOrders.enqueue(self,point,attack_move)
+func queue_move(point: Vector2, attack_move: bool=false, column_spine=null, column_slot: Vector2=Vector2.ZERO) -> void:
+ GroundOrders.enqueue(self,point,attack_move,column_spine,column_slot)
 signal destroyed(entity: Node2D)
 var arena
 var unit_id := ""
@@ -34,6 +34,9 @@ var purchase_cost := 0.0
 var resume_harvest_on_arrival := false
 var blocked_time := 0.0
 var column_move := false
+var column_goal := Vector2.ZERO
+var column_slot := Vector2.ZERO
+var column_spine: PackedVector2Array = PackedVector2Array()
 
 func configure(world, data: Dictionary, side: int, pos: Vector2, harvester: bool) -> void:
  arena=world
@@ -60,6 +63,10 @@ func order_stop() -> void:
  working=false
  state="IDLE"
  moving=false
+ column_move=false
+ column_goal=Vector2.ZERO
+ column_slot=Vector2.ZERO
+ column_spine=PackedVector2Array()
  route.clear()
 
 func order_move(point: Vector2, _attack_move: bool=false) -> void:
@@ -78,6 +85,10 @@ func order_rally(point: Vector2) -> void:
 func set_harvest() -> void:
  pending_orders.clear()
  resume_harvest_on_arrival=false
+ column_move=false
+ column_goal=Vector2.ZERO
+ column_slot=Vector2.ZERO
+ column_spine=PackedVector2Array()
  working=true
  state="SEEK"
  moving=false
@@ -85,6 +96,10 @@ func set_harvest() -> void:
 
 func _route_to(point: Vector2) -> void:
  blocked_time=0.0
+ column_move=false
+ column_goal=Vector2.ZERO
+ column_slot=Vector2.ZERO
+ column_spine=PackedVector2Array()
  destination=arena.clamp_point(point)
  route=arena.find_route(position,destination,false)
  route_index=0
@@ -131,21 +146,29 @@ func _physics_process(delta: float) -> void:
  if moving: _step(delta)
  queue_redraw()
 
+func _complete_move() -> void:
+ if column_move and arena.begin_column_spread(self, true) and moving:
+  return
+ moving=false
+ if state=="MOVE":
+  if resume_harvest_on_arrival: set_harvest()
+  else: state="IDLE"
+
 func _step(delta: float) -> void:
+ if arena.begin_column_spread(self):
+  if not moving:
+   if state=="MOVE":
+    if resume_harvest_on_arrival: set_harvest()
+    else: state="IDLE"
+   return
  if route_index>=route.size():
-  moving=false
-  if state=="MOVE":
-   if resume_harvest_on_arrival: set_harvest()
-   else: state="IDLE"
+  _complete_move()
   return
  var waypoint: Vector2=route[route_index]
  if position.distance_to(waypoint)<2.0:
   route_index+=1
   if route_index>=route.size():
-   moving=false
-   if state=="MOVE":
-    if resume_harvest_on_arrival: set_harvest()
-    else: state="IDLE"
+   _complete_move()
    return
   waypoint=route[route_index]
  if arena.same_direction_holds_cell(self,waypoint):
@@ -162,15 +185,32 @@ func _step(delta: float) -> void:
   facing=lerp_angle(facing,direction.angle(),minf(1.0,delta*3.5))
  else:
   blocked_time+=delta
+  var waypoint_distance: float=position.distance_squared_to(waypoint)
+  var best_slide := Vector2.INF
+  var best_progress := -INF
+  var slid := false
+  var slide_distance: float=minf(8.0, maxf(move_speed*delta, 6.0) if column_move else minf(move_speed*delta, 8.0))
   for angle in [0.52,-0.52,1.05,-1.05,1.57,-1.57]:
-   var candidate: Vector2=position+direction.rotated(angle)*minf(move_speed*delta,8.0)
-   if arena.can_traverse(position,candidate,radius,false,self):
+   var candidate: Vector2=position+direction.rotated(angle)*slide_distance
+   if not arena.can_traverse(position,candidate,radius,false,self):
+    continue
+   if not column_move:
     position=candidate
     arena.update_unit_occupancy(self)
+    slid=true
     break
+   var progress: float=waypoint_distance-candidate.distance_squared_to(waypoint)
+   if progress>best_progress:
+    best_progress=progress
+    best_slide=candidate
+    slid=true
+  if column_move and slid and best_slide!=Vector2.INF:
+   position=best_slide
+   arena.update_unit_occupancy(self)
+   blocked_time=0.0
   if blocked_time>=0.75:
    blocked_time=0.0
-   var alternative: PackedVector2Array=arena.find_route(position,destination,false,self)
+   var alternative: PackedVector2Array=arena.column_route(position,column_spine,false) if column_move and not column_spine.is_empty() else arena.find_route(position,destination,false,null if column_move else self)
    if not alternative.is_empty():
     route=alternative
     route_index=0
