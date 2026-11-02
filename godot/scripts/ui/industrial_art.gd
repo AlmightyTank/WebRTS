@@ -138,13 +138,13 @@ static func asset_kind(id: String) -> String:
  return {"a_mcv":"mcv","r_mcv":"mcv","a_harvester":"harvester","r_hauler":"harvester","a_ranger":"rifleman","r_line":"rifleman","a_javelin":"missile_team","r_hunter":"missile_team","a_engineer":"engineer","r_engineer":"engineer","a_sentinel":"tank","r_bastion":"heavy_tank","a_sentinel_aa":"aa","r_flak":"flak","a_striker":"gunship","r_siege_heli":"helicopter"}.get(id,id)
 
 static func has_asset(id: String) -> bool:
- if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo"]: return true
+ if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo","airfield"]: return true
  if id in ["sam","salvaged_aa"]: return true
  id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return true
  if id in ["a_tempest","r_stormrail","g_volley"]: return true
  if id in ["a_arc_lance","r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2"]: return true
- return asset_kind(id) in ["mcv","yard","power","refinery","barracks","factory","depot","relay","turret","harvester","rifleman","missile_team","engineer","tank","heavy_tank","aa","flak","gunship","helicopter"]
+ return asset_kind(id) in ["mcv","yard","power","refinery","barracks","factory","airfield","depot","relay","turret","harvester","rifleman","missile_team","engineer","tank","heavy_tank","aa","flak","gunship","helicopter"]
 
 static func asset_bounds(id: String) -> Rect2:
  id = asset_kind(id)
@@ -188,7 +188,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   if kind == "harvester": cargo = cargo_frame / 16.0
   _batch_building = true
  var building_key := ""
- if kind in ["yard","power","barracks","refinery","factory","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo"]:
+ if kind in ["yard","power","barracks","refinery","factory","airfield","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo"]:
   # Share identical animation frames across instances; bound retained GPU memory.
   var frame = int(float(animation.get("time",0.0))*20.0)
   var door_frame = int(round(float(animation.get("door",0.0))*16.0))
@@ -231,6 +231,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   "refinery": _faction_industry(c,"refinery",style,faction,animation)
   "barracks": _faction_building(c,"barracks",style,faction,animation)
   "factory": _faction_industry(c,"factory",style,faction,animation)
+  "airfield": _faction_industry(c,"airfield",style,faction,animation)
   "depot": _faction_industry(c,"depot",style,faction,animation)
   "relay":
    if team < 0: _relay(c,faction)
@@ -852,6 +853,22 @@ static func _faction_industry(c: CanvasItem, role: String, team: int, color: Col
     box(c,Vector3(-47,-24,40),Vector3(13,17,12),shell)
   _building_door(c,Vector3(-34,27.1,5),68,28,door,color.darkened(0.35),0 if team==0 else 1)
   _hazards(c,-42,39,84)
+ elif role=="airfield":
+  # Flat pad, a short runway, and a hangar. Distinct from the factory door and the depot gantry.
+  box(c,Vector3(-64,-42,4),Vector3(128,82,2),CONCRETE)
+  box(c,Vector3(-58,-8,6),Vector3(116,16,1),Color("#3e4744"))
+  for mark in [-40.0,-12.0,16.0,44.0]:
+   box(c,Vector3(mark,-8,7),Vector3(10,2,1),YELLOW)
+  box(c,Vector3(-58,-40,6),Vector3(46,30,24),shell)
+  box(c,Vector3(-54,-36,30),Vector3(38,24,4),color)
+  _building_door(c,Vector3(-52,-10,6),36,18,door,color.darkened(0.3),0 if team==0 else 1)
+  _roof_fan(c,Vector3(-35,-26,35),phase*(4.0 if animation.get("working",false) else 1.5),5)
+  for pad_x in [6.0,38.0]:
+   box(c,Vector3(pad_x,10,6),Vector3(24,20,1),STEEL)
+   box(c,Vector3(pad_x+8,16,7),Vector3(8,8,1),color)
+  beam(c,Vector3(52,-30,6),Vector3(52,-30,48),STEEL,2)
+  box(c,Vector3(46,-36,48),Vector3(14,10,3),color)
+  _hazards(c,-46,38,40)
  else:
   # Open service bay: preserve a clear drive-through lane under the gantry.
   for x in [-27.0,17.0]:

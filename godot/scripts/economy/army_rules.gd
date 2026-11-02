@@ -28,8 +28,11 @@ const DISABLED := {"alliance_energy":["a_howitzer"],"alliance_air":["a_sentinel"
 const SIGNATURE_MISSILES := ["g_siege_rocket","g_volley"]
 const STEEL_TANKS := ["r_jugger","r_imperator"]
 const LIGHT_RAIDERS := ["g_rocket_truck","g_rocket_buggy","g_heli"]
+# Salvos per sortie. A dry aircraft cannot fire until a powered airfield rearms it.
+const SORTIES := {"a_striker":4,"a_tempest":6,"r_siege_heli":6,"g_heli":4}
+const REARM_SECONDS := 8.0
 static func structure_ids(choice: String) -> Array:
- var ids: Array = ["power","refinery","barracks","factory","depot","turret"]
+ var ids: Array = ["power","refinery","barracks","factory","airfield","depot","turret"]
  ids.append("salvaged_aa" if faction(choice)=="gia" else "sam")
  if faction(choice)=="republic": ids.append("foundry")
  if faction(choice)=="gia": ids.append("silo")
@@ -88,7 +91,14 @@ static func economic(id: String) -> bool:
  return id in ["a_mcv","r_mcv","g_mcv","a_harvester","r_hauler","g_collector"]
 
 static func lane(id: String, data: Dictionary) -> String:
+ if data.get("armor", "") == "AIR": return "air"
  return "infantry" if data.get("armor", "") == "PERSONNEL" else "vehicle"
+
+static func sortie_count(id: String) -> int:
+ return int(SORTIES.get(id, 0))
+
+static func rearm_seconds(choice: String) -> float:
+ return REARM_SECONDS * (0.85 if choice == "alliance_air" else 1.0)
 
 static func cost_factor(choice: String, data: Dictionary) -> float:
  if choice == "republic_armor" and data.get("armor", "") == "AIR": return 1.2
