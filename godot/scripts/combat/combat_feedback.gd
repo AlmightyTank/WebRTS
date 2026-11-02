@@ -12,7 +12,7 @@ func emit_effect(point: Vector2, kind: String, weapon: String, size: float = 18.
  queue_redraw()
 
 func _process(delta: float) -> void:
- if arena.paused: return
+ if arena.paused or effects.is_empty(): return
  for index in range(effects.size() - 1, -1, -1):
   effects[index].age += delta
   if effects[index].age >= effects[index].life: effects.remove_at(index)

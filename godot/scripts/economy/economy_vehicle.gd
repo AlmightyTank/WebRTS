@@ -34,6 +34,9 @@ var purchase_cost := 0.0
 var resume_harvest_on_arrival := false
 var blocked_time := 0.0
 var column_move := false
+var _drawn_hull := -1
+var _drawn_cargo := -1.0
+var _drawn_flags := -1
 
 func configure(world, data: Dictionary, side: int, pos: Vector2, harvester: bool) -> void:
  arena=world
@@ -129,7 +132,24 @@ func _physics_process(delta: float) -> void:
    elif not moving or destination.distance_to(refinery.position)>15.0:
     _route_to(refinery.position)
  if moving: _step(delta)
- queue_redraw()
+ _publish_visual()
+
+func _publish_visual() -> void:
+ # Straight travel keeps the last quantized hull. Cargo, health and selection still refresh.
+ if selected and moving:
+  _drawn_hull=-1
+  queue_redraw()
+  return
+ var hull := posmod(int(round(facing/TAU*64.0)),64)
+ var hp_steps := int(round(hp/maxf(1.0,max_hp)*46.0))
+ var flags := hp_steps
+ if selected: flags|=1<<8
+ if not pending_orders.is_empty(): flags|=1<<9
+ if hull!=_drawn_hull or not is_equal_approx(cargo,_drawn_cargo) or flags!=_drawn_flags:
+  _drawn_hull=hull
+  _drawn_cargo=cargo
+  _drawn_flags=flags
+  queue_redraw()
 
 func _step(delta: float) -> void:
  if route_index>=route.size():

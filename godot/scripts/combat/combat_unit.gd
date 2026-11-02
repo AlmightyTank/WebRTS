@@ -47,6 +47,7 @@ var column_move := false
 var unit_xp := 0.0
 var stationary_time := 0.0
 var last_combat_position := Vector2.ZERO
+var _visual_pose := -1
 
 func configure(world: Node2D, unit_data: Dictionary, side: int, pos: Vector2, gun: Dictionary, flying: bool = false) -> void:
     arena = world
@@ -232,7 +233,31 @@ func _physics_process(delta: float) -> void:
     if target != null and is_instance_valid(target) and target.hp > 0.0:
         desired_turret_angle = (target.position - position).angle()
     turret_angle = lerp_angle(turret_angle, desired_turret_angle, minf(1.0, (9.0 if target != null else 4.0) * delta))
-    queue_redraw()
+    _publish_visual()
+
+func _publish_visual() -> void:
+    # Position rides the node transform. Meshes are already quantized to 64 headings,
+    # so a steady hull/turret can keep the previous canvas commands.
+    var effects := fire_feedback > 0.0 or hit_feedback > 0.0 or (capture_target != null and is_instance_valid(capture_target))
+    if effects or (selected and moving):
+        _visual_pose = -1
+        queue_redraw()
+        return
+    var hull := posmod(int(round(facing / TAU * 64.0)), 64)
+    var aim := posmod(int(round(turret_angle / TAU * 64.0)), 64)
+    var hp_steps := int(round((hp / maxf(1.0, max_hp)) * 38.0))
+    var pose := hull | (aim << 6) | (hp_steps << 12)
+    if selected:
+        pose |= 1 << 18
+    if hold_position:
+        pose |= 1 << 19
+    if unit_xp >= 100.0:
+        pose |= 1 << 20
+    if not pending_orders.is_empty():
+        pose |= 1 << 21
+    if pose != _visual_pose:
+        _visual_pose = pose
+        queue_redraw()
 
 func _step_movement(delta: float) -> void:
     if route_index >= route.size():

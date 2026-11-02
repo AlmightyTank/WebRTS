@@ -82,7 +82,10 @@ func nearby_units(origin: Vector2, finish: Vector2, margin: float) -> Array:
  var result: Array = []
  for y in range(first.y, last.y + 1):
   for x in range(first.x, last.x + 1):
-   result.append_array(_occupancy.get(Vector2i(x, y), []))
+   # Missing cells are empty. A default array here would allocate on every miss.
+   var bucket: Variant = _occupancy.get(Vector2i(x, y))
+   if bucket != null:
+    result.append_array(bucket)
  return result
 var projectiles: Array = []
 var obstacles: Array[Rect2] = []
