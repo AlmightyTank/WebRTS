@@ -102,6 +102,7 @@ func can_hit(other) -> bool:
 func receive_damage(amount: float, _attacker) -> void:
  if hp<=0.0: return
  hp=maxf(0.0,hp-amount)
+ if team==0 and amount>0.0 and arena!=null and arena.has_method("play_cue"): arena.play_cue("under_attack")
  queue_redraw()
  if hp<=0.0:
   destroyed.emit(self)
