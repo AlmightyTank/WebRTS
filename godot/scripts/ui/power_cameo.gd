@@ -50,22 +50,22 @@ func _clock(amount: float) -> void:
 func _icon(body: Color) -> void:
 	var ink := Color("#0c1418")
 	match power_id:
-		"grid_surge", "breakthrough_order", "scavenger_convoy":
+		"grid_surge", "breakthrough_order", "scavenger_convoy", "electronic_blackout":
 			draw_colored_polygon(PackedVector2Array([Vector2(-4, -26), Vector2(10, -6), Vector2(1, -6), Vector2(8, 26), Vector2(-10, 4), Vector2(-1, 4)]), body)
-		"target_lattice", "rocket_recon", "spotter_recon", "recon_overflight":
+		"target_lattice", "rocket_recon", "spotter_recon", "recon_overflight", "signal_sweep", "false_signals":
 			draw_arc(Vector2.ZERO, 16, 0, TAU, 24, body, 3.0)
 			draw_line(Vector2(-22, 0), Vector2(22, 0), body, 2.0)
 			draw_line(Vector2(0, -22), Vector2(0, 22), body, 2.0)
 			draw_circle(Vector2.ZERO, 4, body)
 		"orbital_pulse", "sky_supremacy", "fire_mission", "saturation_strike":
 			draw_colored_polygon(PackedVector2Array([Vector2(0, -24), Vector2(16, 8), Vector2(5, 8), Vector2(8, 24), Vector2(-8, 24), Vector2(-5, 8), Vector2(-16, 8)]), body)
-		"field_repairs", "rapid_salvage":
+		"field_repairs", "rapid_salvage", "hold_the_line":
 			draw_rect(Rect2(-5, -18, 10, 36), body)
 			draw_rect(Rect2(-18, -5, 36, 10), body)
-		"armor_reserve", "roadside_reinforcements":
+		"armor_reserve", "roadside_reinforcements", "covert_insertion", "reserve_garrison", "ambush_cell":
 			draw_colored_polygon(PackedVector2Array([Vector2(-16, -18), Vector2(16, -18), Vector2(16, 6), Vector2(0, 22), Vector2(-16, 6)]), body)
 			draw_rect(Rect2(-8, -10, 16, 8), ink)
-		"rolling_barrage", "harassing_salvo", "interdiction_flight":
+		"rolling_barrage", "harassing_salvo", "interdiction_flight", "emergency_fortification", "hidden_passage":
 			for i in range(3):
 				var origin := Vector2(-16 + i * 14, 8)
 				draw_colored_polygon(PackedVector2Array([origin + Vector2(0, -28), origin + Vector2(6, -8), origin + Vector2(-6, -8)]), body)

@@ -54,6 +54,8 @@ static func capture(arena) -> Dictionary:
 		}
 		if building.kind in ["wall", "gate"]:
 			row["style"] = int(building.art_style)
+		if building.get("life_left") != null and float(building.life_left) >= 0.0:
+			row["life_left"] = float(building.life_left)
 		structures.append(row)
 	var units: Array = []
 	for unit in arena.units:
@@ -169,6 +171,8 @@ static func apply(arena, data: Dictionary) -> bool:
 		building.timer = float(row.get("timer", 0.0))
 		if row.has("style"):
 			building.art_style = int(row.style)
+		if row.has("life_left") and building.get("life_left") != null:
+			building.life_left = float(row.life_left)
 		building.queue_redraw()
 	var unit_rows: Array = data.units
 	for row in unit_rows:
@@ -344,6 +348,15 @@ static func _capture_unit(arena, unit) -> Dictionary:
 		row["capture_progress"] = _num(unit, "capture_progress")
 		row["capture_pause"] = _num(unit, "capture_pause")
 		row["capture_at"] = _pair(unit.capture_approach_point) if unit.get("capture_approach_point") != null else [0, 0]
+		if unit.get("life_left") != null and float(unit.life_left) >= 0.0:
+			row["life_left"] = float(unit.life_left)
+		if unit.get("deployed") == true or float(unit.get("deploy_left") if unit.get("deploy_left") != null else 0.0) > 0.0:
+			row["deployed"] = bool(unit.deployed)
+			row["packing"] = bool(unit.packing)
+			row["deploy_left"] = float(unit.deploy_left)
+		if unit.get("cloak_hold") != null and (bool(unit.cloaked) or float(unit.cloak_hold) > 0.0):
+			row["cloaked"] = bool(unit.cloaked)
+			row["cloak_hold"] = float(unit.cloak_hold)
 		if unit.get("ammo") != null:
 			row["ammo"] = int(unit.ammo)
 			row["ammo_max"] = int(unit.ammo_max)
@@ -396,6 +409,15 @@ static func _spawn_saved_unit(arena, row: Dictionary):
 	if unit.get("has_attack_move_goal") != null:
 		unit.has_attack_move_goal = bool(row.get("has_attack_goal", false))
 		unit.attack_move_goal = _vec(row.get("attack_goal", [0, 0]))
+	if row.has("life_left") and unit.get("life_left") != null:
+		unit.life_left = float(row.life_left)
+	if row.has("deployed") and unit.get("deployed") != null:
+		unit.deployed = bool(row.deployed)
+		unit.packing = bool(row.get("packing", false))
+		unit.deploy_left = float(row.get("deploy_left", 0.0))
+	if row.has("cloak_hold") and unit.get("cloak_hold") != null:
+		unit.cloaked = bool(row.get("cloaked", false))
+		unit.cloak_hold = float(row.cloak_hold)
 	if row.has("ammo") and unit.get("ammo") != null:
 		unit.ammo = int(row.ammo)
 		unit.ammo_max = int(row.get("ammo_max", unit.ammo_max))
