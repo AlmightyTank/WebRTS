@@ -37,7 +37,7 @@ static func capture(arena) -> Dictionary:
 	for building in arena.structures:
 		if not is_instance_valid(building) or building.hp <= 0.0:
 			continue
-		structures.append({
+		var row := {
 			"kind": building.kind,
 			"team": building.team,
 			"at": _pair(building.position),
@@ -51,7 +51,10 @@ static func capture(arena) -> Dictionary:
 			"rally_attack": building.rally_attack_move,
 			"rally_slot": building.rally_spawn_index,
 			"timer": building.timer
-		})
+		}
+		if building.kind in ["wall", "gate"]:
+			row["style"] = int(building.art_style)
+		structures.append(row)
 	var units: Array = []
 	for unit in arena.units:
 		if not is_instance_valid(unit) or unit.hp <= 0.0:
@@ -162,6 +165,8 @@ static func apply(arena, data: Dictionary) -> bool:
 		building.rally_attack_move = bool(row.get("rally_attack", false))
 		building.rally_spawn_index = int(row.get("rally_slot", 0))
 		building.timer = float(row.get("timer", 0.0))
+		if row.has("style"):
+			building.art_style = int(row.style)
 		building.queue_redraw()
 	var unit_rows: Array = data.units
 	for row in unit_rows:

@@ -95,14 +95,39 @@ func _process(delta: float) -> void:
  _drawn_working=art_working
  queue_redraw()
 
+func _shot_origin(aim: Vector2) -> Vector2:
+ var offset: Vector2=aim-position
+ if offset.length_squared()<1.0: return position
+ var dir: Vector2=offset.normalized()
+ var reach:=0.0
+ if absf(dir.x)>0.001: reach=(footprint.x*0.5)/absf(dir.x)
+ if absf(dir.y)>0.001:
+  var y_reach: float=(footprint.y*0.5)/absf(dir.y)
+  reach=y_reach if reach==0.0 else minf(reach,y_reach)
+ return position+dir*(reach+2.0)
+
 func _physics_process(delta: float) -> void:
- if arena.paused or arena.battle_over or hp<=0 or kind not in ["turret","beam_bastion","sam","salvaged_aa","missile_nest"]: return
+ if arena.paused or arena.battle_over or hp<=0: return
+ if kind in ["wall","gate"]:
+  if team>=0: return
+  if float(weapon.get("damage",0.0))!=18.0: weapon={"type":"SMALL_ARMS","damage":18.0,"interval":0.9,"range":150.0,"projectile_speed":700.0,"anti_ground":true,"anti_air":false}
+  timer-=delta
+  if timer>0.0: return
+  var abandoned=arena.find_target(self,float(weapon["range"]))
+  if abandoned==null: return
+  var origin: Vector2=_shot_origin(abandoned.position)
+  if not arena.clear_shot(origin,abandoned.position,false,abandoned.air,abandoned): return
+  var abandoned_shot: Dictionary=weapon.duplicate(true)
+  timer=float(weapon.interval)
+  arena.spawn_projectile(self,abandoned,abandoned_shot,origin)
+  return
+ if kind not in ["turret","beam_bastion","sam","salvaged_aa","missile_nest"]: return
  if not arena.power_ok(team) and kind!="beam_bastion": return
  timer-=delta
  if timer>0.0: return
  var victim=arena.find_target(self,float(weapon["range"]))
  if victim!=null and arena.clear_shot(position,victim.position,false,victim.air):
-  var shot:=weapon.duplicate(true)
+  var shot: Dictionary=weapon.duplicate(true)
   timer=float(weapon.interval)
   if kind=="beam_bastion":
    if arena.power_ok(team): shot.damage*=1.1

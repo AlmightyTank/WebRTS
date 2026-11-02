@@ -148,6 +148,9 @@ func order_hold() -> void:
 func order_capture(building) -> void:
     if unit_id not in ["a_engineer", "r_engineer", "g_tech"] or not is_instance_valid(building) or building.team == team:
         return
+    # Walls and gates stay with the faction that built them.
+    if str(building.get("kind")) in ["wall", "gate"]:
+        return
     if not arena.entity_visible_to(team, building):
         return
     capture_target = building

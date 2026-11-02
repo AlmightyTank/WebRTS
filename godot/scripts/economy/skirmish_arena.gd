@@ -432,22 +432,47 @@ func _on_destroyed(unit) -> void:
  invalidate_occupancy()
  _check_victory()
 
+func _side_alive(side: int) -> bool:
+ for building in structures:
+  if not is_instance_valid(building) or building.team!=side or building.hp<=0.0: continue
+  if building.kind not in ["turret","wall","gate"]: return true
+ for actor in units:
+  if is_instance_valid(actor) and actor.team==side and actor.hp>0.0 and str(actor.unit_id) in ["a_mcv","r_mcv","g_mcv"]: return true
+ return false
+
+func _abandon_perimeter(side: int) -> void:
+ for building in structures:
+  if not is_instance_valid(building) or building.team!=side or building.hp<=0.0: continue
+  if building.kind not in ["wall","gate"]: continue
+  building.team=-1
+  building.timer=0.0
+  building.door_open=0.0
+  building.queue_redraw()
+
+func _hostile_perimeter() -> bool:
+ for building in structures:
+  if is_instance_valid(building) and building.hp>0.0 and building.team<0 and building.kind in ["wall","gate"]: return true
+ return false
+
 func _check_victory() -> void:
  if battle_over: return
  if skirmish_time<3.0: return
+ var living: Array=[]
+ var dead: Array=[]
  for side in range(2):
-  var significant=0
-  var deployed_or_mobile=false
-  for building in structures:
-   if is_instance_valid(building) and building.team==side and building.hp>0:
-    if building.kind!="turret": significant+=1
-    if building.kind=="yard": deployed_or_mobile=true
-  for actor in units:
-   if is_instance_valid(actor) and actor.team==side and actor.unit_id in ["a_mcv","r_mcv","g_mcv"]: deployed_or_mobile=true
-  if significant==0 and not deployed_or_mobile:
-   battle_over=true
-   if is_instance_valid(result_text): result_text.text="VICTORY — REPUBLIC DEFEATED" if side==1 else "DEFEAT — ALLIANCE LOST"
-   return
+  if _side_alive(side): living.append(side)
+  else: dead.append(side)
+ if living.is_empty():
+  battle_over=true
+  if is_instance_valid(result_text): result_text.text="DEFEAT — ALLIANCE LOST"
+  return
+ if living.size()==2: return
+ for side in dead:
+  _abandon_perimeter(side)
+ if _hostile_perimeter(): return
+ var loser: int=int(dead[0])
+ battle_over=true
+ if is_instance_valid(result_text): result_text.text="VICTORY — REPUBLIC DEFEATED" if loser==1 else "DEFEAT — ALLIANCE LOST"
 
 func projectile_targets() -> Array:
  var targets=units.duplicate()
@@ -483,7 +508,8 @@ func find_target(seeker, search_radius: float):
 func _rank_target(seeker, entity, search_radius: float, radius_sq: float, building: bool) -> float:
  if not is_instance_valid(entity) or entity.hp<=0 or entity.team==seeker.team: return INF
  if seeker.position.distance_squared_to(entity.position)>radius_sq: return INF
- if not entity_visible_to(seeker.team,entity) or not seeker.can_hit(entity): return INF
+ if seeker.team>=0 and not entity_visible_to(seeker.team,entity): return INF
+ if not seeker.can_hit(entity): return INF
  var distance: float=seeker.position.distance_to(entity.position)
  if distance>search_radius: return INF
  var score:=distance
@@ -844,6 +870,7 @@ func capture_structure(engineer, b) -> bool:
  if engineer==null or b==null or not is_instance_valid(engineer) or not is_instance_valid(b): return false
  if not units.has(engineer) or not structures.has(b) or b.hp<=0.0: return false
  if not ArmyRules.engineer(engineer.unit_id) or engineer.team==b.team: return false
+ if str(b.kind) in ["wall","gate"]: return false
  var old_owner: int=b.team
  b.team=engineer.team
  if b.kind in PRODUCER_KINDS:

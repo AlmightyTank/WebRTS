@@ -390,17 +390,18 @@ func show_combat_feedback(point: Vector2, kind: String, weapon: String, size: fl
   combat_feedback.z_index = 80
  combat_feedback.emit_effect(point, kind, weapon, size)
 
-func spawn_projectile(source, target, weapon: Dictionary) -> void:
+func spawn_projectile(source, target, weapon: Dictionary, muzzle = null) -> void:
  if not is_instance_valid(target):
   return
+ var origin: Vector2 = source.position if muzzle == null else muzzle
  var p: Variant = Node2D.new()
  p.set_script(ProjectileScript)
  actors.add_child(p)
- p.configure(self, source.position, source, target, weapon)
+ p.configure(self, origin, source, target, weapon)
  p.visible = entity_visible_to(0, source)
  projectiles.append(p)
  shots += 1
- show_combat_feedback(source.position + source.position.direction_to(target.position) * source.radius, "muzzle", str(weapon.get("type", "SMALL_ARMS")))
+ show_combat_feedback(origin + origin.direction_to(target.position) * source.radius, "muzzle", str(weapon.get("type", "SMALL_ARMS")))
 
 func register_hit(_source, _victim, _damage: float) -> void:
  hits += 1
