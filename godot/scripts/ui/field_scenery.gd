@@ -3,8 +3,38 @@ extends RefCounted
 ## low shrubs and pebbles are passable decoration. Ore remains harvestable.
 const ORE_SITES = [Vector2(630,330),Vector2(580,930),Vector2(1320,820),Vector2(1370,150),Vector2(1080,1010)]
 
-static func road_distance(point: Vector2) -> float:
- return point.distance_to(Geometry2D.get_closest_point_to_segment(point,Vector2(80,960),Vector2(1700,225)))
+static func road_distance(point: Vector2, bounds: Rect2 = Rect2()) -> float:
+ var box := bounds if bounds.size.x > 1.0 else Rect2(0, 0, 1920, 1200)
+ var start := box.position + Vector2(box.size.x * 80.0 / 1920.0, box.size.y * 960.0 / 1200.0)
+ var finish := box.position + Vector2(box.size.x * 1700.0 / 1920.0, box.size.y * 225.0 / 1200.0)
+ return point.distance_to(Geometry2D.get_closest_point_to_segment(point, start, finish))
+
+static func generate_on(map: Dictionary, blocked: Array) -> Array[Dictionary]:
+ var bounds: Rect2 = map["board"]
+ var rng := RandomNumberGenerator.new()
+ rng.seed = int(map.get("seed", 77341))
+ var result: Array[Dictionary] = []
+ var target := mini(64, maxi(16, int(bounds.get_area() / 110000.0)))
+ var west: Vector2 = map["spawns"]["west"]
+ var east: Vector2 = map["spawns"]["east"]
+ var relay: Vector2 = map["relay"]
+ for _attempt in range(target * 16):
+  if result.size() >= target: break
+  var p := Vector2(rng.randf_range(bounds.position.x + 80.0, bounds.end.x - 80.0), rng.randf_range(bounds.position.y + 80.0, bounds.end.y - 80.0))
+  if p.distance_to(west) < 400.0 or p.distance_to(east) < 400.0 or p.distance_to(relay) < 220.0: continue
+  if road_distance(p, bounds) < 110.0: continue
+  var clear := true
+  for site in map["ore"]:
+   if p.distance_to(site["position"]) < 160.0: clear = false
+  for obstacle in blocked:
+   if obstacle.grow(80.0).has_point(p): clear = false
+  for item in result:
+   if p.distance_to(item["position"]) < 110.0: clear = false
+  if not clear: continue
+  var kind := "tree" if result.size() % 4 == 0 else ("shrub" if result.size() % 3 == 0 else "stones")
+  result.append({"position": p, "kind": kind, "variant": rng.randi_range(0, 4), "bounds": Rect2(p - Vector2(12, 12), Vector2(24, 24))})
+ result.sort_custom(func(a, b): return a["position"].y < b["position"].y)
+ return result
 
 static func generate(bounds: Rect2, blocked: Array[Rect2]) -> Array[Dictionary]:
  var rng = RandomNumberGenerator.new()

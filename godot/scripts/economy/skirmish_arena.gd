@@ -112,6 +112,7 @@ const SkirmishMaps = preload("res://scripts/economy/skirmish_maps.gd")
 const MatchSave = preload("res://scripts/economy/match_save.gd")
 var army_choices: Array = ["alliance", "republic"]
 var map_id := "meridian_basin"
+var _land_id := ""
 var starting_credits := 10000
 var start_slots: Array = ["west", "east"]
 var commander = preload("res://scripts/economy/commander_system.gd").new()
@@ -176,6 +177,7 @@ func _ai_decide() -> void:
 
 func _ready() -> void:
  army_choices = [ArmyRules.valid_choice(str(army_choices[0])), ArmyRules.valid_choice(str(army_choices[1]))]
+ _fit_board(SkirmishMaps.get_map(map_id))
  audio = preload("res://scripts/audio/match_audio.gd").new()
  audio.name = "MatchAudio"
  add_child(audio)
@@ -184,6 +186,7 @@ func _ready() -> void:
  super._ready()
  # reset_battle() captures immutable scenery on the first run.
  _rebuild_navigation()
+ _frame_player()
  get_viewport().size_changed.connect(_on_hud_viewport_resized)
  _on_hud_viewport_resized()
 
@@ -237,6 +240,47 @@ func clear_for_restore() -> void:
  if static_obstacles.is_empty(): static_obstacles=obstacles.duplicate()
  _rebuild_navigation()
 
+func _fit_board(battlefield: Dictionary) -> void:
+ var rect: Rect2=battlefield["board"]
+ COLS=maxi(8, int(round(rect.size.x/float(CELL))))
+ ROWS=maxi(8, int(round(rect.size.y/float(CELL))))
+ BOARD=Rect2(Vector2.ZERO, Vector2(float(COLS*CELL), float(ROWS*CELL)))
+
+func _make_obstacles() -> void:
+ var battlefield: Dictionary=SkirmishMaps.get_map(map_id)
+ _fit_board(battlefield)
+ obstacles.clear()
+ for box in battlefield["cliffs"]:
+  obstacles.append(box)
+ if map_id=="meridian_basin":
+  scenery=SceneryArt.generate(BOARD, obstacles)
+ else:
+  scenery=SceneryArt.generate_on(battlefield, obstacles)
+ tree_footprints.clear()
+ for item in scenery:
+  if item["kind"]=="tree":
+   tree_footprints.append(item["bounds"])
+   obstacles.append(item["bounds"])
+ _land_id=map_id
+
+func adopt_map() -> void:
+ var battlefield: Dictionary=SkirmishMaps.get_map(map_id)
+ var next_cols: int=int(round(float(battlefield["board"].size.x)/float(CELL)))
+ var next_rows: int=int(round(float(battlefield["board"].size.y)/float(CELL)))
+ if _land_id==map_id and COLS==next_cols and ROWS==next_rows: return
+ _make_obstacles()
+ static_obstacles=obstacles.duplicate()
+ var terrain=get_node_or_null("BattlefieldTerrain")
+ if terrain!=null and terrain.has_method("configure"): terrain.configure(BOARD)
+ if navigation!=null: _create_navigation()
+ if camera!=null and is_instance_valid(camera): camera.configure(BOARD, BOARD.get_center())
+
+func _frame_player() -> void:
+ if camera==null or not is_instance_valid(camera): return
+ if BOARD.size.x<=1920.5 and BOARD.size.y<=1200.5: return
+ var resolved: Array=SkirmishMaps.resolve_slots(start_slots)
+ camera.configure(BOARD, SkirmishMaps.point(map_id, str(resolved[0])))
+
 func reset_battle() -> void:
  # Override the Combat Lab's scenario starting point; its four benchmark
  # scenes remain available as res://scenes/combat_lab.tscn.
@@ -256,7 +300,7 @@ func reset_battle() -> void:
  _deploy_mcv(1)
  if ai_vs_ai: _deploy_mcv(0)
  # A capturable neutral structure provides a tactical expansion objective.
- _place_structure("relay",-1,Vector2(1080,225),0.0)
+ _place_structure("relay",-1,battlefield["relay"],0.0)
  if ally!=null and not ai_vs_ai:
   ally.selected=true
   selected=[ally]
@@ -1045,8 +1089,19 @@ func _spawn_engineer(id: String, side: int, where: Vector2):
  invalidate_occupancy()
  return u
 
+func _base_anchor(side: int) -> Vector2:
+ for building in structures:
+  if is_instance_valid(building) and building.team==side and building.kind=="yard" and building.hp>0.0: return building.position
+ for actor in units:
+  if is_instance_valid(actor) and actor.team==side and actor.hp>0.0 and str(actor.unit_id) in ["a_mcv","r_mcv","g_mcv"]: return actor.position
+ var resolved: Array=SkirmishMaps.resolve_slots(start_slots)
+ return SkirmishMaps.point(map_id, str(resolved[side]))
+
 func _ai_place_ready(lane: String, id: String, side: int = 1) -> void:
  var sites=[Vector2(-235,-205),Vector2(-225,-10),Vector2(-225,190),Vector2(80,-225),Vector2(200,15),Vector2(170,195),Vector2(-400,110),Vector2(40,360),Vector2(-400,-230),Vector2(340,-250)]
+ var anchor: Vector2=_base_anchor(side)
+ # Offsets face the center. West bases mirror them; east bases use them as written.
+ var inward: float=-1.0 if anchor.x<BOARD.get_center().x else 1.0
  for offset in sites:
   var place=(Vector2(1600,610)+offset) if side==1 else (Vector2(310,620)+Vector2(-offset.x,offset.y))
   place=_snap_build_point(id, place)

@@ -16,7 +16,8 @@ static func paint(canvas: CanvasItem, bounds: Rect2, with_road: bool = true) -> 
  var palette = [Color("#59694a"),Color("#4d6042"),Color("#606d4a"),Color("#566745"),Color("#4e6247")]
  var clip = PackedVector2Array([bounds.position,Vector2(bounds.end.x,bounds.position.y),bounds.end,Vector2(bounds.position.x,bounds.end.y)])
  # Broad, low-contrast patches rather than noisy per-cell triangles.
- var count = maxi(12,int(bounds.get_area()/28000.0))
+ # Large maps keep the same broad patches. The cap avoids a lobby hitch on the biggest boards.
+ var count = clampi(int(bounds.get_area()/28000.0), 12, 140)
  for i in range(count):
   var center = bounds.position+Vector2(rng.randf()*bounds.size.x,rng.randf()*bounds.size.y)
   var radius = Vector2(rng.randf_range(90,230),rng.randf_range(65,155))
