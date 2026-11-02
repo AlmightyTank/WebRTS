@@ -31,11 +31,28 @@ const LIGHT_RAIDERS := ["g_rocket_truck","g_rocket_buggy","g_heli"]
 # Salvos per sortie. A dry aircraft cannot fire until a powered airfield rearms it.
 const SORTIES := {"a_striker":4,"a_tempest":6,"r_siege_heli":6,"g_heli":4}
 const REARM_SECONDS := 8.0
+# Perimeter segments. Republic is the tough line. GIA is cheap and fragile. Gates share that health.
+const PERIMETER := {
+ "alliance": {
+  "wall": {"name":"Energy-Reinforced Barrier","cost":100.0,"time":6.0,"hp":600.0},
+  "gate": {"name":"Security Gate","cost":180.0,"time":8.0,"hp":600.0}
+ },
+ "republic": {
+  "wall": {"name":"Reinforced Concrete Wall","cost":150.0,"time":8.0,"hp":1200.0},
+  "gate": {"name":"Fortress Gate","cost":250.0,"time":10.0,"hp":1200.0}
+ },
+ "gia": {
+  "wall": {"name":"Scrap Barricade","cost":50.0,"time":4.0,"hp":280.0},
+  "gate": {"name":"Checkpoint Gate","cost":90.0,"time":5.0,"hp":280.0}
+ }
+}
 static func structure_ids(choice: String) -> Array:
- var ids: Array = ["power","refinery","barracks","factory","airfield","depot","turret"]
+ var ids: Array = ["power","refinery","barracks","factory","airfield","depot","turret","wall","gate"]
  ids.append("salvaged_aa" if faction(choice)=="gia" else "sam")
  if faction(choice)=="republic": ids.append("foundry")
  if faction(choice)=="gia": ids.append("silo")
+ elif faction(choice)=="alliance": ids.append("beam_array")
+ elif faction(choice)=="republic": ids.append("ironstorm")
  var mapping: Dictionary = REPLACEMENTS.get(choice,{})
  return ids.map(func(id): return mapping.get(id,id)).filter(func(id): return id not in DISABLED.get(choice,[]))
 const PROFILES := {
@@ -99,6 +116,9 @@ static func sortie_count(id: String) -> int:
 
 static func rearm_seconds(choice: String) -> float:
  return REARM_SECONDS * (0.85 if choice == "alliance_air" else 1.0)
+
+static func perimeter(choice: String, id: String) -> Dictionary:
+ return PERIMETER[faction(choice)][id]
 
 static func cost_factor(choice: String, data: Dictionary) -> float:
  if choice == "republic_armor" and data.get("armor", "") == "AIR": return 1.2

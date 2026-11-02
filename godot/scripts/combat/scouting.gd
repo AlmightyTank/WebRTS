@@ -30,7 +30,7 @@ func _next(world, unit) -> void:
     candidates.append(point)
  candidates.sort_custom(func(a: Vector2, b: Vector2): return unit.position.distance_squared_to(a) < unit.position.distance_squared_to(b))
  for point in candidates:
-  var path: Array = world.find_route(unit.position, point, unit.air)
+  var path: Array = world.find_route(unit.position, point, unit.air, unit, false)
   if path.is_empty():
    failed[world.world_cell(point)] = true
    continue

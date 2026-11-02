@@ -73,5 +73,15 @@ func _icon(body: Color) -> void:
 		"silo":
 			draw_colored_polygon(PackedVector2Array([Vector2(0, -26), Vector2(8, -8), Vector2(5, -8), Vector2(5, 16), Vector2(-5, 16), Vector2(-5, -8), Vector2(-8, -8)]), body)
 			draw_rect(Rect2(-14, 16, 28, 5), body)
+		"beam_array":
+			draw_line(Vector2(-16, 10), Vector2(-16, -14), body, 4)
+			draw_line(Vector2(16, 10), Vector2(16, -14), body, 4)
+			draw_line(Vector2(-16, -6), Vector2(16, -6), Color("#d7fbff"), 3)
+			draw_circle(Vector2(0, -6), 5, Color("#d7fbff"))
+		"ironstorm":
+			for i in range(3):
+				var origin := Vector2(-18 + i * 14, 6)
+				draw_rect(Rect2(origin.x, origin.y - 16, 8, 22), body)
+				draw_line(origin + Vector2(4, -16), origin + Vector2(4, -28), body, 3)
 		_:
 			draw_circle(Vector2.ZERO, 14, body)
