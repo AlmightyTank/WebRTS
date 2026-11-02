@@ -25,14 +25,14 @@ Every slice is done when a player can feel it in a match, with original names, a
 | Fantasy | In a match today | Still missing for the feel |
 | --- | --- | --- |
 | Construction yard | Deploy, sidebar tabs, queues, refund, repair, sell, rally, staging, multiple factories | Walls, gates, radar building |
-| Ore and power | Finite iron, delivery once, brownout slows production, turrets go dark | Relay does not pay; low power has no sound |
+| Ore and power | Finite iron, delivery once, brownout slows production, turrets go dark, low-power cue | Relay does not pay |
 | Orders | Select, groups, attack-move, hold, formations, scout, fog | Fog is a radius, not terrain line of sight |
 | Three armies | Alliance, Republic, GIA, with different rosters and some structures | Shared build rules; many designed units stay in the balance file |
-| Generals | Vale, Voss, Korda, Orlov, Sayegh, Varek: replacements, research, rank, aimed powers | Powers sit in the Upgrades tab. Rook, Volkov, Nadir are unbuilt |
+| Generals | Vale, Voss, Korda, Orlov, Sayegh, Varek: replacements, research, rank, aimed powers on the left | Rook, Volkov, and Nadir are unbuilt |
 | Superweapons | GIA silo, with a public warning | Alliance beam and Republic artillery array |
 | Air | Tempest, Striker, helicopters, from the vehicle queue | No airfield, no rearm |
-| Skirmish | Lobby: army, start, credits, fog, AI vs AI. One map, Meridian Basin | More maps, difficulty that changes behavior, resume |
-| Product | Main menu, pause, settings file | Campaign and multiplayer buttons are disabled. No match save. Volume slider has nothing to play |
+| Skirmish | Lobby: army, start, credits, fog, AI vs AI. One map, Meridian Basin. Save and resume | More maps, difficulty that changes behavior |
+| Product | Main menu, pause, settings file, match cues, save and resume | Campaign and multiplayer buttons are disabled |
 
 About 38 unit ids and 15 structure ids can appear in a match. The balance file holds a larger proposed roster. Godot smoke tests cover combat, economy, fog, armies, and commander kits. CI installs Godot 4.4.1; `project.godot` declares a 4.7 feature tag, which should be reconciled before a release export.
 
@@ -40,9 +40,9 @@ About 38 unit ids and 15 structure ids can appear in a match. The balance file h
 
 Work in this order. A later row can start only when the rows above it are playable.
 
-1. **Command bar.** Show rank, points, and the three powers on the battlefield. Click to arm, click the map to cast, keep the warnings that already exist. The Upgrades tab keeps research.
-2. **Match sounds.** Original cues for construction complete, unit ready, low power, base under attack, and incoming superweapon. One acknowledgement style per faction is enough here.
-3. **Save and resume.** A versioned skirmish snapshot: credits, ore, queues, units, structures, fog, commander rank, research, and AI plans. Leaving the match can offer save. Campaign checkpoints reuse this.
+1. **Command bar.** Show rank, points, and the three powers on the battlefield. Click to arm, click the map to cast, keep the warnings that already exist. The Upgrades tab keeps research. Done.
+2. **Match sounds.** Original cues for construction complete, unit ready, low power, base under attack, and incoming superweapon. One acknowledgement style per faction is enough here. Done.
+3. **Save and resume.** A versioned skirmish snapshot: credits, ore, queues, units, structures, fog, commander rank, research, and AI plans. Leaving the match can offer save. Campaign checkpoints reuse this. Done.
 4. **Relay income.** Capturing the north relay starts a capped credit trickle. Document the rate next to the ore numbers and test that it cannot outrun a living economy.
 5. **Airfield.** Aircraft build from an airfield, return to rearm, and stop firing when they are dry. Voss’s bonuses apply to that loop.
 6. **The other two superweapons.** Alliance particle beam and Republic ironstorm, with the same warning, power, and one-structure rules as the silo.

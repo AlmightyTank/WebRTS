@@ -84,5 +84,8 @@ jobs:
       - name: Test match audio cues
         run: godot --headless --path godot --script res://tests/match_audio_smoke.gd
         timeout-minutes: 2
+      - name: Test skirmish save and resume
+        run: godot --headless --path godot --script res://tests/match_save_smoke.gd
+        timeout-minutes: 2
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180
