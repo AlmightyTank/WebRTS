@@ -25,7 +25,7 @@ Every slice is done when a player can feel it in a match, with original names, a
 | Fantasy | In a match today | Still missing for the feel |
 | --- | --- | --- |
 | Construction yard | Deploy, sidebar tabs, queues, refund, repair, sell, rally, staging, multiple factories | Walls, gates, radar building |
-| Ore and power | Finite iron, delivery once, brownout slows production, turrets go dark, low-power cue | Relay does not pay |
+| Ore and power | Finite iron, delivery once, brownout slows production, turrets go dark, low-power cue. Captured relay pays 6/s, once per side | — |
 | Orders | Select, groups, attack-move, hold, formations, scout, fog | Fog is a radius, not terrain line of sight |
 | Three armies | Alliance, Republic, GIA, with different rosters and some structures | Shared build rules; many designed units stay in the balance file |
 | Generals | Vale, Voss, Korda, Orlov, Sayegh, Varek: replacements, research, rank, aimed powers on the left | Rook, Volkov, and Nadir are unbuilt |
@@ -43,7 +43,7 @@ Work in this order. A later row can start only when the rows above it are playab
 1. **Command bar.** Show rank, points, and the three powers on the battlefield. Click to arm, click the map to cast, keep the warnings that already exist. The Upgrades tab keeps research. Done.
 2. **Match sounds.** Original cues for construction complete, unit ready, low power, base under attack, and incoming superweapon. One acknowledgement style per faction is enough here. Done.
 3. **Save and resume.** A versioned skirmish snapshot: credits, ore, queues, units, structures, fog, commander rank, research, and AI plans. Leaving the match can offer save. Campaign checkpoints reuse this. Done.
-4. **Relay income.** Capturing the north relay starts a capped credit trickle. Document the rate next to the ore numbers and test that it cannot outrun a living economy.
+4. **Relay income.** Capturing the north relay starts a capped credit trickle. Document the rate next to the ore numbers and test that it cannot outrun a living economy. Done. The rate is 6 credits per second, once per side. A harvester biting 18 iron every 0.15 seconds still earns more while a field has iron.
 5. **Airfield.** Aircraft build from an airfield, return to rearm, and stop firing when they are dry. Voss’s bonuses apply to that loop.
 6. **The other two superweapons.** Alliance particle beam and Republic ironstorm, with the same warning, power, and one-structure rules as the silo.
 7. **Walls and gates.** They block ground paths, have faction health differences, and open for friendlies. This is also Volkov’s foundation.

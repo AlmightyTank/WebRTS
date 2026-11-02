@@ -128,7 +128,7 @@ func _physics_process(delta: float) -> void:
   elif state=="MINING":
    mine_timer-=delta
    if mine_timer<=0.0:
-    mine_timer=0.15
+    mine_timer=arena.ORE_BITE_SECONDS
     cargo+=arena.mine_near(position,60.0,team)
     if cargo>=capacity or arena.find_ore(position,team)<0:
      state="RETURN"

@@ -23,6 +23,13 @@ const STRUCTURE_DATA := {
 }
 const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES","UPGRADES"]
 const STAGING_IDS := ["ALPHA","BRAVO","CHARLIE"]
+# A harvester bites 18 iron every 0.15s (120 iron per second) while it stands on a field,
+# carries an 800-iron hold, and pays credits only when that cargo reaches a refinery.
+# A captured relay pays 6 credits per second, once per side, so the match can continue
+# after the fields are empty without replacing a harvester that still has iron to haul.
+const ORE_BITE := 18.0
+const ORE_BITE_SECONDS := 0.15
+const RELAY_CREDITS_PER_SECOND := 6.0
 var structures: Array = []
 var ore_fields: Array = []
 var static_obstacles: Array[Rect2] = []
@@ -169,7 +176,7 @@ func _ready() -> void:
  _on_hud_viewport_resized()
 
 func _new_state() -> Dictionary:
- return {"credits":float(starting_credits),"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
+ return {"credits":float(starting_credits),"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"total_relay":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
 
 func clear_for_restore() -> void:
  commander.reset(self)
@@ -919,10 +926,25 @@ func find_ore(point: Vector2, _side: int) -> int:
 func mine_near(point: Vector2, radius: float, _side: int) -> float:
  for field in ore_fields:
   if point.distance_to(field["position"])<radius and float(field["remaining"])>0.0:
-   var amount=minf(18.0,float(field["remaining"]))
+   var amount=minf(ORE_BITE,float(field["remaining"]))
    field["remaining"]=float(field["remaining"])-amount
    return amount
  return 0.0
+
+func _owns_living_relay(side: int) -> bool:
+ for building in structures:
+  if is_instance_valid(building) and building.hp>0.0 and building.team==side and building.kind=="relay":
+   return true
+ return false
+
+# One trickle per side. A second captured relay does not raise the rate.
+func _tick_relay_income(delta: float) -> void:
+ if delta<=0.0: return
+ var gain:=RELAY_CREDITS_PER_SECOND*delta
+ for side in range(mini(2,states.size())):
+  if not _owns_living_relay(side): continue
+  states[side]["credits"]=float(states[side]["credits"])+gain
+  states[side]["total_relay"]=float(states[side].get("total_relay",0.0))+gain
 
 func deliver_ore(side: int, amount: float) -> void:
  if amount<=0.0: return
@@ -999,6 +1021,7 @@ func _physics_process(delta: float) -> void:
  _tick_production(0,delta)
  _tick_production(1,delta)
  _advance_repairs(delta)
+ _tick_relay_income(delta)
  economy_ai_timer-=delta
  if economy_ai_timer<=0:
   economy_ai_timer=2.1
@@ -1809,7 +1832,8 @@ func _update_hud() -> void:
  var state: Dictionary=states[0]
  if is_instance_valid(title_text):
   title_text.text="IRON %d" % int(state["credits"])
- hud_text.text="POWER %+d     COMMAND RANK %d     ORE %d" % [int(state["power"])-int(state["demand"]),commander.rank(0),int(state["total_mined"])]
+ var relay_text: String=("    RELAY +%d/s" % int(RELAY_CREDITS_PER_SECOND)) if _owns_living_relay(0) else ""
+ hud_text.text="POWER %+d     COMMAND RANK %d     ORE %d%s" % [int(state["power"])-int(state["demand"]),commander.rank(0),int(state["total_mined"]),relay_text]
  var details: Array[String]=[]
  for lane in ["build","defense","infantry","vehicle"]:
   var job: Dictionary=state["lanes"][lane]
@@ -1818,7 +1842,10 @@ func _update_hud() -> void:
    var percentage=int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1.0))))
    details.append("%s %s %d%%" % [lane.to_upper(),str(recipe.get("name",job["id"])),percentage])
  if selected_building!=null and is_instance_valid(selected_building):
-  details.append("SELECTED %s HP %d/%d %s" % [selected_building.kind,int(selected_building.hp),int(selected_building.max_hp),"REPAIRING" if selected_building.repairing else ""])
+  var relay_note: String=""
+  if selected_building.kind=="relay" and selected_building.team==0:
+   relay_note=" RELAY +%d/s" % int(RELAY_CREDITS_PER_SECOND)
+  details.append("SELECTED %s HP %d/%d %s%s" % [selected_building.kind,int(selected_building.hp),int(selected_building.max_hp),"REPAIRING" if selected_building.repairing else "",relay_note])
  for lane in ["infantry","vehicle"]:
   var b=_active_producer(0,lane)
   if b!=null:
@@ -1830,7 +1857,7 @@ func _update_hud() -> void:
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
  if is_instance_valid(retro_economy_label):
-  retro_economy_label.text="IRON  %06d   POWER %+d" % [int(state["credits"]),int(state["power"])-int(state["demand"])]
+  retro_economy_label.text="IRON  %06d%s   POWER %+d" % [int(state["credits"]),relay_text,int(state["power"])-int(state["demand"])]
  if is_instance_valid(retro_powerbar):
   retro_powerbar.value=100.0 if int(state["demand"])<=0 else clampf(100.0*float(state["power"])/float(state["demand"]),0.0,100.0)
  var on_upgrades=current_tab>=TABS.size()-1 or current_tab>3

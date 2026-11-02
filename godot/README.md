@@ -31,7 +31,7 @@
 - Buildings and defenses have separate shared READY-to-place queues. Barracks and War Factory run concurrent unit-production queues, with incremental credit payments and pause-on-insufficient-funds.
 - Construction placement validates map bounds, blockers, units, ore patches, and proximity to connected friendly buildings; structures cannot overlap.
 - Power plants produce 150 power; refinery, barracks, factory, and turret consume power. A deficit slows production to 50%, and unpowered defense turrets stop firing. Power production remains possible during brownouts.
-- Finite iron patches are mined in value units, carried by armored harvesters, and delivered to refineries exactly once. The initial harvester with a refinery is free, while additional harvesters are produced at factories.
+- Finite iron patches are mined in value units, carried by armored harvesters, and delivered to refineries exactly once. A harvester bites 18 iron every 0.15 seconds (120 iron per second while it stands on a field) into an 800-iron hold. The initial harvester with a refinery is free, while additional harvesters are produced at factories. A captured relay pays 6 credits per second to its owner, once per side, in a brownout or at full power. A second relay does not raise that rate, and one harvester hauling a living field earns more.
 - Selectable infantry, rockets, tanks, AA vehicles, auto-harvesters and MCVs share the existing collision, A* ground navigation, damage, projectile and AI combat systems.
 - Republic AI deploys its Yard and follows its own paid building, defense and troop production. Both sides obey credit and prerequisite rules, not hidden grants.
 - Victory/defeat when one side loses all significant placed structures and all surviving MCVs. Combat Lab scenario keys are not active in the main skirmish.
@@ -46,7 +46,7 @@
 - **Active factory/barracks:** the newest completed War Factory or Barracks automatically becomes the physical production exit for its shared unit queue. Click an older owned producer to make it active, or use **USE SELECTED PRODUCTION BUILDING**. This does not change the multiple-factory speed bonus. If it is sold, captured, or destroyed, production switches to the newest surviving eligible factory.
 - **Independent rally points:** with the factory or Barracks selected, right-click ground to set its rally destination, or click **SET RALLY POINT (G)** and select a destination with mouse/touch. Each producer retains its own point when another is selected. The active point is drawn as a world marker; units automatically walk or drive there on completion. Purchased harvesters resume automatic harvesting after arriving. Esc/right-click cancels armed rally mode.
 - **Expansion MCV:** after building a **Service Depot**, purchase an MCV in the VEHICLES tab. Select it, move it to clear ground and press H to deploy an additional Yard and base-building anchor.
-- **Engineer capture:** train a **Field Engineer** at the Barracks, select it and right-click an enemy structure or the neutral relay in the north-center of the map. Neutral capture takes 0.7s; enemy takeover requires 3 uninterrupted seconds near the target. Engineers are consumed after success; damage interrupts capture progress. No refinery harvesting vehicle is spawned by capture.
+- **Engineer capture:** train a **Field Engineer** at the Barracks, select it and right-click an enemy structure or the neutral relay in the north-center of the map. Neutral capture takes 0.7s; enemy takeover requires 3 uninterrupted seconds near the target. Engineers are consumed after success; damage interrupts capture progress. No refinery harvesting vehicle is spawned by capture. Holding the relay starts its 6 credit per second trickle; losing or destroying it stops the payment.
 
 ## Shared staging areas and attack-move rally (v0.8.3)
 
@@ -115,6 +115,7 @@ godot --headless --path godot --script res://tests/rally_staging_smoke.gd
 godot --headless --path godot --script res://tests/production_hud_smoke.gd
 godot --headless --path godot --script res://tests/match_audio_smoke.gd
 godot --headless --path godot --script res://tests/match_save_smoke.gd
+godot --headless --path godot --script res://tests/relay_income_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 
