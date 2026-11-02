@@ -33,6 +33,7 @@ func run_checks() -> void:
  expect(world.repair_button.get_parent()==world.sell_button.get_parent(),"Repair and sell share the row under the map")
  expect(is_instance_valid(world.orders_sheet) and not world.orders_sheet.visible,"Rally setup stays out of the build column until a producer is selected")
  expect(is_instance_valid(world.upgrades_panel) and not world.upgrades_panel.visible,"Upgrades page waits for its tab")
+ expect(is_instance_valid(world.hud_powers) and not world.hud_powers.visible,"A standard army hides the power column")
  expect(world.hud_dock.get_theme_stylebox("panel") is StyleBoxFlat,"Sidebar receives beveled steel style")
  expect(world.hud_toolbar.get_theme_stylebox("panel") is StyleBoxFlat,"Command bar receives beveled steel style")
  expect(world.radar_view.map_point(Vector2(0,0)).is_equal_approx(Vector2.ZERO),"Radar maps battlefield origin")

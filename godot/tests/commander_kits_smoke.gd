@@ -45,6 +45,18 @@ func run() -> void:
    expect(w.queue_production(0,w._lane_for(id),id),"Resolved infrastructure can queue: "+id)
    w.cancel_production(0,w._lane_for(id))
   var powers: Array=c.power_ids(0)
+  w._apply_hud_layout(Vector2(1280,720))
+  expect(w.hud_powers.visible,choice+": powers stay on the battlefield")
+  expect(w.hud_powers.position.x+w.hud_powers.size.x<w.hud_dock.position.x,choice+": power column is left of the sidebar")
+  expect(w.hud_powers.position.x+1.0<w.hud_top_panel.position.x,choice+": status bar starts to the right of the powers")
+  expect(absf(w.hud_powers.position.y-w.hud_top_panel.position.y)<2.0,choice+": power column aligns with the top of the battlefield")
+  var ancestor: Node=c.power_buttons[powers[0]].use
+  var in_upgrades:=false
+  while ancestor!=null:
+   if ancestor==w.upgrades_panel: in_upgrades=true
+   ancestor=ancestor.get_parent()
+  expect(not in_upgrades,choice+": power cameos left the upgrades tab")
+  expect(c.countdown_labels[powers[2]].text.begins_with("R"),choice+": a locked power shows its rank on the cameo")
   c.award_xp(1,3500.0)
   c.ai_tick()
   expect(not c.teams[1].powers.is_empty() and not c.teams[1].job.is_empty(),"AI purchases its own powers and starts legal research")
@@ -88,6 +100,8 @@ func run() -> void:
    var count: int=w.units.size()
    var target_point: Vector2=point+Vector2(0,80) if id=="armor_reserve" else point
    expect(c.cast(0,id,target_point),"Cast "+id)
+   expect(c.countdown_labels[id].text==str(ceili(float(c.teams[0].cooldowns[id]))),choice+": cameo countdown matches "+id)
+   expect(c.cameos[id].fraction>0.95,choice+": clock covers "+id+" after it fires")
    expect(not c.cast(0,id,point),"Cooldown prevents spam")
    if Kits.POWERS[id].delay>0:
     expect(not c.events.is_empty() and victim.hp==hp,"Warning precedes damage/delivery")

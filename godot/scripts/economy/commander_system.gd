@@ -2,6 +2,7 @@ extends Node2D
 ## Match-local authority for research, promotions, telegraphed support and interception.
 const Rules = preload("res://scripts/economy/army_rules.gd")
 const RetroSkin = preload("res://scripts/ui/retro_skin.gd")
+const CameoScript = preload("res://scripts/ui/power_cameo.gd")
 const RESEARCH := {
  "beam_capacitors":{"name":"Beam Capacitors","army":"alliance_energy","site":"depot","cost":1400.0,"time":35.0,"demand":25},
  "grid_stabilizers":{"name":"Grid Stabilizers","army":"alliance_energy","site":"depot","cost":1200.0,"time":30.0,"demand":15},
@@ -49,6 +50,10 @@ var research_buttons: Dictionary = {}
 var power_buttons: Dictionary = {}
 var rank_label: Label
 var silo_button: Button
+var power_column: VBoxContainer
+var strip_label: Label
+var countdown_labels: Dictionary = {}
+var cameos: Dictionary = {}
 
 func reset(arena) -> void:
  world=arena
@@ -60,6 +65,7 @@ func reset(arena) -> void:
  interception.clear()
  pending_power=""
  z_index=95 # Warning circles are visible to both teams, even through shroud.
+ if is_instance_valid(rank_label): refresh_ui()
  queue_redraw()
 
 func rank(side: int) -> int:
@@ -134,6 +140,7 @@ func cast(side: int, id: String, point: Vector2) -> bool:
  else: resolve(event)
  pending_power=""
  queue_redraw()
+ if is_instance_valid(rank_label): refresh_ui()
  return true
 
 func living_count(side: int) -> int:
@@ -148,6 +155,7 @@ func launch_silo(side: int, point: Vector2) -> bool:
  teams[side].silo=240.0
  events.append({"id":"silo","side":side,"point":point,"radius":230.0 if has_research(side,"saturation_payload") else 100.0,"remaining":7.0,"level":1,"wide":has_research(side,"saturation_payload")})
  queue_redraw()
+ if is_instance_valid(rank_label): refresh_ui()
  return true
 
 func blast(event: Dictionary, point: Vector2, kind: String, damage: float, radius: float) -> void:
@@ -363,36 +371,96 @@ func build_ui(column: VBoxContainer) -> void:
  RetroSkin.button(cancel,false,true)
  cancel.pressed.connect(func(): cancel_research(0); refresh_ui())
  column.add_child(cancel)
+ if power_column==null: return
+ strip_label=Label.new()
+ strip_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ strip_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ RetroSkin.label(strip_label,true,true)
+ power_column.add_child(strip_label)
  for id in power_ids(0):
-  var row:=HBoxContainer.new()
-  column.add_child(row)
-  var buy:=Button.new()
-  buy.text="+ GP"
-  buy.custom_minimum_size=Vector2(50,44)
-  buy.pressed.connect(func(): buy_power(0,id); refresh_ui())
-  row.add_child(buy)
-  RetroSkin.button(buy,false,true)
-  var use:=Button.new()
-  use.custom_minimum_size.y=44
-  use.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-  use.pressed.connect(func(): pending_power=id; world.placement_lane=""; world.rally_placing=false; world.hud_status="Choose target for "+str(POWERS[id].name)+"; right-click/Esc cancels.")
-  row.add_child(use)
-  RetroSkin.button(use,false,true)
-  use.tooltip_text="Rank %d; 1 GP per level, up to 3 levels. Radius %d; cooldown %ds; warning %.1fs. Offensive powers need shared sight; recon can target shroud." % [POWERS[id].rank,POWERS[id].radius,POWERS[id].cooldown,POWERS[id].delay]
-  power_buttons[id]={"buy":buy,"use":use}
+  _add_cameo(id,true)
  if Rules.faction(world.army_choices[0])=="gia":
-  var use:=Button.new()
-  use.text="FIRE SILO (240s charge)"
-  use.custom_minimum_size.y=44
-  use.pressed.connect(func(): pending_power="silo"; world.placement_lane=""; world.rally_placing=false)
+  _add_cameo("silo",false)
+ _show_column()
+ refresh_ui()
+
+func _player_tint() -> Color:
+ match Rules.faction(world.army_choices[0]):
+  "republic": return Color("#d9896a")
+  "gia": return Color("#c4b56a")
+  _: return Color("#7ec8d4")
+
+func _show_column() -> void:
+ var show: bool=not power_ids(0).is_empty() or Rules.faction(world.army_choices[0])=="gia"
+ if world.get("hud_powers")!=null and is_instance_valid(world.hud_powers):
+  world.hud_powers.visible=show
+
+func _add_cameo(id: String, purchasable: bool) -> void:
+ var slot:=Control.new()
+ slot.custom_minimum_size=Vector2(64,64)
+ slot.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ power_column.add_child(slot)
+ var use:=Button.new()
+ use.flat=true
+ use.focus_mode=Control.FOCUS_ALL
+ use.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ use.pressed.connect(_arm_power.bind(id))
+ RetroSkin.button(use,false,true)
+ slot.add_child(use)
+ var cameo:=Control.new()
+ cameo.set_script(CameoScript)
+ cameo.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ cameo.configure(id,_player_tint())
+ use.add_child(cameo)
+ var count:=Label.new()
+ count.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ count.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ count.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+ count.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ count.add_theme_font_size_override("font_size",16)
+ count.add_theme_color_override("font_color",Color("#f6f3e8"))
+ count.add_theme_color_override("font_outline_color",Color("#061014"))
+ count.add_theme_constant_override("outline_size",6)
+ use.add_child(count)
+ if purchasable:
+  var buy:=Button.new()
+  buy.text="+"
+  buy.focus_mode=Control.FOCUS_ALL
+  buy.anchor_left=1.0
+  buy.anchor_right=1.0
+  buy.anchor_top=0.0
+  buy.anchor_bottom=0.0
+  buy.offset_left=-24.0
+  buy.offset_right=-2.0
+  buy.offset_top=2.0
+  buy.offset_bottom=24.0
+  buy.pressed.connect(func(): buy_power(0,id); refresh_ui())
+  RetroSkin.button(buy,true,true)
+  buy.add_theme_font_size_override("font_size",14)
+  buy.tooltip_text="Spend 1 general point. Each power has three levels."
+  slot.add_child(buy)
+  power_buttons[id]={"buy":buy,"use":use}
+ else:
   silo_button=use
-  RetroSkin.button(use,false,true)
-  column.add_child(use)
+ countdown_labels[id]=count
+ cameos[id]=cameo
+
+func _arm_power(id: String) -> void:
+ pending_power=id
+ world.placement_lane=""
+ world.rally_placing=false
+ if id=="silo":
+  world.hud_status="Choose the silo impact. Right-click or Esc cancels."
+ else:
+  world.hud_status="Choose target for "+str(POWERS[id].name)+". Right-click or Esc cancels."
+ refresh_ui()
 
 func refresh_ui() -> void:
  if not is_instance_valid(rank_label) or teams.size()!=2: return
  var s: Dictionary=teams[0]
- rank_label.text="COMMAND RANK %d · XP %d · GP %d\nResearch & commander powers" % [s.rank,int(s.xp),s.points]
+ rank_label.text="COMMAND RANK %d · XP %d · GP %d\nResearch" % [s.rank,int(s.xp),s.points]
+ if is_instance_valid(strip_label):
+  strip_label.text="RANK %d\nGP %d" % [s.rank,s.points]
  for id in research_buttons:
   var button: Button=research_buttons[id]
   button.text=str(RESEARCH[id].name)+(" DONE" if has_research(0,id) else " $%d" % int(RESEARCH[id].cost))
@@ -402,12 +470,34 @@ func refresh_ui() -> void:
  for id in power_buttons:
   var level:=int(s.powers.get(id,0))
   var cooldown:=float(s.cooldowns.get(id,0.0))
-  power_buttons[id].buy.disabled=s.points<1 or level>=3 or rank(0)<POWERS[id].rank
+  var data: Dictionary=POWERS[id]
+  var ranked: bool=rank(0)>=int(data.rank)
+  power_buttons[id].buy.disabled=s.points<1 or level>=3 or not ranked
+  power_buttons[id].buy.visible=level<3 and ranked
   power_buttons[id].use.disabled=level==0 or cooldown>0.0
-  power_buttons[id].use.text="%s L%d · %s" % [POWERS[id].name,level,"R%d" % POWERS[id].rank if level==0 else ("%ds" % ceili(cooldown) if cooldown>0 else "READY")]
+  power_buttons[id].use.tooltip_text="%s. Rank %d. 1 GP per level, up to 3. Radius %d. Cooldown %ds. Warning %.1fs. Offensive powers need shared sight. Recon can target shroud." % [data.name,data.rank,data.radius,data.cooldown,data.delay]
+  _present_cameo(id,level,cooldown,float(data.cooldown),rank(0)<int(data.rank) and level==0,"R%d" % int(data.rank))
  if is_instance_valid(silo_button):
-  silo_button.text="SILO · "+("%ds" % ceili(s.silo) if s.silo>0 else "READY")
-  silo_button.disabled=not world.has_structure(0,"silo") or not world.power_ok(0) or s.silo>0
+  var owns_silo: bool=world.has_structure(0,"silo")
+  var charge: float=float(s.silo) if owns_silo else 0.0
+  var silo_ready: bool=owns_silo and world.power_ok(0) and charge<=0.0
+  silo_button.disabled=not silo_ready
+  silo_button.tooltip_text="Ballistic missile. 240s charge. A powered silo is required."
+  _present_cameo("silo",1 if owns_silo else 0,charge,240.0,not owns_silo or not world.power_ok(0),"")
+ _show_column()
+
+func _present_cameo(id: String, level: int, remaining: float, duration: float, locked: bool, locked_text: String) -> void:
+ if not countdown_labels.has(id): return
+ var count: Label=countdown_labels[id]
+ if remaining>0.0:
+  count.text=str(ceili(remaining))
+  count.add_theme_font_size_override("font_size",16)
+ elif locked and locked_text!="":
+  count.text=locked_text
+  count.add_theme_font_size_override("font_size",13)
+ else:
+  count.text=""
+ cameos[id].present(level,remaining/maxf(duration,0.001),pending_power==id,locked)
 
 func _draw() -> void:
  for event in events:
