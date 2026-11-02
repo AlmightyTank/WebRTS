@@ -25,8 +25,8 @@ func nearby_units(origin: Vector2, finish: Vector2, margin: float) -> Array:
  record("nearby",start)
  return result
 
-func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = null) -> PackedVector2Array:
+func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = null, avoid_units: bool = true) -> PackedVector2Array:
  var start := Time.get_ticks_usec()
- var result := super.find_route(origin,destination,is_air,actor)
+ var result := super.find_route(origin,destination,is_air,actor,avoid_units)
  record("route",start)
  return result

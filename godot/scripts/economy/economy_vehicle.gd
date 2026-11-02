@@ -104,7 +104,7 @@ func _route_to(point: Vector2) -> void:
  column_slot=Vector2.ZERO
  column_spine=PackedVector2Array()
  destination=arena.clamp_point(point)
- route=arena.find_route(position,destination,false)
+ route=arena.find_route(position,destination,false,self,false)
  route_index=0
  moving=route.size()>0
 
@@ -230,7 +230,7 @@ func _step(delta: float) -> void:
    blocked_time=0.0
   if blocked_time>=0.75:
    blocked_time=0.0
-   var alternative: PackedVector2Array=arena.column_route(position,column_spine,false) if column_move and not column_spine.is_empty() else arena.find_route(position,destination,false,null if column_move else self)
+   var alternative: PackedVector2Array=arena.column_route(position,column_spine,false,self) if column_move and not column_spine.is_empty() else arena.find_route(position,destination,false,null if column_move else self)
    if not alternative.is_empty():
     route=alternative
     route_index=0

@@ -96,5 +96,8 @@ jobs:
       - name: Test faction superweapons
         run: godot --headless --path godot --script res://tests/superweapon_smoke.gd
         timeout-minutes: 2
+      - name: Test walls and gates
+        run: godot --headless --path godot --script res://tests/walls_smoke.gd
+        timeout-minutes: 2
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180

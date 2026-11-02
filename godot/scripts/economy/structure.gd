@@ -52,6 +52,17 @@ func notify_unit_exit() -> void:
  exit_activity=2.0
 
 func _process(delta: float) -> void:
+ if kind=="gate" and arena!=null and not arena.paused and not arena.battle_over:
+  var open:=false
+  for unit in arena.units:
+   if is_instance_valid(unit) and unit.hp>0.0 and not unit.air and unit.team==team and unit.position.distance_to(position)<=40.0:
+    open=true
+    break
+  var next: float=move_toward(door_open, 1.0 if open else 0.0, delta*6.0)
+  if not is_equal_approx(next, door_open):
+   door_open=next
+   queue_redraw()
+  return
  if kind not in ["yard","power","barracks","refinery","factory","airfield","depot","relay","vanguard_foundry"] or arena==null: return
  if kind=="relay" and team<0: return
  if arena.paused or arena.battle_over: return

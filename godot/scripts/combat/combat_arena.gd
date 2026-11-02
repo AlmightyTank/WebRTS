@@ -174,7 +174,7 @@ func _create_navigation() -> void:
   for x in range(COLS):
    var cell := Vector2i(x, y)
    for obstacle in obstacles:
-    if obstacle.grow(24.0).has_point(cell_center(cell)):
+    if obstacle.grow(obstacle_clearance(obstacle)).has_point(cell_center(cell)):
      navigation.set_point_solid(cell)
      break
 
@@ -193,6 +193,7 @@ func can_occupy(point: Vector2, radius: float, is_air: bool, actor = null, neigh
  if is_air:
   return true
  for box in obstacles:
+  if passage_open(actor, box): continue
   if box.grow(radius).has_point(point):
    return false
  var candidates: Array = nearby_units(point, point, radius + 1.0) if neighbors == null else neighbors
@@ -203,18 +204,19 @@ func can_occupy(point: Vector2, radius: float, is_air: bool, actor = null, neigh
    return false
  return true
 
-func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = null) -> PackedVector2Array:
+func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = null, avoid_units: bool = true) -> PackedVector2Array:
  var end := clamp_point(destination)
  if is_air:
   return PackedVector2Array([end])
  var start_cell := world_cell(origin)
  var goal_cell := world_cell(end)
+ var temporary: Array[Vector2i] = []
+ var opened: Array[Vector2i] = open_passage(actor)
  if navigation.is_point_solid(goal_cell):
   goal_cell = _nearby_open_cell(goal_cell)
  if navigation.is_point_solid(start_cell):
   start_cell = _nearby_open_cell(start_cell)
- var temporary: Array[Vector2i] = []
- if actor != null:
+ if actor != null and avoid_units:
   for unit in units:
    if not is_instance_valid(unit) or unit == actor or unit.air or unit.hp <= 0.0:
     continue
@@ -228,12 +230,14 @@ func find_route(origin: Vector2, destination: Vector2, is_air: bool, actor = nul
       navigation.set_point_solid(cell)
       temporary.append(cell)
  var diagonal_mode := navigation.diagonal_mode
- if actor != null:
+ if actor != null and avoid_units:
   navigation.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
  var ids: Array[Vector2i] = navigation.get_id_path(start_cell, goal_cell)
  navigation.diagonal_mode = diagonal_mode
  for cell in temporary:
   navigation.set_point_solid(cell, false)
+ for cell in opened:
+  navigation.set_point_solid(cell, true)
  var result := PackedVector2Array()
  if ids.is_empty():
   return result
@@ -255,6 +259,7 @@ func can_traverse(origin: Vector2, finish: Vector2, radius: float, is_air: bool,
  if is_air:
   return true
  for box in obstacles:
+  if passage_open(actor, box): continue
   if _segment_hits_rect(origin, finish, box.grow(radius)):
    return false
  for unit in candidates:
@@ -275,6 +280,17 @@ func _nearby_open_cell(point: Vector2i) -> Vector2i:
     if navigation.is_in_boundsv(cell) and not navigation.is_point_solid(cell):
      return cell
  return point
+
+func obstacle_clearance(_box: Rect2) -> float:
+ return 24.0
+
+# A gate overrides this so its owner can walk the cell. Everyone else treats it as solid.
+func passage_open(_actor, _box: Rect2) -> bool:
+ return false
+
+# Cells temporarily opened for this actor. The caller seals them again after the search.
+func open_passage(_actor) -> Array[Vector2i]:
+ return []
 
 func clear_shot(from: Vector2, to: Vector2, from_air: bool, to_air: bool, hit_target = null) -> bool:
  if from_air or to_air:
@@ -576,7 +592,7 @@ func begin_column_spread(actor, force: bool = false) -> bool:
 
 # Join the shared corridor and follow it to the destination. The arrival cell
 # is applied only after the unit gets there.
-func column_route(origin: Vector2, spine: PackedVector2Array, is_air: bool = false) -> PackedVector2Array:
+func column_route(origin: Vector2, spine: PackedVector2Array, is_air: bool = false, actor = null) -> PackedVector2Array:
  if is_air or spine.is_empty():
   return PackedVector2Array()
  var goal: Vector2 = spine[spine.size() - 1]
@@ -591,15 +607,15 @@ func column_route(origin: Vector2, spine: PackedVector2Array, is_air: bool = fal
    best = distance
    join = i
  var route := PackedVector2Array()
- var approach := find_route(origin, spine[join], false)
+ var approach := find_route(origin, spine[join], false, actor, false)
  if approach.is_empty() and origin.distance_to(spine[join]) > 2.0:
-  return find_route(origin, goal, false)
+  return find_route(origin, goal, false, actor, false)
  for point in approach:
   _append_corner(route, point)
  for i in range(join, spine.size()):
   _append_corner(route, spine[i])
  if route.is_empty():
-  return find_route(origin, goal, false)
+  return find_route(origin, goal, false, actor, false)
  return route
 
 func _append_corner(route: PackedVector2Array, point: Vector2) -> void:
@@ -678,7 +694,7 @@ func issue_order(point: Vector2, attack_move: bool = false, queued: bool = false
   else:
    u.order_move(slot, attack_move)
    if formation == "GROUP" and u.get("air") != true and not spine.is_empty():
-    var column := column_route(u.position, spine, false)
+    var column := column_route(u.position, spine, false, u)
     if not column.is_empty():
      u.route = column
      u.route_index = 0

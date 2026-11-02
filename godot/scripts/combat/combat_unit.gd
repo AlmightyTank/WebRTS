@@ -196,7 +196,7 @@ func _begin_route(point: Vector2) -> void:
     column_slot = Vector2.ZERO
     column_spine = PackedVector2Array()
     destination = arena.clamp_point(point)
-    route = arena.find_route(position, destination, air)
+    route = arena.find_route(position, destination, air, self, false)
     route_index = 0
     moving = not route.is_empty()
     if not moving and position.distance_to(destination) > 12.0:
@@ -388,7 +388,7 @@ func _step_movement(delta: float) -> void:
             if waiting_for_traffic and traffic_wait < 2.5:
                 return
             traffic_wait = 0.0
-            var alternative: PackedVector2Array = arena.column_route(position, column_spine, air) if column_move and not column_spine.is_empty() else arena.find_route(position, destination, air, null if column_move else self)
+            var alternative: PackedVector2Array = arena.column_route(position, column_spine, air, self) if column_move and not column_spine.is_empty() else arena.find_route(position, destination, air, null if column_move else self)
             if not alternative.is_empty():
                 route = alternative
                 route_index = 0
