@@ -21,7 +21,7 @@ const STRUCTURE_DATA := {
  "vanguard_foundry":{"name":"Vanguard Foundry","cost":1600.0,"time":30.0,"power":0,"demand":35,"size":Vector2(130,110),"hp":1600},
  "silo":{"name":"Ballistic Missile Silo","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(110,100),"hp":1800}
 }
-const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES"]
+const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES","UPGRADES"]
 const STAGING_IDS := ["ALPHA","BRAVO","CHARLIE"]
 var structures: Array = []
 var ore_fields: Array = []
@@ -78,6 +78,11 @@ var retro_economy_label: Label
 var retro_powerbar: ProgressBar
 var queue_preview_labels: Array = []
 var queue_preview_caption: Label
+var queue_panel: VBoxContainer
+var upgrades_panel: VBoxContainer
+var orders_sheet: VBoxContainer
+var orders_sheet_open := false
+var field_orders: HBoxContainer
 var production_tile_icons: Dictionary = {}
 var action_palette_buttons: Array = []
 
@@ -199,6 +204,7 @@ func reset_battle() -> void:
  kills=[0,0]
  placement_lane=""
  current_tab=0
+ orders_sheet_open=false
  hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
  if static_obstacles.is_empty(): static_obstacles=obstacles.duplicate()
  _rebuild_navigation()
@@ -1043,7 +1049,7 @@ func _unhandled_input(event: InputEvent) -> void:
    if _deploy_mcv(0): _update_hud()
    get_viewport().set_input_as_handled()
    return
-  if event.keycode in [KEY_1,KEY_2,KEY_3,KEY_4]:
+  if event.keycode in [KEY_1,KEY_2,KEY_3,KEY_4,KEY_5]:
    current_tab=event.keycode-KEY_1
    _update_hud()
    get_viewport().set_input_as_handled()
@@ -1144,7 +1150,7 @@ func _apply_hud_layout(view_size: Vector2) -> void:
  _set_control_rect(hud_toolbar,layout["toolbar"])
  _set_control_rect(hud_dock,layout["dock"])
  if is_instance_valid(sidebar_toggle):
-  sidebar_toggle.text=("PRODUCTION  ▲  COLLAPSE" if sidebar_open else "PRODUCTION  ▼  OPEN") if compact_hud else "PRODUCTION / ACTIVE FACTORIES"
+  sidebar_toggle.text=("PRODUCTION  ▲  COLLAPSE" if sidebar_open else "PRODUCTION  ▼  OPEN") if compact_hud else "PRODUCTION"
   sidebar_toggle.disabled=not compact_hud
  if is_instance_valid(producer_summary):
   producer_summary.visible=sidebar_open
@@ -1159,6 +1165,9 @@ func _apply_hud_layout(view_size: Vector2) -> void:
   chip.custom_minimum_size.y=44.0 if compact_hud else 27.0
  for tab in tab_buttons:
   tab.custom_minimum_size.y=44.0 if compact_hud else 27.0
+ for mode_button in [repair_button,sell_button]:
+  if is_instance_valid(mode_button):
+   mode_button.custom_minimum_size.y=44.0 if compact_hud else 28.0
  if is_instance_valid(rally_stage_selector):
   rally_stage_selector.visible=not compact_hud
  if is_instance_valid(activate_producer_button):
@@ -1299,7 +1308,7 @@ func _create_hud() -> void:
  var dock_stack=VBoxContainer.new()
  dock.add_child(dock_stack)
  sidebar_toggle=Button.new()
- sidebar_toggle.text="PRODUCTION / ACTIVE FACTORIES"
+ sidebar_toggle.text="PRODUCTION"
  sidebar_toggle.custom_minimum_size=Vector2(0,28)
  sidebar_toggle.pressed.connect(_toggle_sidebar)
  dock_stack.add_child(sidebar_toggle)
@@ -1347,31 +1356,54 @@ func _create_hud() -> void:
  retro_powerbar.add_theme_stylebox_override("background",RetroSkin.tile("disabled"))
  retro_powerbar.add_theme_stylebox_override("fill",RetroSkin.tile("active"))
  column.add_child(retro_powerbar)
- var section=HSeparator.new()
- column.add_child(section)
- var command_toggle=Button.new()
- command_toggle.text="COMMAND / RESEARCH"
- command_toggle.toggle_mode=true
- command_toggle.custom_minimum_size.y=34
- RetroSkin.button(command_toggle)
- column.add_child(command_toggle)
- var command_panel=VBoxContainer.new()
- column.add_child(command_panel)
- commander.build_ui(command_panel)
- command_panel.visible=false
- command_toggle.toggled.connect(func(open: bool): command_panel.visible=open)
- command_toggle.visible=not commander.power_ids(0).is_empty() or ArmyRules.faction(army_choices[0])=="gia"
- var tab_header=Label.new()
- tab_header.text="PRODUCTION QUEUES"
- column.add_child(tab_header)
+ var mode_row=HBoxContainer.new()
+ mode_row.add_theme_constant_override("separation",6)
+ column.add_child(mode_row)
+ var repair=Button.new()
+ repair.text="REPAIR"
+ repair.tooltip_text="Repair the selected building. Credits are spent per hit point."
+ repair.custom_minimum_size=Vector2(0,28)
+ repair.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ repair.pressed.connect(_toggle_repair_selected)
+ mode_row.add_child(repair)
+ repair_button=repair
+ var sell=Button.new()
+ sell.text="SELL"
+ sell.tooltip_text="Sell the selected building for half its construction cost. Tap again within 5 seconds to confirm."
+ sell.custom_minimum_size=Vector2(0,28)
+ sell.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ sell.pressed.connect(_on_sell_selected)
+ mode_row.add_child(sell)
+ sell_button=sell
+ field_orders=HBoxContainer.new()
+ field_orders.add_theme_constant_override("separation",6)
+ field_orders.visible=false
+ column.add_child(field_orders)
+ var deploy=Button.new()
+ deploy.text="DEPLOY"
+ deploy.tooltip_text="Deploy the selected MCV (H)."
+ deploy.custom_minimum_size=Vector2(0,28)
+ deploy.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ deploy.pressed.connect(_on_deploy)
+ field_orders.add_child(deploy)
+ var harvest=Button.new()
+ harvest.text="HARVEST"
+ harvest.tooltip_text="Send selected collectors back to ore."
+ harvest.custom_minimum_size=Vector2(0,28)
+ harvest.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ harvest.pressed.connect(_on_harvest)
+ field_orders.add_child(harvest)
  var tabs=HBoxContainer.new()
  column.add_child(tabs)
- for i in range(4):
+ for i in range(5):
   var tab=Button.new()
-  tab.text=["BUILD","DEF","INF","VEH"][i]
+  tab.text=["BLD","DEF","INF","VEH","UPG"][i]
+  tab.tooltip_text=["Buildings","Defense","Infantry","Vehicles","General upgrades"][i]
   tab.toggle_mode=true
+  tab.clip_text=true
   tab.custom_minimum_size=Vector2(0,27)
   tab.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  tab.add_theme_font_size_override("font_size",10)
   tab.pressed.connect(_set_tab.bind(i))
   RetroSkin.button(tab,i==0,true)
   tabs.add_child(tab)
@@ -1399,18 +1431,62 @@ func _create_hud() -> void:
   icon.configure(id,0,faction_style(0))
   production_tile_icons[id]=icon
   action_buttons[id]=button
+ upgrades_panel=VBoxContainer.new()
+ upgrades_panel.visible=false
+ column.add_child(upgrades_panel)
+ commander.build_ui(upgrades_panel)
+ queue_panel=VBoxContainer.new()
+ column.add_child(queue_panel)
+ queue_preview_caption=Label.new()
+ queue_preview_caption.text="Select a production tab"
+ RetroSkin.label(queue_preview_caption,true)
+ queue_panel.add_child(queue_preview_caption)
+ var queue_row=HBoxContainer.new()
+ queue_panel.add_child(queue_row)
+ for q in range(4):
+  var slot=Label.new()
+  slot.custom_minimum_size=Vector2(0,26)
+  slot.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  slot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+  slot.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+  slot.add_theme_stylebox_override("normal",RetroSkin.tile("disabled"))
+  RetroSkin.label(slot,true)
+  queue_row.add_child(slot)
+  queue_preview_labels.append(slot)
+ var cancel_row=HBoxContainer.new()
+ cancel_row.add_theme_constant_override("separation",6)
+ queue_panel.add_child(cancel_row)
+ var cancel=Button.new()
+ cancel.text="CANCEL"
+ cancel.tooltip_text="Cancel the item currently building in this tab and refund it."
+ cancel.custom_minimum_size=Vector2(0,28)
+ cancel.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ cancel.pressed.connect(_cancel_current_tab)
+ cancel_row.add_child(cancel)
+ refund_button=cancel
+ var cancel_queued=Button.new()
+ cancel_queued.text="UNDO"
+ cancel_queued.tooltip_text="Remove the last unit waiting in this tab."
+ cancel_queued.custom_minimum_size=Vector2(0,28)
+ cancel_queued.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ cancel_queued.pressed.connect(_cancel_last_queued)
+ cancel_row.add_child(cancel_queued)
+ cancel_queue_button=cancel_queued
+ orders_sheet=VBoxContainer.new()
+ orders_sheet.visible=false
+ column.add_child(orders_sheet)
  var header=Label.new()
- header.text="SPAWN EXIT  ·  TAP TO ACTIVATE"
+ header.text="SPAWN EXIT"
  header.add_theme_font_size_override("font_size",9)
- column.add_child(header)
+ orders_sheet.add_child(header)
  producer_list=VBoxContainer.new()
- column.add_child(producer_list)
+ orders_sheet.add_child(producer_list)
  var stage_header=Label.new()
  stage_header.text="SEND NEW UNITS TO"
- stage_header.add_theme_font_size_override("font_size",13)
- column.add_child(stage_header)
+ stage_header.add_theme_font_size_override("font_size",11)
+ orders_sheet.add_child(stage_header)
  var stage_row=HBoxContainer.new()
- column.add_child(stage_row)
+ orders_sheet.add_child(stage_row)
  for i in range(4):
   var chip=Button.new()
   chip.text=["SELF","ALPHA","BRAVO","CHARLIE"][i]
@@ -1424,10 +1500,10 @@ func _create_hud() -> void:
  stage_detail=Label.new()
  stage_detail.text="Select a producer to assign a destination."
  stage_detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- column.add_child(stage_detail)
+ orders_sheet.add_child(stage_detail)
 
  var rally_row=HBoxContainer.new()
- column.add_child(rally_row)
+ orders_sheet.add_child(rally_row)
  var rally=Button.new()
  rally.text="SET DESTINATION (G)"
  rally.custom_minimum_size=Vector2(0,28)
@@ -1450,75 +1526,15 @@ func _create_hud() -> void:
  for i in range(STAGING_IDS.size()):
   stage.add_item("Stage "+STAGING_IDS[i],i+1)
  stage.item_selected.connect(_on_stage_selected)
- # Keep the desktop dropdown as an accessible alternative to the quick chips.
- column.add_child(stage)
+ # Desktop keeps the dropdown; compact layout hides it and uses the chips.
+ orders_sheet.add_child(stage)
  rally_stage_selector=stage
  var activate=Button.new()
  activate.text="ACTIVATE SELECTED PRODUCTION BUILDING"
  activate.custom_minimum_size=Vector2(0,28)
  activate.pressed.connect(_activate_selected_producer)
- column.add_child(activate)
+ orders_sheet.add_child(activate)
  activate_producer_button=activate
-
- var queue_header=Label.new()
- queue_header.text="QUEUE / PRODUCTION STATUS"
- RetroSkin.label(queue_header,true,true)
- column.add_child(queue_header)
- queue_preview_caption=Label.new()
- queue_preview_caption.text="Select a production tab"
- RetroSkin.label(queue_preview_caption,true)
- column.add_child(queue_preview_caption)
- var queue_row=HBoxContainer.new()
- column.add_child(queue_row)
- for q in range(4):
-  var slot=Label.new()
-  slot.custom_minimum_size=Vector2(0,26)
-  slot.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-  slot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-  slot.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
-  slot.add_theme_stylebox_override("normal",RetroSkin.tile("disabled"))
-  RetroSkin.label(slot,true)
-  queue_row.add_child(slot)
-  queue_preview_labels.append(slot)
- var divider=HSeparator.new()
- column.add_child(divider)
- var operations=Label.new()
- operations.text="BASE & PRODUCTION ACTIONS"
- column.add_child(operations)
- var deploy=Button.new()
- deploy.text="DEPLOY SELECTED MCV (H)"
- deploy.custom_minimum_size=Vector2(0,28)
- deploy.pressed.connect(_on_deploy)
- column.add_child(deploy)
- var harvest=Button.new()
- harvest.text="AUTO-HARVEST SELECTED"
- harvest.custom_minimum_size=Vector2(0,28)
- harvest.pressed.connect(_on_harvest)
- column.add_child(harvest)
- var cancel=Button.new()
- cancel.text="CANCEL CURRENT / REFUND"
- cancel.custom_minimum_size=Vector2(0,28)
- cancel.pressed.connect(_cancel_current_tab)
- column.add_child(cancel)
- refund_button=cancel
- var cancel_queued=Button.new()
- cancel_queued.text="REMOVE LAST QUEUED UNIT"
- cancel_queued.custom_minimum_size=Vector2(0,28)
- cancel_queued.pressed.connect(_cancel_last_queued)
- column.add_child(cancel_queued)
- cancel_queue_button=cancel_queued
- var repair=Button.new()
- repair.text="REPAIR SELECTED BUILDING"
- repair.custom_minimum_size=Vector2(0,28)
- repair.pressed.connect(_toggle_repair_selected)
- column.add_child(repair)
- repair_button=repair
- var sell=Button.new()
- sell.text="SELL SELECTED (CONFIRM)"
- sell.custom_minimum_size=Vector2(0,28)
- sell.pressed.connect(_on_sell_selected)
- column.add_child(sell)
- sell_button=sell
 
  var bottom=PanelContainer.new()
  bottom.mouse_filter=Control.MOUSE_FILTER_STOP
@@ -1564,6 +1580,9 @@ func _skin_hud() -> void:
   RetroSkin.panel(p)
  for control in [sidebar_toggle,activate_producer_button,rally_button,rally_mode_button,refund_button,cancel_queue_button,repair_button,sell_button]:
   if control!=null: RetroSkin.button(control)
+ if is_instance_valid(field_orders):
+  for child in field_orders.get_children():
+   RetroSkin.button(child)
  RetroSkin.button(sidebar_toggle,true)
  for l in [title_text,hud_text,info_text,producer_summary,stage_detail]:
   RetroSkin.label(l,l==stage_detail or l==producer_summary,l==title_text)
@@ -1581,6 +1600,7 @@ func _on_toolbar(action: String) -> void:
   "RALLY": _begin_rally()
   "STAGING":
    sidebar_open=true
+   orders_sheet_open=true
    _apply_hud_layout(get_viewport_rect().size)
    if current_tab not in [2,3]: current_tab=2
    _update_hud()
@@ -1590,6 +1610,10 @@ func _on_deploy() -> void:
  if _deploy_mcv(0): _update_hud()
 
 func _cancel_current_tab() -> void:
+ if current_tab<0 or current_tab>3:
+  hud_status="Switch to a production tab to cancel construction."
+  _update_hud()
+  return
  var lane=["build","defense","infantry","vehicle"][current_tab]
  if cancel_production(0,lane):
   hud_status="Canceled production; invested credits refunded."
@@ -1598,6 +1622,10 @@ func _cancel_current_tab() -> void:
  _update_hud()
 
 func _cancel_last_queued() -> void:
+ if current_tab<0 or current_tab>3:
+  hud_status="Switch to a production tab to edit the queue."
+  _update_hud()
+  return
  var lane=["build","defense","infantry","vehicle"][current_tab]
  var waiting: Array=states[0]["queued"].get(lane,[])
  if not waiting.is_empty() and cancel_production(0,lane,waiting.size()-1):
@@ -1630,7 +1658,16 @@ func _on_sell_selected() -> void:
 
 func _on_harvest() -> void:
  for actor in selected:
-  if is_instance_valid(actor) and actor.unit_id=="a_harvester": actor.set_harvest()
+  if is_instance_valid(actor) and actor.unit_id in ["a_harvester","r_hauler","g_collector"]: actor.set_harvest()
+
+func _selection_has_unit(ids: Array) -> bool:
+ for actor in selected:
+  if is_instance_valid(actor) and actor.unit_id in ids: return true
+ return false
+
+func _orders_sheet_wanted() -> bool:
+ if orders_sheet_open or rally_placing: return true
+ return selected_building!=null and is_instance_valid(selected_building) and selected_building.team==0 and selected_building.kind in ["barracks","factory"]
 
 func _set_tab(value: int) -> void:
  current_tab=value
@@ -1684,7 +1721,22 @@ func _update_hud() -> void:
   retro_economy_label.text="IRON  %06d   POWER %+d" % [int(state["credits"]),int(state["power"])-int(state["demand"])]
  if is_instance_valid(retro_powerbar):
   retro_powerbar.value=100.0 if int(state["demand"])<=0 else clampf(100.0*float(state["power"])/float(state["demand"]),0.0,100.0)
- if is_instance_valid(queue_preview_caption):
+ var on_upgrades=current_tab>=TABS.size()-1 or current_tab>3
+ if is_instance_valid(build_container): build_container.visible=not on_upgrades
+ if is_instance_valid(upgrades_panel):
+  upgrades_panel.visible=on_upgrades
+  if on_upgrades: commander.refresh_ui()
+ if is_instance_valid(queue_panel): queue_panel.visible=not on_upgrades
+ if is_instance_valid(orders_sheet): orders_sheet.visible=_orders_sheet_wanted()
+ if is_instance_valid(field_orders) and field_orders.get_child_count()>1:
+  var show_deploy=_selection_has_unit(["a_mcv","r_mcv","g_mcv"])
+  var show_harvest=_selection_has_unit(["a_harvester","r_hauler","g_collector"])
+  var deploy_button: Button=field_orders.get_child(0)
+  var harvest_button: Button=field_orders.get_child(1)
+  deploy_button.visible=show_deploy
+  harvest_button.visible=show_harvest
+  field_orders.visible=show_deploy or show_harvest
+ if is_instance_valid(queue_preview_caption) and not on_upgrades:
   var queue_lane=["build","defense","infantry","vehicle"][current_tab]
   var current_job: Dictionary=state["lanes"][queue_lane]
   var in_line: Array=state["queued"].get(queue_lane,[])
@@ -1722,10 +1774,15 @@ func _update_hud() -> void:
   button.text="\n\n\n"+str(short_label)+"\n"+label_tail
   button.tooltip_text="%s | %d credits | %d seconds" % [label,cost,int(recipe.get("time",0))]
   button.disabled=not ready and (not _tech_ready(0,id) or not _has_producer(0,lane) or (not job.is_empty() and lane in ["build","defense"]))
- if is_instance_valid(refund_button): refund_button.disabled=state["lanes"][["build","defense","infantry","vehicle"][current_tab]].is_empty()
- if is_instance_valid(cancel_queue_button): cancel_queue_button.disabled=current_tab not in [2,3] or state["queued"][["infantry","vehicle"][maxi(0,current_tab-2)]].is_empty()
+ if is_instance_valid(refund_button):
+  refund_button.disabled=on_upgrades or state["lanes"][["build","defense","infantry","vehicle"][mini(current_tab,3)]].is_empty()
+ if is_instance_valid(cancel_queue_button):
+  cancel_queue_button.disabled=current_tab not in [2,3] or state["queued"][["infantry","vehicle"][mini(maxi(current_tab-2,0),1)]].is_empty()
  if is_instance_valid(repair_button): repair_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
- if is_instance_valid(sell_button): sell_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
+ if is_instance_valid(sell_button):
+  var confirming=pending_sale==selected_building and is_instance_valid(selected_building) and skirmish_time<=sale_confirm_deadline
+  sell_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0
+  sell_button.text="CONFIRM" if confirming else "SELL"
  if is_instance_valid(activate_producer_button): activate_producer_button.disabled=selected_building==null or not is_instance_valid(selected_building) or selected_building.team!=0 or selected_building.kind not in ["barracks","factory"]
  if is_instance_valid(rally_button):
   rally_button.disabled=_rally_candidate()==null

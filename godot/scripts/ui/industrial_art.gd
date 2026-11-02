@@ -180,7 +180,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   vehicle_key = "%s:%d:%d:%d:%d" % [kind, team, hull_frame, aim_frame, cargo_frame]
   if kind in ["rifleman","missile_team","engineer"]: vehicle_key += ":%d" % style
   if _vehicle_mesh_cache.has(vehicle_key):
-    _draw_retained_mesh(c,_vehicle_mesh_cache[vehicle_key])
+   _draw_retained_mesh(c,_vehicle_mesh_cache[vehicle_key])
    return
   heading = hull_frame * TAU / VEHICLE_ANGLE_STEPS
   aim = aim_frame * TAU / VEHICLE_ANGLE_STEPS
@@ -200,7 +200,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
    aim = aim_frame * TAU / 64.0
    building_key += ":%d" % aim_frame
   if _building_mesh_cache.has(building_key):
-    _draw_retained_mesh(c,_building_mesh_cache[building_key])
+   _draw_retained_mesh(c,_building_mesh_cache[building_key])
    return
   animation=animation.duplicate()
   animation["time"]=frame/20.0
