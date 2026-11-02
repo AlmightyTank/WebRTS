@@ -138,6 +138,8 @@ static func apply(arena, data: Dictionary) -> bool:
 	arena.army_choices = [str(data.army[0]), str(data.army[1])]
 	arena.ai_vs_ai = bool(data.get("ai_vs_ai", false))
 	arena.map_id = str(data.map)
+	if arena.has_method("adopt_map"):
+		arena.adopt_map()
 	arena.starting_credits = int(data.get("credits_start", arena.starting_credits))
 	arena.fog_enabled = bool(data.get("fog", true))
 	arena.start_slots = [str(data.starts[0]), str(data.starts[1])]
