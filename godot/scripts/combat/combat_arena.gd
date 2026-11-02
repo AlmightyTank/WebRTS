@@ -9,9 +9,10 @@ const ProjectileScript = preload("res://scripts/combat/combat_projectile.gd")
 const CameraScript = preload("res://scripts/combat/combat_camera.gd")
 const BALANCE = "res://data/unit_balance_v0.4.json"
 const CELL := 48
-const COLS := 40
-const ROWS := 25
-const BOARD := Rect2(0, 0, COLS * CELL, ROWS * CELL)
+# A skirmish map can grow this grid. The Combat Lab keeps the original 40 by 25.
+var COLS := 40
+var ROWS := 25
+var BOARD := Rect2(0, 0, 1920, 1200)
 const ALLY := Color("#73b9e3")
 const ENEMY := Color("#dc907a")
 const WEAPONS := {

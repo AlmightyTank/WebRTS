@@ -119,6 +119,7 @@ godot --headless --path godot --script res://tests/relay_income_smoke.gd
 godot --headless --path godot --script res://tests/airfield_smoke.gd
 godot --headless --path godot --script res://tests/superweapon_smoke.gd
 godot --headless --path godot --script res://tests/walls_smoke.gd
+godot --headless --path godot --script res://tests/maps_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 
@@ -139,7 +140,7 @@ effects do not move collision bodies or pause combat. Feedback respects current
 player sight and is capped at 96 simultaneous effects; restart clears it.
 # Playable army slice
 
-Skirmish setup is a lobby. It shows the Meridian Basin preview, your army and the computer's army, west or east deployment (or Random), starting credits (5,000 / 10,000 / 20,000), and fog. Two rows cannot take the same numbered start; Random fills the spot that is still open, and both Random are assigned when the match starts. On a narrow window the map stacks above the player rows. Player ownership remains blue/red; faction building geometry is independent of ownership and is retained when a building is captured. Both armies still use the shared power, ore, construction, capture and production systems.
+Skirmish setup is a lobby. The map list is Meridian Basin, Cutter Gap, Salt Flats, Shelf Road, Twin Fords, Scrap Mile, Amber Reach, and Glass Canyon. The preview draws that map’s cliffs, iron, relay, and the two starts. Meridian Basin, Cutter Gap, and Salt Flats are 1920×1200. Shelf Road, Twin Fords, and Scrap Mile are 2880×1680. Amber Reach and Glass Canyon are 3840×2160, and those larger fields open with the camera on your MCV. Each map has west and east starts, iron, cliffs, and one neutral relay. Your army and the computer's army, west or east deployment (or Random), starting credits (5,000 / 10,000 / 20,000), and fog are on the same screen. Two rows cannot take the same numbered start; Random fills the spot that is still open, and both Random are assigned when the match starts. On a narrow window the map stacks above the player rows. Player ownership remains blue/red; faction building geometry is independent of ownership and is retained when a building is captured. Both armies still use the shared power, ore, construction, capture and production systems.
 
 Supported choices (initial tuning, not balance-certified):
 
@@ -189,5 +190,7 @@ Regression: `godot --headless --path godot --script res://tests/commander_kits_s
 Regression: `godot --headless --path godot --script res://tests/superweapon_smoke.gd` covers the beam and the ironstorm: faction build gates, the shared 240 second charge, brownout and destruction, the 7 second warning, pulse and volley spacing, friendlies and aircraft spared, a unit leaving the circle, one cue, and a saved pulse index.
 
 Regression: `godot --headless --path godot --script res://tests/walls_smoke.gd` covers faction health and prices, the defense-tab cameos, a sealed ground line, the owner's gate, a rejected capture, the neutral gun after a wipe, sell, aircraft crossing, and a saved damaged wall.
+
+Regression: `godot --headless --path godot --script res://tests/maps_smoke.gd` covers all eight maps: board size, separated starts, open iron, the relay, a ground route, trees, the opening camera, and resuming Amber Reach onto its own board.
 
 Regression: `godot --headless --path godot --script res://tests/army_rules_smoke.gd` covers all nine choices on both ownership sides, mirror-match deployment, collector grants, queue/spawn legality, signature stats, power penalties and setup transfer. Running without `--headless` also saves `user://army_selection.png` and `user://army_battlefield.png` for visual review. Human counterplay/balance testing remains necessary.
