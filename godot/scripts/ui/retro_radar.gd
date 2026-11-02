@@ -6,7 +6,7 @@ var enabled := true
 const BACK=Color("#07150f")
 const ALLIED=Color("#6fd4ff")
 const FOE=Color("#f68171")
-const ORE=Color("#e6c075")
+const ORE=Color("#c5ccd4")
 
 func configure(arena) -> void:
  world=arena

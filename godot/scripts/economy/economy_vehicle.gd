@@ -230,6 +230,6 @@ func _draw() -> void:
  IndustrialArt.draw_asset(self,unit_id,team,facing,NAN,cargo/maxf(1.0,capacity))
  if working and cargo>0.0:
   draw_rect(Rect2(-23,-48,46,4),Color("#1b2927"))
-  draw_rect(Rect2(-23,-48,46*cargo/capacity,4),Color("#f3c276"))
+  draw_rect(Rect2(-23,-48,46*cargo/capacity,4),Color("#aeb6be"))
  draw_rect(Rect2(-23,-59,46,4),Color("#20302f"))
  draw_rect(Rect2(-23,-59,46*hp/maxf(1.0,max_hp),4),Color("#8fe18a"))

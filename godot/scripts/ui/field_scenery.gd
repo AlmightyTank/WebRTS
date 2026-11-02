@@ -45,18 +45,19 @@ static func rock(c: CanvasItem, p: Vector2, size: Vector2, color: Color, height:
  c.draw_colored_polygon(PackedVector2Array([ridge,d,e,f]),color.darkened(0.3))
 
 static func ore(c: CanvasItem, p: Vector2, amount: float) -> void:
- # Earth remains after depletion; individual boulders disappear as ore is mined.
+ # Iron-stained earth stays after the vein is mined. Hematite and magnetite boulders shrink away with the remaining ore.
  var earth = PackedVector2Array()
  for i in range(11):
   var angle = TAU*float(i)/11.0
   var radius = 40.0+float(i%3)*4.0
   earth.append(p+Vector2(cos(angle)*radius,sin(angle)*radius*0.67))
- c.draw_colored_polygon(earth,Color("#786248"))
+ c.draw_colored_polygon(earth,Color("#6d5344"))
  var offsets = [Vector2(-27,-8),Vector2(-5,-13),Vector2(21,-11),Vector2(-19,8),Vector2(9,6),Vector2(30,10),Vector2(-8,21)]
  var count = ceili(clampf(amount,0,1)*offsets.size())
+ var iron = [Color("#8a4636"),Color("#4e565f"),Color("#3e454d")]
  for i in range(count):
   var size = Vector2(16+float(i%3)*3,14+float(i%2)*4)
-  rock(c,p+offsets[i],size,Color("#d6ac47") if i%2==0 else Color("#bd9138"),7+float(i%3)*2)
+  rock(c,p+offsets[i],size,iron[i%iron.size()],7+float(i%3)*2)
  if count==0:
   for offset in [Vector2(-12,3),Vector2(18,-8)]:
    rock(c,p+offset,Vector2(7,5),Color("#8b795a"),1)
