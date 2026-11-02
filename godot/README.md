@@ -133,7 +133,7 @@ effects do not move collision bodies or pause combat. Feedback respects current
 player sight and is capped at 96 simultaneous effects; restart clears it.
 # Playable army slice
 
-Skirmish setup now selects **your army and the AI army independently**, including mirror matches. Player ownership remains blue/red; faction building geometry is independent of ownership and is retained when a building is captured. Both armies still use the shared power, ore, construction, capture and production systems.
+Skirmish setup is a lobby. It shows the Meridian Basin preview, your army and the computer's army, west or east deployment (or Random), starting credits (5,000 / 10,000 / 20,000), and fog. Two rows cannot take the same numbered start; Random fills the spot that is still open, and both Random are assigned when the match starts. On a narrow window the map stacks above the player rows. Player ownership remains blue/red; faction building geometry is independent of ownership and is retained when a building is captured. Both armies still use the shared power, ore, construction, capture and production systems.
 
 Supported choices (initial tuning, not balance-certified):
 

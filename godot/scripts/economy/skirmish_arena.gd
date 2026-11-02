@@ -89,7 +89,11 @@ var action_palette_buttons: Array = []
 var fog_enabled := true
 var fog
 const ArmyRules = preload("res://scripts/economy/army_rules.gd")
+const SkirmishMaps = preload("res://scripts/economy/skirmish_maps.gd")
 var army_choices: Array = ["alliance", "republic"]
+var map_id := "meridian_basin"
+var starting_credits := 10000
+var start_slots: Array = ["west", "east"]
 var commander = preload("res://scripts/economy/commander_system.gd").new()
 var fog_timer := 0.0
 
@@ -157,7 +161,7 @@ func _ready() -> void:
  _on_hud_viewport_resized()
 
 func _new_state() -> Dictionary:
- return {"credits":10000.0,"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
+ return {"credits":float(starting_credits),"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
 
 func reset_battle() -> void:
  commander.reset(self)
@@ -187,13 +191,10 @@ func reset_battle() -> void:
  active_producers=[{"infantry":null,"vehicle":null},{"infantry":null,"vehicle":null}]
  staging_areas=[_new_staging_areas(),_new_staging_areas()]
  states=[_new_state(),_new_state()]
- ore_fields=[
-  {"position":Vector2(630,330),"remaining":7200.0,"initial":7200.0},
-  {"position":Vector2(580,930),"remaining":6000.0,"initial":6000.0},
-  {"position":Vector2(1320,820),"remaining":7200.0,"initial":7200.0},
-  {"position":Vector2(1370,150),"remaining":6000.0,"initial":6000.0},
-  {"position":Vector2(1080,1010),"remaining":5500.0,"initial":5500.0}
- ]
+ var battlefield: Dictionary = SkirmishMaps.get_map(map_id)
+ ore_fields=[]
+ for site in battlefield["ore"]:
+  ore_fields.append({"position":site["position"],"remaining":float(site["amount"]),"initial":float(site["amount"])})
  skirmish_time=0.0
  economy_ai_timer=2.0
  ai_build_tick=0
@@ -208,8 +209,9 @@ func reset_battle() -> void:
  hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
  if static_obstacles.is_empty(): static_obstacles=obstacles.duplicate()
  _rebuild_navigation()
- var ally=_spawn_economy(ArmyRules.economic_id(army_choices[0]),0,Vector2(310,620),false)
- _spawn_economy(ArmyRules.economic_id(army_choices[1]),1,Vector2(1600,610),false)
+ var resolved: Array = SkirmishMaps.resolve_slots(start_slots)
+ var ally=_spawn_economy(ArmyRules.economic_id(army_choices[0]),0,SkirmishMaps.point(map_id,str(resolved[0])),false)
+ _spawn_economy(ArmyRules.economic_id(army_choices[1]),1,SkirmishMaps.point(map_id,str(resolved[1])),false)
  # An AI follows the same construction/credit rules, but deploys its MCV immediately.
  _deploy_mcv(1)
  if ai_vs_ai: _deploy_mcv(0)
