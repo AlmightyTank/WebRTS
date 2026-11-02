@@ -3,20 +3,31 @@ extends RefCounted
 const CHOICES := {
  "alliance": {"name":"Alliance — Standard", "faction":"alliance", "summary":"Flexible combined arms. Precise tanks, missile infantry and mobile AA."},
  "alliance_energy": {"name":"Vale — Lattice Command", "faction":"alliance", "summary":"Arc Lance, Lattice Interceptor and Beam Bastion. Powered energy +10%; shortage halves fire rate. Grid research and orbital support."},
+ "alliance_air": {"name":"Voss — Sky Command", "faction":"alliance", "summary":"Tempest replaces the Striker. No Sentinel tank. Aircraft cost +10%. Hangar research and warned air strikes."},
  "republic": {"name":"Republic — Standard", "faction":"republic", "summary":"Durable, slower armor. Heavy tanks cost more and take longer to field."},
  "republic_armor": {"name":"Korda — Steel Vanguard", "faction":"republic", "summary":"Juggernaut, Imperator, Armored Scout and Vanguard Foundry. Tanks +10% HP; aircraft +20% cost. Veteran crews and armor support."},
+ "republic_artillery": {"name":"Orlov — Longbow Command", "faction":"republic", "summary":"Stormrail replaces the Mammoth. Escort tank replaces the Bastion. Longer range, two-second setup, and warned barrages."},
  "gia": {"name":"GIA — Standard", "faction":"gia", "summary":"Cheap mobile pressure; fragile vehicles need flanks and missile support."},
- "gia_missile": {"name":"Sayegh — Saturation Command", "faction":"gia", "summary":"Siege Rocket Squad, Volley and AA-only Missile Nest. Signature missiles reload 10% faster, move 10% slower. Recon and warned saturation strikes."}
+ "gia_missile": {"name":"Sayegh — Saturation Command", "faction":"gia", "summary":"Siege Rocket Squad, Volley and AA-only Missile Nest. Signature missiles reload 10% faster, move 10% slower. Recon and warned saturation strikes."},
+ "gia_salvage": {"name":"Varek — Wreckrunner Command", "faction":"gia", "summary":"Junker replaces the Scavenger and starts weaker. Light raiders are faster. Kills add up to two salvage tiers."}
 }
 const ROSTERS := {
  "alliance":["a_ranger","a_javelin","a_engineer","a_sentinel","a_sentinel_aa","a_striker","a_harvester","a_mcv"],
   "republic":["r_line","r_hunter","r_engineer","r_bastion","r_flak","r_mammoth","r_siege_heli","r_hauler","r_mcv","r_recon"],
  "gia":["g_militia","g_rocket_cell","g_tech","g_scavenger","g_rocket_truck","g_rocket_buggy","g_heli","g_collector","g_mcv"]
 }
-const REPLACEMENTS := {"alliance_energy":{"a_sentinel":"a_lance","a_sentinel_aa":"a_lattice","turret":"beam_bastion"}, "republic_armor":{"r_bastion":"r_jugger","r_mammoth":"r_imperator","r_recon":"r_armored_scout","foundry":"vanguard_foundry"}, "gia_missile":{"g_rocket_cell":"g_siege_rocket","g_rocket_buggy":"g_volley","salvaged_aa":"missile_nest"}}
-const DISABLED := {"alliance_energy":["a_howitzer"],"republic_armor":["r_thunder"],"gia_missile":["g_shadow","camo_netting"]}
+const REPLACEMENTS := {
+ "alliance_energy":{"a_sentinel":"a_lance","a_sentinel_aa":"a_lattice","turret":"beam_bastion"},
+ "alliance_air":{"a_striker":"a_tempest"},
+ "republic_armor":{"r_bastion":"r_jugger","r_mammoth":"r_imperator","r_recon":"r_armored_scout","foundry":"vanguard_foundry"},
+ "republic_artillery":{"r_bastion":"r_escort","r_mammoth":"r_stormrail"},
+ "gia_missile":{"g_rocket_cell":"g_siege_rocket","g_rocket_buggy":"g_volley","salvaged_aa":"missile_nest"},
+ "gia_salvage":{"g_scavenger":"g_junker"}
+}
+const DISABLED := {"alliance_energy":["a_howitzer"],"alliance_air":["a_sentinel"],"republic_armor":["r_thunder"],"gia_missile":["g_shadow","camo_netting"]}
 const SIGNATURE_MISSILES := ["g_siege_rocket","g_volley"]
 const STEEL_TANKS := ["r_jugger","r_imperator"]
+const LIGHT_RAIDERS := ["g_rocket_truck","g_rocket_buggy","g_heli"]
 static func structure_ids(choice: String) -> Array:
  var ids: Array = ["power","refinery","barracks","factory","depot","turret"]
  ids.append("salvaged_aa" if faction(choice)=="gia" else "sam")
@@ -39,7 +50,11 @@ const PROFILES := {
  "g_siege_rocket":{"type":"ROCKET","damage":110.0,"interval":3.8,"range":235.0,"projectile_speed":285.0,"homing":true,"anti_air":true,"brace":1.2},
  "r_mammoth":{"type":"AP","damage":210.0,"interval":3.5,"range":220.0,"projectile_speed":430.0},
  "r_imperator":{"type":"AP","damage":245.0,"interval":3.7,"range":225.0,"projectile_speed":430.0},
- "g_volley":{"type":"ROCKET","damage":125.0,"interval":3.2,"range":285.0,"min_range":80.0,"projectile_speed":320.0,"homing":true}
+ "g_volley":{"type":"ROCKET","damage":125.0,"interval":3.2,"range":285.0,"min_range":80.0,"projectile_speed":320.0,"homing":true},
+ "a_tempest":{"type":"ROCKET","damage":110.0,"interval":1.65,"range":230.0,"projectile_speed":350.0,"homing":true},
+ "r_escort":{"type":"AP","damage":95.0,"interval":2.1,"range":190.0,"projectile_speed":460.0},
+ "r_stormrail":{"type":"AP","damage":160.0,"interval":6.0,"range":400.0,"min_range":140.0,"projectile_speed":280.0,"brace":2.0},
+ "g_junker":{"type":"AP","damage":92.0,"interval":2.65,"range":185.0,"projectile_speed":420.0}
 }
 
 static func valid_choice(id: String) -> String:
@@ -76,7 +91,9 @@ static func lane(id: String, data: Dictionary) -> String:
  return "infantry" if data.get("armor", "") == "PERSONNEL" else "vehicle"
 
 static func cost_factor(choice: String, data: Dictionary) -> float:
- return 1.2 if choice == "republic_armor" and data.get("armor", "") == "AIR" else 1.0
+ if choice == "republic_armor" and data.get("armor", "") == "AIR": return 1.2
+ if choice == "alliance_air" and data.get("armor", "") == "AIR": return 1.1
+ return 1.0
 
 static func apply_unit(choice: String, unit) -> void:
  if choice == "republic_armor" and unit.unit_id in STEEL_TANKS:
@@ -85,3 +102,8 @@ static func apply_unit(choice: String, unit) -> void:
  if choice == "gia_missile" and unit.unit_id in SIGNATURE_MISSILES:
   unit.move_speed *= 0.9
   unit.weapon.interval *= 0.9
+ if choice == "gia_salvage" and unit.unit_id == "g_junker":
+  unit.max_hp *= 0.9
+  unit.hp = unit.max_hp
+ if choice == "gia_salvage" and unit.unit_id in LIGHT_RAIDERS:
+  unit.move_speed *= 1.1

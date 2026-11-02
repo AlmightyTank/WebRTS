@@ -100,7 +100,7 @@ func faction_style(side: int) -> int:
 func _load_balance() -> void:
  super._load_balance()
  for data in registry.get("specialist_units", []):
-  if data.id in ["a_lance","a_lattice","r_jugger","r_imperator","r_armored_scout","g_siege_rocket","g_volley"]: roster[data.id] = data
+  if data.id in ["a_lance","a_lattice","r_jugger","r_imperator","r_armored_scout","g_siege_rocket","g_volley","a_tempest","r_stormrail","r_escort","g_junker"]: roster[data.id] = data
 
 func _spawn(id: String, side: int, point: Vector2):
  var unit
@@ -361,6 +361,7 @@ func register_hit(source, victim, amount: float) -> void:
  if victim.get("unit_id")!=null: value=maxf(40.0,float(roster.get(victim.unit_id,{}).get("credits",200.0))*0.25)
  commander.award_xp(source.team,value)
  if source.get("unit_xp")!=null: source.unit_xp+=50.0
+ if str(source.get("unit_id"))=="g_junker": commander.salvage_kill(source,victim)
 
 func find_target(seeker, search_radius: float):
  var winner
@@ -1763,9 +1764,11 @@ func _update_hud() -> void:
    "a_ranger":"RANGER","a_javelin":"JAVELIN","a_engineer":"ENGINEER",
    "a_sentinel":"SENTINEL","a_sentinel_aa":"MOBILE AA",
    "a_harvester":"HARVESTER","a_mcv":"MCV",
-   "a_lance":"ARC LANCE","a_striker":"STRIKER",
+   "a_lance":"ARC LANCE","a_striker":"STRIKER","a_tempest":"TEMPEST",
    "r_imperator":"IMPERATOR","r_mammoth":"MAMMOTH","r_siege_heli":"SIEGE HELI",
-   "g_rocket_truck":"MOBILE AA","g_volley":"VOLLEY","g_heli":"HELICOPTER","g_collector":"COLLECTOR"
+   "r_stormrail":"STORMRAIL","r_escort":"ESCORT",
+   "g_rocket_truck":"MOBILE AA","g_volley":"VOLLEY","g_heli":"HELICOPTER","g_collector":"COLLECTOR",
+   "g_junker":"JUNKER"
   }.get(id,label.to_upper())
   var label_tail="$%d" % cost
   if ready: label_tail="READY"

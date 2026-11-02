@@ -48,6 +48,7 @@ var column_goal := Vector2.ZERO
 var column_slot := Vector2.ZERO
 var column_spine: PackedVector2Array = PackedVector2Array()
 var unit_xp := 0.0
+var salvage_tier := 0
 var stationary_time := 0.0
 var last_combat_position := Vector2.ZERO
 
@@ -287,7 +288,11 @@ func _step_movement(delta: float) -> void:
     var steering := (direction + separation * 1.5).normalized()
     if steering.length_squared() < 0.01:
         steering = direction
-    var speed_factor := 1.2 if arena.get("commander")!=null and arena.commander.buff_at(team,"breakthrough_order",position) and armor=="HEAVY" else 1.0
+    var speed_factor := 1.0
+    if arena.get("commander") != null and arena.commander.buff_at(team, "breakthrough_order", position) and armor == "HEAVY":
+        speed_factor = 1.2
+    elif arena.get("commander") != null and armor == "LIGHT" and arena.commander.buff_at(team, "scavenger_convoy", position):
+        speed_factor = 1.1
     var next_position := position + steering * minf(move_speed * speed_factor * delta, position.distance_to(waypoint))
     if arena.can_traverse(position, next_position, radius, air, self, neighbors):
         position = next_position
@@ -367,6 +372,9 @@ func receive_damage(value: float, attacker) -> void:
         capture_pause = 1.0
     if arena.get("commander")!=null and armor=="HEAVY" and arena.commander.buff_at(team,"breakthrough_order",position): value*=0.8
     if unit_id=="r_jugger" and is_instance_valid(attacker) and absf(angle_difference(facing,(attacker.position-position).angle()))<PI/3.0: value*=0.8
+    if unit_id=="a_tempest" and arena.get("commander")!=null and arena.commander.has_research(team,"countermeasures") and is_instance_valid(attacker):
+        var attacker_weapon: Variant = attacker.get("weapon")
+        if attacker_weapon is Dictionary and str(attacker_weapon.get("type",""))=="AA": value*=0.85
     hp = maxf(0.0, hp - value)
     if value > 0.0: hit_feedback = 0.16
     if team == 1 and not explicit_attack and not moving and attacker != null and is_instance_valid(attacker) and can_hit(attacker):
@@ -383,7 +391,11 @@ func _draw() -> void:
         draw_arc(Vector2.ZERO,radius+8.0,0.0,TAU,36,Color("#e1f39e"),2.2)
         if hold_position:
             draw_string(ThemeDB.fallback_font,Vector2(-15,28),"HOLD",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#e1f39e"))
-    var artwork = unit_id if IndustrialArt.has_asset(unit_id) else ("gunship" if air else ("rifleman" if profile_name=="infantry" else "tank"))
+    var artwork := unit_id
+    if unit_id == "g_junker" and salvage_tier > 0:
+        artwork = "g_junker_salvage_%d" % salvage_tier
+    if not IndustrialArt.has_asset(artwork):
+        artwork = "gunship" if air else ("rifleman" if profile_name == "infantry" else "tank")
     # Recoil is visual only: collision, aim and navigation keep their exact transforms.
     draw_set_transform(-Vector2.from_angle(turret_angle) * 3.0 * fire_feedback / 0.12)
     IndustrialArt.draw_asset(self,artwork,team,facing,turret_angle)
