@@ -21,7 +21,7 @@ const DRAW_MESHES_META = &"industrial_draw_meshes"
 const UNIT_MESH_KINDS = [
  "mcv","harvester","rifleman","missile_team","engineer",
  "tank","heavy_tank","aa","flak","gunship","helicopter",
- "a_arc_lance","a_tempest","r_stormrail","g_volley",
+ "a_arc_lance","a_tempest","r_stormrail","r_escort","g_volley",
  "a_ghost_carrier","r_siege_carrier","g_ghost_technical",
   "r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2",
   "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket"
@@ -150,6 +150,7 @@ static func asset_bounds(id: String) -> Rect2:
  id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return Rect2(-82,-100,164,170)
  if id in ["a_tempest","r_stormrail","g_volley"]: return Rect2(-90,-110,180,180)
+ if id=="r_escort": return Rect2(-53,-61,106,98)
  if id in ["a_arc_lance","r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2"]: return Rect2(-82,-100,164,170)
  var kind = asset_kind(id)
  if kind in ["rifleman","missile_team","engineer"]: return Rect2(-23,-43,54,57)
@@ -217,6 +218,7 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   "a_arc_lance": _arc_lance(c,faction,heading,aim)
   "a_tempest": _tempest(c,faction,heading)
   "r_stormrail": _stormrail(c,faction,heading,aim)
+  "r_escort": _escort(c,faction,heading,aim)
   "g_volley": _volley(c,faction,heading,aim)
   "a_ghost_carrier": _ghost_carrier(c,faction,heading,aim)
   "r_siege_carrier": _siege_carrier(c,faction,heading,aim)
@@ -1024,6 +1026,21 @@ static func _volley(c: CanvasItem, color: Color, heading: float, aim: float) -> 
    face(c,[Vector3(11.1,y-1.7,z-1.3)+offset,Vector3(11.1,y+1.7,z-1.3)+offset,Vector3(11.1,y+1.7,z+1.3)+offset,Vector3(11.1,y-1.7,z+1.3)+offset],INK,aim)
  _flush_depth(c)
 
+static func _escort(c: CanvasItem, color: Color, heading: float, aim: float) -> void:
+ # Shorter hull, thin side skirts, a small turret and a short barrel.
+ _tracks(c,heading,false)
+ box(c,Vector3(-18,-11,7),Vector3(36,22,8),color.darkened(0.08),heading)
+ for y in [-16.0,13.0]:
+  box(c,Vector3(-16,y,8),Vector3(32,3,7),STEEL,heading)
+ box(c,Vector3(-12,-9,15),Vector3(22,18,2),color,heading)
+ for x in [-10.0,-4.0]:
+  beam(c,Vector3(x,-6,17.2),Vector3(x,6,17.2),INK,1.2,heading)
+ _collect_depth=true
+ box(c,Vector3(-5,-6,17),Vector3(13,12,6),color,aim)
+ box(c,Vector3(-3,-4,23),Vector3(7,8,2),STEEL,aim)
+ _gun_barrel(c,Vector3(6,0,20),16,2.2,aim)
+ _flush_depth(c)
+
 static func _gun_barrel(c: CanvasItem, start: Vector3, length: float, width: float, aim: float) -> void:
  # Real projected volume: line strokes have constant screen width and cannot
  # meet a rotated muzzle or mantlet consistently.
@@ -1160,7 +1177,8 @@ static func _harvester(c: CanvasItem, color: Color, heading: float, cargo: float
  box(c,Vector3(-28,-14,16),Vector3(36,28,2),INK,heading)
  if cargo>0:
   for x in [-20.0,-7.0]:
-   box(c,Vector3(x,-8,18),Vector3(9,16,clampf(cargo,0,1)*9),YELLOW.darkened(0.2),heading)
+   var lump := Color("#7a4a3a") if x<-10.0 else Color("#5c656e")
+   box(c,Vector3(x,-8,18),Vector3(9,16,clampf(cargo,0,1)*9),lump,heading)
  for y in [-15.0,12.0]:
   box(c,Vector3(-29,y,16),Vector3(38,3,10),YELLOW,heading)
  box(c,Vector3(-30,-12,16),Vector3(3,24,10),YELLOW,heading)

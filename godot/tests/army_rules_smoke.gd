@@ -64,6 +64,33 @@ func _run() -> void:
    var volley = world._spawn("g_volley",0,Vector2(700,600))
    expect(is_equal_approx(volley.move_speed,float(world.roster.g_volley.speed)*0.9), "Volley speed tradeoff")
    expect(is_equal_approx(float(volley.weapon.interval),3.2*0.9), "Volley reload bonus")
+  if choice=="alliance_air":
+   expect("a_tempest" in Rules.roster_ids(choice) and "a_sentinel" not in Rules.roster_ids(choice), "Sky Command fields the Tempest and drops the Sentinel")
+   expect(is_equal_approx(float(world._recipe("a_tempest").cost),1650.0*1.1), "Aircraft cost +10% for Sky Command")
+   expect(world.commander.power_ids(0).size()==3, "Sky Command has three powers")
+   world.commander.teams[0].research["countermeasures"]=true
+   var tempest = world._spawn("a_tempest",0,Vector2(700,640))
+   var aa = world._spawn("g_rocket_truck",1,Vector2(820,640))
+   tempest.receive_damage(100.0,aa)
+   expect(is_equal_approx(tempest.max_hp-tempest.hp,85.0), "Countermeasures reduce AA damage by 15%")
+  if choice=="republic_artillery":
+   expect("r_mammoth" not in Rules.roster_ids(choice) and "r_stormrail" in Rules.roster_ids(choice) and "r_escort" in Rules.roster_ids(choice), "Longbow replaces Mammoth and Bastion")
+   var gun = world._spawn("r_stormrail",0,Vector2(700,680))
+   var spotter = world._spawn("r_line",1,Vector2(900,680))
+   expect(is_equal_approx(world.commander.weapon_range(gun,spotter),400.0*1.15), "Stormrail doctrine range is +15%")
+   expect(is_equal_approx(float(gun.weapon.brace),2.0), "Stormrail braces for two seconds")
+   expect(world.commander.power_ids(0).size()==3, "Longbow has three powers")
+  if choice=="gia_salvage":
+   var junker = world._spawn("g_junker",0,Vector2(700,720))
+   expect(is_equal_approx(junker.max_hp,float(world.roster.g_junker.hp)*0.9), "Junker starts at 90% hull health")
+   var buggy = world._spawn("g_rocket_buggy",0,Vector2(780,720))
+   expect(is_equal_approx(buggy.move_speed,float(world.roster.g_rocket_buggy.speed)*1.1), "Light raiders move 10% faster")
+   var wreck = world._spawn("g_militia",1,Vector2(860,720))
+   var hull_before: float = junker.max_hp
+   wreck.hp=0.0
+   world.register_hit(junker,wreck,10.0)
+   expect(junker.salvage_tier==1 and junker.max_hp>hull_before, "A Junker kill grants one salvage tier")
+   expect(world.commander.power_ids(0).size()==3, "Wreckrunner has three powers")
   for id in Rules.roster_ids(choice): expect(world.action_buttons.has(id), "Production tile matches resolved roster: " + id)
   var ai_used_signature := not Rules.REPLACEMENTS.has(choice)
   for tick in range(12):

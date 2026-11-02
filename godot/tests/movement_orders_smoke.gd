@@ -102,7 +102,7 @@ func _initialize() -> void:
     unit._step_movement(1.0 / 60.0)
  var arrived := 0
  for i in range(crowd.size()):
-  # Ordinary blocked finals are allowed to stop within six pixels.
+  # Ordinary moves may stop within six pixels when the last step is blocked.
   if crowd[i].position.distance_to(goals[i]) <= 6.0:
    arrived += 1
   else:
@@ -165,6 +165,131 @@ func _initialize() -> void:
  expect(max_in_one_cell <= 1, "Only one vehicle occupies the gap cell at a time")
  for tanker in column:
   tanker.free()
+ world.units.clear()
+ world.selected.clear()
+ world.obstacles.clear()
+ world._create_navigation()
+ world.formation = "GROUP"
+ world.invalidate_occupancy()
+ var file: Array = []
+ for i in range(5):
+  var marcher = load("res://scripts/combat/combat_unit.gd").new()
+  marcher.arena = world
+  marcher.radius = 18.0
+  marcher.team = 0
+  marcher.move_speed = 90.0
+  marcher.position = Vector2(180.0 + float(i % 3) * 36.0, 376.0 + float(i / 3) * 36.0)
+  world.units.append(marcher)
+  world.selected.append(marcher)
+  file.append(marcher)
+ var march_goal := Vector2(1000, 400)
+ world.issue_order(march_goal)
+ world.issue_order(Vector2(1280, 400), false, true)
+ var slots: Array[Vector2] = []
+ var goal: Vector2 = file[0].column_goal
+ var deferred := 0
+ for marcher in file:
+  slots.append(marcher.column_slot)
+  expect(marcher.column_move and marcher.pending_orders.size() == 1 and marcher.pending_orders[0].has("column_spine"), "Group order files to the destination before the queued spread")
+  expect(marcher.route[marcher.route.size() - 1].distance_to(goal) < 4.0, "March route ends at the shared destination")
+  if marcher.column_slot.distance_to(goal) > 30.0:
+   deferred += 1
+   expect(marcher.route[marcher.route.size() - 1].distance_to(marcher.column_slot) > 30.0, "Spread cell stays off the march route")
+ expect(deferred >= 3, "The group keeps distinct spread cells for after arrival")
+ var origin := Vector2.ZERO
+ for marcher in file:
+  origin += marcher.position
+ origin /= float(file.size())
+ var axis: Vector2 = goal - origin
+ var axis_dir := axis.normalized()
+ var saw_file := false
+ var broke_file := false
+ var released_early := false
+ var closest: Array[float] = []
+ var second_slots: Array[Vector2] = []
+ var captured_second: Array[bool] = []
+ var crossed_second: Array[bool] = []
+ var cross_y: Array[float] = []
+ for _i in file.size():
+  closest.append(10000.0)
+  second_slots.append(Vector2.ZERO)
+  captured_second.append(false)
+  crossed_second.append(false)
+  cross_y.append(0.0)
+ var packed := false
+ for frame in range(4800):
+  var moving_now := false
+  for marcher in file:
+   marcher._physics_process(1.0 / 60.0)
+   if marcher.moving or marcher.pending_orders.size() > 0:
+    moving_now = true
+  var band: Array = []
+  for i in range(file.size()):
+   var marcher = file[i]
+   closest[i] = minf(closest[i], marcher.position.distance_to(slots[i]))
+   if not marcher.column_move and marcher.position.distance_to(goal) > 180.0 and not captured_second[i]:
+    released_early = true
+   if marcher.pending_orders.is_empty() and marcher.column_move and marcher.column_goal.distance_to(goal) > 80.0 and not captured_second[i]:
+    captured_second[i] = true
+    second_slots[i] = marcher.column_slot
+   if not marcher.column_move:
+    continue
+   if marcher.column_goal.distance_to(goal) < 80.0:
+    var offset: Vector2 = marcher.position - origin
+    var along := offset.dot(axis_dir)
+    var lateral := (offset - axis_dir * along).length()
+    if along > 220.0 and along < axis.length() - 120.0:
+     band.append(marcher)
+     if lateral > 28.0:
+      broke_file = true
+   elif not crossed_second[i] and marcher.position.distance_to(goal) > 40.0 and marcher.position.distance_to(marcher.column_goal) < marcher.column_goal.distance_to(goal) * 0.55:
+    crossed_second[i] = true
+    cross_y[i] = marcher.position.y
+  if band.size() >= 3:
+   saw_file = true
+  var arrived_now := true
+  for i in range(file.size()):
+   if closest[i] > 16.0:
+    arrived_now = false
+  if arrived_now:
+   packed = true
+  if packed and not moving_now:
+   break
+ expect(saw_file, "Units travel single file before the destination")
+ expect(not broke_file, "The file does not walk abreast")
+ expect(not released_early, "Units keep the file until they reach the destination")
+ var arrived_slots := 0
+ for i in range(file.size()):
+  if closest[i] < 16.0:
+   arrived_slots += 1
+  else:
+   print("Spread ", i, " closest ", closest[i], " slot ", slots[i], " at ", file[i].position)
+ expect(arrived_slots == file.size(), "Units occupy their spread cells after the march: " + str(arrived_slots))
+ var second_arrived := 0
+ for i in range(file.size()):
+  if captured_second[i] and file[i].position.distance_to(second_slots[i]) < 16.0:
+   second_arrived += 1
+  else:
+   print("Queued spread ", i, " at ", file[i].position, " slot ", second_slots[i], " captured ", captured_second[i], " moving ", file[i].moving)
+ expect(second_arrived == file.size(), "Queued order spreads after its own destination: " + str(second_arrived))
+ var cross_span := 0.0
+ var crossed := 0
+ for i in range(file.size()):
+  if not crossed_second[i]:
+   continue
+  crossed += 1
+  for j in range(i):
+   if crossed_second[j]:
+    cross_span = maxf(cross_span, absf(cross_y[i] - cross_y[j]))
+ expect(crossed == file.size() and cross_span < 36.0, "Queued march stays single file: " + str(crossed) + " span " + str(cross_span))
+ var spread_out := true
+ for i in range(file.size()):
+  for j in range(i):
+   if file[i].position.distance_to(file[j].position) < file[i].radius + file[j].radius:
+    spread_out = false
+ expect(spread_out, "Spread cells do not leave the group stacked")
+ for marcher in file:
+  marcher.free()
  world.units.clear()
  actor.free()
  world.free()
