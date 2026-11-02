@@ -4,8 +4,8 @@ const IndustrialArt = preload("res://scripts/ui/industrial_art.gd")
 const GroundOrders = preload("res://scripts/combat/ground_orders.gd")
 var pending_orders: Array = []
 
-func queue_move(point: Vector2, attack_move: bool = false) -> void:
-    GroundOrders.enqueue(self, point, attack_move)
+func queue_move(point: Vector2, attack_move: bool = false, column_spine = null, column_slot: Vector2 = Vector2.ZERO) -> void:
+    GroundOrders.enqueue(self, point, attack_move, column_spine, column_slot)
 signal destroyed(unit: Node2D)
 
 var arena
@@ -44,6 +44,9 @@ var hold_position := false
 var blocked_time := 0.0
 var traffic_wait := 0.0
 var column_move := false
+var column_goal := Vector2.ZERO
+var column_slot := Vector2.ZERO
+var column_spine: PackedVector2Array = PackedVector2Array()
 var unit_xp := 0.0
 var stationary_time := 0.0
 var last_combat_position := Vector2.ZERO
@@ -106,6 +109,10 @@ func order_attack(enemy) -> void:
     target = enemy
     has_attack_move_goal = false
     moving = false
+    column_move = false
+    column_goal = Vector2.ZERO
+    column_slot = Vector2.ZERO
+    column_spine = PackedVector2Array()
     route.clear()
     route_index = 0
     aggressive = true
@@ -121,6 +128,10 @@ func order_stop() -> void:
     moving = false
     aggressive = false
     has_attack_move_goal = false
+    column_move = false
+    column_goal = Vector2.ZERO
+    column_slot = Vector2.ZERO
+    column_spine = PackedVector2Array()
     route.clear()
 
 func order_hold() -> void:
@@ -173,6 +184,10 @@ func _tick_capture(delta: float) -> bool:
 func _begin_route(point: Vector2) -> void:
     blocked_time = 0.0
     traffic_wait = 0.0
+    column_move = false
+    column_goal = Vector2.ZERO
+    column_slot = Vector2.ZERO
+    column_spine = PackedVector2Array()
     destination = arena.clamp_point(point)
     route = arena.find_route(position, destination, air)
     route_index = 0
@@ -235,14 +250,18 @@ func _physics_process(delta: float) -> void:
     queue_redraw()
 
 func _step_movement(delta: float) -> void:
+    if arena.begin_column_spread(self) and not moving:
+        return
     if route_index >= route.size():
-        moving = false
+        if not arena.begin_column_spread(self, true):
+            moving = false
         return
     var waypoint: Vector2 = route[route_index]
     if position.distance_to(waypoint) <= 2.0:
         route_index += 1
         if route_index >= route.size():
-            moving = false
+            if not arena.begin_column_spread(self, true):
+                moving = false
             return
         waypoint = route[route_index]
     if arena.same_direction_holds_cell(self, waypoint):
@@ -259,7 +278,7 @@ func _step_movement(delta: float) -> void:
         var reach := Vector2.ONE * minf(move_speed * 1.2 * delta, maxf(8.0,position.distance_to(waypoint)))
         neighbors = arena.nearby_units(position-reach, position+reach, radius + 8.0)
         for other in neighbors:
-            if other == self or not is_instance_valid(other) or other.hp <= 0.0 or other.air:
+            if column_move or other == self or not is_instance_valid(other) or other.hp <= 0.0 or other.air:
                 continue
             var offset: Vector2 = position - other.position
             var gap = radius + other.radius + 5.0
@@ -280,18 +299,40 @@ func _step_movement(delta: float) -> void:
         # A blocked final few pixels are acceptable for ordinary move orders only.
         # Captures and combat approaches retain their exact arrival rules.
         if route_index == route.size() - 1 and position.distance_to(destination) <= 6.0 and capture_target == null and target == null and not explicit_attack:
-            moving = false
+            if not arena.begin_column_spread(self, true):
+                moving = false
             return
         # Try a lateral step around traffic without cutting through static corners.
+        # In a file, only a step that still gets closer to the shared waypoint counts.
         blocked_time += delta
         traffic_wait += delta
+        var waypoint_distance := position.distance_squared_to(waypoint)
+        var best_slide := Vector2.INF
+        var best_progress := -INF
+        var slid := false
+        # A file that is already touching needs a longer nudge than one frame of speed.
+        var slide_distance := maxf(move_speed * delta, 6.0) if column_move else minf(move_speed * delta, 8.0)
+        slide_distance = minf(slide_distance, 8.0)
         for angle in [0.0, 0.52, -0.52, 1.05, -1.05, 1.57, -1.57]:
             var lateral := direction.rotated(angle)
-            var candidate := position + lateral * minf(move_speed * delta, 8.0)
-            if arena.can_traverse(position, candidate, radius, air, self, neighbors):
+            var candidate := position + lateral * slide_distance
+            if not arena.can_traverse(position, candidate, radius, air, self, neighbors):
+                continue
+            if not column_move:
                 position = candidate
                 arena.update_unit_occupancy(self)
+                slid = true
                 break
+            var progress := waypoint_distance - candidate.distance_squared_to(waypoint)
+            if progress > best_progress:
+                best_progress = progress
+                best_slide = candidate
+                slid = true
+        if column_move and slid and best_slide != Vector2.INF:
+            position = best_slide
+            arena.update_unit_occupancy(self)
+            blocked_time = 0.0
+            traffic_wait = 0.0
         if blocked_time >= 0.75 + float(get_instance_id() % 7) * 0.06:
             blocked_time = 0.0
             # Keep the route while nearby traffic is still moving; retry later.
@@ -303,7 +344,7 @@ func _step_movement(delta: float) -> void:
             if waiting_for_traffic and traffic_wait < 2.5:
                 return
             traffic_wait = 0.0
-            var alternative: PackedVector2Array = arena.find_route(position, destination, air, self)
+            var alternative: PackedVector2Array = arena.column_route(position, column_spine, air) if column_move and not column_spine.is_empty() else arena.find_route(position, destination, air, null if column_move else self)
             if not alternative.is_empty():
                 route = alternative
                 route_index = 0
