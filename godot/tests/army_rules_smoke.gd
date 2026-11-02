@@ -26,6 +26,7 @@ func _run() -> void:
    world._place_structure("refinery",side,Vector2(x,900))
    world._place_structure("barracks",side,Vector2(x,460))
    world._place_structure("factory",side,Vector2(x,700))
+   world._place_structure("airfield",side,Vector2(x+200,700))
    world._place_structure("depot",side,Vector2(x+180,300))
    var collector := false
    for u in world.units:
@@ -57,7 +58,8 @@ func _run() -> void:
    expect(is_equal_approx(float(world._recipe("r_siege_heli",1).cost),float(world.roster.r_siege_heli.credits)*1.2), "Aircraft price tradeoff applies to either team")
    for side in range(2):
     var paid_before: float = world.states[side].total_spent
-    world.queue_production(side,"vehicle","r_siege_heli")
+    var heli_lane: String = world._lane_for("r_siege_heli")
+    world.queue_production(side,heli_lane,"r_siege_heli")
     world._tick_production(side,1000.0)
     expect(is_equal_approx(float(world.states[side].total_spent)-paid_before,float(world.roster.r_siege_heli.credits)*1.2), "Production actually charges the aircraft premium")
   if choice=="gia_missile":
@@ -97,12 +99,13 @@ func _run() -> void:
    # The match loop advances this once for both sides, not _ai_economy().
    world.ai_build_tick = tick
    world._ai_economy()
-   var job: Dictionary = world.states[1].lanes.vehicle
-   if not job.is_empty():
-    expect(str(job.id) in Rules.roster_ids(choice), "AI chooses legal faction units")
-    if str(job.id) in Rules.REPLACEMENTS.get(choice,{}).values(): ai_used_signature=true
-   world.cancel_production(1,"vehicle")
-   world.cancel_production(1,"infantry")
+   var lanes_to_read := ["vehicle","air","infantry"]
+   for lane_name in lanes_to_read:
+    var job: Dictionary = world.states[1].lanes.get(lane_name, {})
+    if not job.is_empty():
+     expect(str(job.id) in Rules.roster_ids(choice), "AI chooses legal faction units")
+     if str(job.id) in Rules.REPLACEMENTS.get(choice,{}).values(): ai_used_signature=true
+    world.cancel_production(1,lane_name)
   expect(ai_used_signature, "AI can field the selected general's signature")
   expect(world.faction_style(0)==world.faction_style(1), "Mirror match shares faction geometry, not owner color")
   if choice=="gia_missile" and DisplayServer.get_name()!="headless":

@@ -116,6 +116,7 @@ godot --headless --path godot --script res://tests/production_hud_smoke.gd
 godot --headless --path godot --script res://tests/match_audio_smoke.gd
 godot --headless --path godot --script res://tests/match_save_smoke.gd
 godot --headless --path godot --script res://tests/relay_income_smoke.gd
+godot --headless --path godot --script res://tests/airfield_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 
@@ -152,7 +153,7 @@ Supported choices (initial tuning, not balance-certified):
 | Sayegh / Saturation | Siege Rocket Squad, Volley, Missile Defense Nest replace Rocket Cell, Buggy, Salvaged AA. Signature missiles reload/move ×0.9; Nest is AA-only |
 | Varek / Wreckrunner | Junker replaces the Scavenger and starts at 90% hull health. Rocket Truck, Rocket Buggy and the improvised helicopter move +10%. Kills add up to two salvage tiers |
 
-Each army has its own MCV and collector. Aircraft temporarily use the vehicle queue and require a factory and power plant; there is no airfield/rearm simulation yet. New weapon translations are explicit provisional profiles in `scripts/economy/army_rules.gd`, not automatic parsing of proposal text. GIA standard units reuse existing art; replacement units and infrastructure have cached original silhouettes.
+Each army has its own MCV and collector. Aircraft build from an Airfield (1,000 credits, 18 seconds, 20 power) on their own lane, and the cameos stay on the vehicles tab. A Striker and the GIA helicopter carry 4 salvos; a Tempest and the Siege Helicopter carry 6. They cannot fire when dry. They fly back to the nearest living airfield and rearm in 8 seconds while it has power, or 6.8 seconds under Voss. A brownout pauses that timer. Voss still pays 10% more for aircraft, and Reinforced Hangars still adds 15% hull to a new Tempest. The Skybridge pad upgrade is not in this build. New weapon translations are explicit provisional profiles in `scripts/economy/army_rules.gd`, not automatic parsing of proposal text. GIA standard units reuse existing art; replacement units and infrastructure have cached original silhouettes.
 
 The supported roster resolves before displaying production tiles. Removed and foreign units/structures are rejected by queue and completion APIs; the AI uses the same rules and prices. Vale has no Precision Howitzer, Voss no Sentinel, Korda no Thunderbolt, Sayegh no Shadow Operative/camouflage research. Match choices are fixed until returning to setup. This is **nine choices**, not completion of the 12-army proposal: Rook, Volkov and Nadir, plus stealth, tunnels and the full wreck-yard system, remain unimplemented.
 

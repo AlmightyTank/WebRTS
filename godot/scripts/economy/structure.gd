@@ -52,7 +52,7 @@ func notify_unit_exit() -> void:
  exit_activity=2.0
 
 func _process(delta: float) -> void:
- if kind not in ["yard","power","barracks","refinery","factory","depot","relay","vanguard_foundry"] or arena==null: return
+ if kind not in ["yard","power","barracks","refinery","factory","airfield","depot","relay","vanguard_foundry"] or arena==null: return
  if kind=="relay" and team<0: return
  if arena.paused or arena.battle_over: return
  var powered: bool = arena.power_ok(team)
@@ -61,10 +61,13 @@ func _process(delta: float) -> void:
   var lanes: Dictionary = arena.states[team]["lanes"]
   for lane in ["build","defense"]:
    if not lanes[lane].is_empty() and not bool(lanes[lane].get("ready",false)): art_working=true
+ if kind=="airfield" and team>=0:
+  var air_job: Dictionary = arena.states[team]["lanes"].get("air", {})
+  if not air_job.is_empty() and not bool(air_job.get("ready",false)): art_working=true
  if powered: art_time+=delta
  exit_activity=maxf(0.0,exit_activity-delta)
  var target := 0.0
- if kind in ["barracks","factory"]:
+ if kind in ["barracks","factory","airfield"]:
   target=1.0 if exit_activity>0.0 else 0.0
  elif kind=="yard" and powered:
   # Service-only ambient cycle. Never produces or spawns a unit.
@@ -114,10 +117,10 @@ func _draw() -> void:
  if repairing:
   draw_arc(Vector2.ZERO,radius+10.0,0,TAU,28,Color("#67e7bf"),2.5)
  if selected: draw_rect(Rect2(-size*0.5-Vector2(5,5),size+Vector2(10,10)),Color("#e5e8b8"),false,2.0)
- if team==0 and kind in ["barracks","factory"] and arena!=null and arena.has_method("_active_producer"):
-  var lane="infantry" if kind=="barracks" else "vehicle"
+ if team==0 and kind in ["barracks","factory","airfield"] and arena!=null and arena.has_method("_active_producer"):
+  var lane="infantry" if kind=="barracks" else ("air" if kind=="airfield" else "vehicle")
   if arena._active_producer(team,lane)==self:
-   var active_color=Color("#8fe9cb") if kind=="barracks" else Color("#ffd489")
+   var active_color=Color("#8fe9cb") if kind=="barracks" else (Color("#9fd7ff") if kind=="airfield" else Color("#ffd489"))
    draw_rect(Rect2(-size*0.5-Vector2(9,9),size+Vector2(18,18)),active_color,false,3.0)
    draw_string(ThemeDB.fallback_font,Vector2(-size.x*0.5,-size.y*0.5-42),"ACTIVE SPAWN",HORIZONTAL_ALIGNMENT_LEFT,-1,15,active_color)
  var bar_y = IndustrialArt.asset_bounds(kind).position.y-8.0

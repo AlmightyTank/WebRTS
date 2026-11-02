@@ -60,8 +60,9 @@ static func capture(arena) -> Dictionary:
 	var producers: Array = []
 	for side in range(mini(2, arena.active_producers.size())):
 		producers.append({
-			"infantry": arena.structures.find(arena.active_producers[side]["infantry"]),
-			"vehicle": arena.structures.find(arena.active_producers[side]["vehicle"])
+			"infantry": arena.structures.find(arena.active_producers[side].get("infantry")),
+			"vehicle": arena.structures.find(arena.active_producers[side].get("vehicle")),
+			"air": arena.structures.find(arena.active_producers[side].get("air"))
 		})
 	var staging: Array = []
 	for side in range(mini(2, arena.staging_areas.size())):
@@ -170,7 +171,9 @@ static func apply(arena, data: Dictionary) -> bool:
 	_bind_targets(arena, unit_rows)
 	var producer_rows: Array = data.get("producers", [])
 	for side in range(mini(2, producer_rows.size())):
-		for lane in ["infantry", "vehicle"]:
+		for lane in ["infantry", "vehicle", "air"]:
+			if not producer_rows[side].has(lane):
+				continue
 			var index := int(producer_rows[side].get(lane, -1))
 			if index >= 0 and index < arena.structures.size():
 				arena._set_active_producer(side, lane, arena.structures[index])
@@ -334,6 +337,11 @@ static func _capture_unit(arena, unit) -> Dictionary:
 		row["capture_progress"] = _num(unit, "capture_progress")
 		row["capture_pause"] = _num(unit, "capture_pause")
 		row["capture_at"] = _pair(unit.capture_approach_point) if unit.get("capture_approach_point") != null else [0, 0]
+		if unit.get("ammo") != null:
+			row["ammo"] = int(unit.ammo)
+			row["ammo_max"] = int(unit.ammo_max)
+			row["rearming"] = bool(unit.rearming)
+			row["rearm_left"] = float(unit.rearm_left)
 	if bool(unit.get("column_move")):
 		row["column"] = {
 			"goal": _pair(unit.column_goal),
@@ -381,6 +389,11 @@ static func _spawn_saved_unit(arena, row: Dictionary):
 	if unit.get("has_attack_move_goal") != null:
 		unit.has_attack_move_goal = bool(row.get("has_attack_goal", false))
 		unit.attack_move_goal = _vec(row.get("attack_goal", [0, 0]))
+	if row.has("ammo") and unit.get("ammo") != null:
+		unit.ammo = int(row.ammo)
+		unit.ammo_max = int(row.get("ammo_max", unit.ammo_max))
+		unit.rearming = bool(row.get("rearming", false))
+		unit.rearm_left = float(row.get("rearm_left", 0.0))
 	if unit.get("cargo") != null:
 		unit.cargo = float(row.get("cargo", 0.0))
 		unit.working = bool(row.get("working", false))

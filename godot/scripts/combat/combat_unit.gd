@@ -13,6 +13,11 @@ var unit_id := ""
 var display_name := ""
 var team := 0
 var air := false
+# -1 is unlimited. Skirmish aircraft receive a sortie count and cannot fire at 0.
+var ammo := -1
+var ammo_max := -1
+var rearming := false
+var rearm_left := 0.0
 var armor := "PERSONNEL"
 var max_hp := 100.0
 var hp := 100.0
@@ -206,6 +211,15 @@ func _physics_process(delta: float) -> void:
     if _tick_capture(delta):
         queue_redraw()
         return
+    if air and ammo == 0:
+        target = null
+        explicit_attack = false
+        if arena.has_method("service_aircraft"):
+            arena.service_aircraft(self, delta)
+        if moving:
+            _step_movement(delta)
+        _publish_visual()
+        return
     cooldown = maxf(0.0, cooldown - delta)
     stationary_time = stationary_time + delta if position.distance_to(last_combat_position) < 0.1 else 0.0
     last_combat_position = position
@@ -380,6 +394,8 @@ func _step_movement(delta: float) -> void:
                 route_index = 0
 
 func fire(enemy) -> void:
+    if ammo == 0:
+        return
     fire_feedback = 0.12
     cooldown = float(weapon.get("interval", 1.0))
     var shot := weapon.duplicate(true)
@@ -388,6 +404,8 @@ func fire(enemy) -> void:
         else: cooldown *= 2.0
     if arena.get("commander")!=null: cooldown=arena.commander.modify_shot(self,enemy,shot,cooldown)
     arena.spawn_projectile(self, enemy, shot)
+    if ammo > 0:
+        ammo -= 1
 
 func receive_damage(value: float, attacker) -> void:
     if hp <= 0.0:

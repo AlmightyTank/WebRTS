@@ -90,5 +90,8 @@ jobs:
       - name: Test captured relay income
         run: godot --headless --path godot --script res://tests/relay_income_smoke.gd
         timeout-minutes: 2
+      - name: Test airfield production and rearm
+        run: godot --headless --path godot --script res://tests/airfield_smoke.gd
+        timeout-minutes: 2
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180
