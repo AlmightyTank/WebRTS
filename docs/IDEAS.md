@@ -3,7 +3,8 @@
 This document collects reusable ideas from the former Godot isometric roadmap.
 It is a design backlog, not an implementation schedule or a statement that any
 feature is complete. The active execution plan is the root [`ROADMAP.md`](../ROADMAP.md)
-and the current design authority is the reviewed master GDD.
+(Red Alert 2 base-building plus Zero Hour generals, offline Windows 1.0).
+The current design authority is the reviewed master GDD.
 
 ## Ideas retained from the old roadmap
 
