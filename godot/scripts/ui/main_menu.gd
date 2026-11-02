@@ -10,6 +10,7 @@ var page := "home"
 var status: Label
 const ArmyRules = preload("res://scripts/economy/army_rules.gd")
 const SkirmishMaps = preload("res://scripts/economy/skirmish_maps.gd")
+const MatchSave = preload("res://scripts/economy/match_save.gd")
 const MapPreview = preload("res://scripts/ui/skirmish_map_preview.gd")
 const PLAYER_COLOR := [Color("#73b9e3"), Color("#dc907a")]
 const CREDIT_AMOUNTS := [5000, 10000, 20000]
@@ -31,6 +32,7 @@ var lobby_watch: CheckButton
 var lobby_map_summary: Label
 var _lobby_compact_applied := false
 var _lobby_compact_known := false
+var save_notice := ""
 
 func _ready() -> void:
  process_mode = Node.PROCESS_MODE_ALWAYS
@@ -114,7 +116,11 @@ func _show_page(next_page: String) -> void:
  match page:
   "home":
    _text("Establish your base. Secure the ore fields. Control the front.")
-   first = _button("SKIRMISH", _show_page.bind("skirmish"))
+   if MatchSave.read() != null:
+    first = _button("RESUME MATCH", _resume_saved_match)
+    _button("SKIRMISH", _show_page.bind("skirmish"))
+   else:
+    first = _button("SKIRMISH", _show_page.bind("skirmish"))
    _button("CAMPAIGN — coming later", func(): pass, false)
    _button("MULTIPLAYER — coming later", func(): pass, false)
    _button("SETTINGS", _show_page.bind("settings"))
@@ -126,9 +132,12 @@ func _show_page(next_page: String) -> void:
   "pause":
    _text("OPERATIONS PAUSED", true)
    first = _button("RESUME", _resume)
+   _button("SAVE MATCH", _save_from_pause)
    _button("SETTINGS", _show_page.bind("settings"))
    _button("CONTROLS", _show_page.bind("controls"))
    _button("RETURN TO MAIN MENU", _show_page.bind("leave"))
+   if save_notice != "":
+    _text(save_notice)
   "settings":
    _text("SETTINGS", true)
    var volume := HSlider.new()
@@ -154,9 +163,12 @@ func _show_page(next_page: String) -> void:
   "credits":
    _text("Meridian Warfront\nAn original real-time strategy project.\nBuilt with Godot Engine — godotengine.org (MIT license).\nUnits, structures and command UI use the project's procedural artwork.\nDevelopment build: gameplay, artwork and content are still evolving.")
   "leave":
-   _text("Return to main menu? The current match will be lost.", true)
+   _text("Return to main menu? Save the match first if you want to resume it.", true)
    first = _button("KEEP PLAYING", _resume)
+   _button("SAVE AND LEAVE", _save_and_leave)
    _button("END MATCH", _leave_game)
+   if save_notice != "":
+    _text(save_notice)
   "quit":
    _text("Exit Meridian Warfront?", true)
    first = _button("CANCEL", _show_page.bind("home"))
@@ -403,6 +415,39 @@ func _start_game() -> void:
  get_tree().paused = false
 
 func _resume() -> void:
+ overlay.hide()
+ get_tree().paused = false
+
+func _save_current_match() -> bool:
+ if not is_instance_valid(game) or not game.has_method("save_match"):
+  save_notice = "Could not save the match."
+  return false
+ var ok := bool(game.save_match())
+ save_notice = "Match saved. Resume it from the main menu." if ok else "Could not save the match."
+ return ok
+
+func _save_from_pause() -> void:
+ _save_current_match()
+ _show_page("pause")
+
+func _save_and_leave() -> void:
+ if _save_current_match():
+  _leave_game()
+ else:
+  _show_page("leave")
+
+func _resume_saved_match() -> void:
+ var scene := load("res://scenes/skirmish.tscn") as PackedScene
+ if scene == null or MatchSave.read() == null:
+  _show_page("home")
+  return
+ game = scene.instantiate()
+ game.process_mode = Node.PROCESS_MODE_PAUSABLE
+ add_child(game)
+ if not game.load_match():
+  save_notice = "Could not resume the saved match."
+  _leave_game()
+  return
  overlay.hide()
  get_tree().paused = false
 

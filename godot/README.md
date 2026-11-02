@@ -114,6 +114,7 @@ godot --headless --path godot --script res://tests/ra2_systems_smoke.gd
 godot --headless --path godot --script res://tests/rally_staging_smoke.gd
 godot --headless --path godot --script res://tests/production_hud_smoke.gd
 godot --headless --path godot --script res://tests/match_audio_smoke.gd
+godot --headless --path godot --script res://tests/match_save_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 

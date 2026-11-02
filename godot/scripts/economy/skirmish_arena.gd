@@ -90,9 +90,11 @@ var action_palette_buttons: Array = []
 var fog_enabled := true
 var audio
 var power_short := false
+var restoring := false
 var fog
 const ArmyRules = preload("res://scripts/economy/army_rules.gd")
 const SkirmishMaps = preload("res://scripts/economy/skirmish_maps.gd")
+const MatchSave = preload("res://scripts/economy/match_save.gd")
 var army_choices: Array = ["alliance", "republic"]
 var map_id := "meridian_basin"
 var starting_credits := 10000
@@ -169,20 +171,26 @@ func _ready() -> void:
 func _new_state() -> Dictionary:
  return {"credits":float(starting_credits),"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{}},"queued":{"infantry":[],"vehicle":[]},"harvesters":0}
 
-func reset_battle() -> void:
+func clear_for_restore() -> void:
  commander.reset(self)
  if is_instance_valid(combat_feedback):
   combat_feedback.effects.clear()
   combat_feedback.queue_redraw()
  scouting.orders.clear()
- # Override the Combat Lab's scenario starting point; its four benchmark
- # scenes remain available as res://scenes/combat_lab.tscn.
  for u in units:
-  if is_instance_valid(u): u.queue_free()
+  if is_instance_valid(u):
+   u.set_physics_process(false)
+   u.set_process(false)
+   u.queue_free()
  for p in projectiles:
-  if is_instance_valid(p): p.queue_free()
+  if is_instance_valid(p):
+   p.set_physics_process(false)
+   p.queue_free()
  for b in structures:
-  if is_instance_valid(b): b.queue_free()
+  if is_instance_valid(b):
+   b.set_physics_process(false)
+   b.set_process(false)
+   b.queue_free()
  units.clear()
  invalidate_occupancy()
  projectiles.clear()
@@ -197,13 +205,7 @@ func reset_battle() -> void:
  active_producers=[{"infantry":null,"vehicle":null},{"infantry":null,"vehicle":null}]
  staging_areas=[_new_staging_areas(),_new_staging_areas()]
  states=[_new_state(),_new_state()]
- var battlefield: Dictionary = SkirmishMaps.get_map(map_id)
- ore_fields=[]
- for site in battlefield["ore"]:
-  ore_fields.append({"position":site["position"],"remaining":float(site["amount"]),"initial":float(site["amount"])})
- skirmish_time=0.0
- economy_ai_timer=2.0
- ai_build_tick=0
+ ore_fields.clear()
  battle_over=false
  paused=false
  shots=0
@@ -212,11 +214,22 @@ func reset_battle() -> void:
  placement_lane=""
  current_tab=0
  orders_sheet_open=false
- hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
  power_short=false
- if audio != null and is_instance_valid(audio): audio.reset_cues()
  if static_obstacles.is_empty(): static_obstacles=obstacles.duplicate()
  _rebuild_navigation()
+
+func reset_battle() -> void:
+ # Override the Combat Lab's scenario starting point; its four benchmark
+ # scenes remain available as res://scenes/combat_lab.tscn.
+ clear_for_restore()
+ var battlefield: Dictionary = SkirmishMaps.get_map(map_id)
+ for site in battlefield["ore"]:
+  ore_fields.append({"position":site["position"],"remaining":float(site["amount"]),"initial":float(site["amount"])})
+ skirmish_time=0.0
+ economy_ai_timer=2.0
+ ai_build_tick=0
+ hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
+ if audio != null and is_instance_valid(audio): audio.reset_cues()
  var resolved: Array = SkirmishMaps.resolve_slots(start_slots)
  var ally=_spawn_economy(ArmyRules.economic_id(army_choices[0]),0,SkirmishMaps.point(map_id,str(resolved[0])),false)
  _spawn_economy(ArmyRules.economic_id(army_choices[1]),1,SkirmishMaps.point(map_id,str(resolved[1])),false)
@@ -283,7 +296,8 @@ func _deploy_mcv(side: int) -> bool:
  return true
 
 func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-1.0) -> bool:
- if side>=0 and id not in ["yard","relay"] and not id in ArmyRules.structure_ids(army_choices[side]): return false
+ # A resume can include a captured building the owner's roster would not build.
+ if not restoring and side>=0 and id not in ["yard","relay"] and not id in ArmyRules.structure_ids(army_choices[side]): return false
  var size: Vector2=Vector2(155,135) if id=="yard" else STRUCTURE_DATA[id]["size"]
  var b=Node2D.new()
  b.set_script(StructureScript)
@@ -303,7 +317,7 @@ func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-
  _rebuild_navigation()
  if side>=0: _calculate_power(side)
  if side==0 and id!="relay": play_cue("construction")
- if id=="refinery":
+ if id=="refinery" and not restoring:
   var nearest=point+Vector2(0,135 if side==0 else -135)
   var spawn_site=_find_open_position(nearest,22.0)
   if spawn_site!=Vector2.ZERO:
@@ -1144,7 +1158,39 @@ func issue_order(point: Vector2, attack_move: bool=false, queued: bool=false) ->
  super.issue_order(point,attack_move,queued)
 
 func play_cue(id: String) -> void:
+ if restoring: return
  if audio != null and is_instance_valid(audio): audio.cue(id)
+
+func save_match(path: String = "") -> bool:
+ return MatchSave.write(self, MatchSave.PATH if path == "" else path)
+
+func load_match(path: String = "") -> bool:
+ var data = MatchSave.read(MatchSave.PATH if path == "" else path)
+ if typeof(data) != TYPE_DICTIONARY: return false
+ return MatchSave.apply(self, data)
+
+func restore_explored(cells) -> void:
+ if not fog_enabled:
+  if fog != null: fog.visible = false
+  for entity in units + structures:
+   if is_instance_valid(entity): entity.visible = true
+  return
+ if fog == null:
+  fog = load("res://scripts/combat/fog_of_war.gd").new()
+  add_child(fog)
+  fog.world = self
+  fog.z_index = 90
+  fog.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+ fog.visible = true
+ fog.explored_cells = [{}, {}]
+ fog.visible_cells = [{}, {}]
+ if typeof(cells) == TYPE_ARRAY:
+  for side in range(mini(2, cells.size())):
+   if typeof(cells[side]) != TYPE_ARRAY: continue
+   for pair in cells[side]:
+    if typeof(pair) == TYPE_ARRAY and pair.size() >= 2:
+     fog.explored_cells[side][Vector2i(int(pair[0]), int(pair[1]))] = true
+ fog.refresh()
 
 # Godot 4 canvas-items stretch uses visible viewport coordinates on desktop
 # and Android. Keep a single geometry contract for landscape and portrait.
