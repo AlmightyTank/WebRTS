@@ -137,7 +137,7 @@ func _show_page(next_page: String) -> void:
    volume.step = 1
    volume.value = float(config.get_value("audio", "volume", 80))
    volume.custom_minimum_size.y = 44
-   _text("Master volume (applies when audio is available)")
+   _text("Master volume")
    content.add_child(volume)
    volume.value_changed.connect(_set_volume)
    var fullscreen := CheckButton.new()

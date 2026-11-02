@@ -96,7 +96,7 @@ Sight refreshes every 0.15 seconds and currently uses radial grid-based vision,
 not terrain-occluded line of sight or remembered enemy-building silhouettes.
 Restart clears exploration. Test with `res://tests/fog_of_war_smoke.gd`.
 
-- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. Vale, Voss, Korda, Orlov, Sayegh and Varek have research and commander trees; naval, aircraft factories, saving, networking and refined audio remain future work.
+- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. Vale, Voss, Korda, Orlov, Sayegh and Varek have research and commander trees. The match plays original cues for construction, a finished unit, low power, base under attack, an incoming superweapon, and one acknowledgement motif per faction. Music, spoken unit voices, naval, aircraft factories, saving and networking remain future work.
 - Building production time/health and some structure silhouettes are provisional. Full battle balancing requires interactive device testing. The core v0.4 combat stats remain loaded from `res://data/unit_balance_v0.4.json`.
 - AI is a budget-constrained scripted opponent, not a full tactical strategic planner; its building sites are selected from predefined viable locations.
 - RTS mobile layout needs additional touch QA for differing aspect ratios and scaling.
@@ -113,6 +113,7 @@ godot --headless --path godot --script res://tests/skirmish_smoke.gd
 godot --headless --path godot --script res://tests/ra2_systems_smoke.gd
 godot --headless --path godot --script res://tests/rally_staging_smoke.gd
 godot --headless --path godot --script res://tests/production_hud_smoke.gd
+godot --headless --path godot --script res://tests/match_audio_smoke.gd
 godot --headless --path godot --quit-after 180
 ```
 

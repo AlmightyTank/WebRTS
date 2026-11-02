@@ -81,5 +81,8 @@ jobs:
       - name: Test commander research, progression and support powers
         run: godot --headless --path godot --script res://tests/commander_kits_smoke.gd
         timeout-minutes: 2
+      - name: Test match audio cues
+        run: godot --headless --path godot --script res://tests/match_audio_smoke.gd
+        timeout-minutes: 2
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180

@@ -136,12 +136,16 @@ func cast(side: int, id: String, point: Vector2) -> bool:
  if id=="roadside_reinforcements" and (not legal_site(side,point) or living_count(side)+level>80): return false
  s.cooldowns[id]=float(POWERS[id].cooldown)
  var event={"id":id,"side":side,"point":point,"radius":float(POWERS[id].radius),"remaining":float(POWERS[id].delay),"level":level}
- if event.remaining>0.0: events.append(event)
+ if event.remaining>0.0: _queue_warning(event)
  else: resolve(event)
  pending_power=""
  queue_redraw()
  if is_instance_valid(rank_label): refresh_ui()
  return true
+
+func _queue_warning(event: Dictionary) -> void:
+ events.append(event)
+ if float(event.get("remaining",0.0))>=0.5 and world!=null and world.has_method("play_cue"): world.play_cue("superweapon")
 
 func living_count(side: int) -> int:
  var count:=0
@@ -153,7 +157,7 @@ func launch_silo(side: int, point: Vector2) -> bool:
  if side<0 or side>1 or world.paused or world.battle_over or not world.BOARD.has_point(point): return false
  if not world.has_structure(side,"silo") or not world.power_ok(side) or teams[side].silo>0.0 or not sees(side,point): return false
  teams[side].silo=240.0
- events.append({"id":"silo","side":side,"point":point,"radius":230.0 if has_research(side,"saturation_payload") else 100.0,"remaining":7.0,"level":1,"wide":has_research(side,"saturation_payload")})
+ _queue_warning({"id":"silo","side":side,"point":point,"radius":230.0 if has_research(side,"saturation_payload") else 100.0,"remaining":7.0,"level":1,"wide":has_research(side,"saturation_payload")})
  queue_redraw()
  if is_instance_valid(rank_label): refresh_ui()
  return true

@@ -88,6 +88,8 @@ var production_tile_icons: Dictionary = {}
 var action_palette_buttons: Array = []
 
 var fog_enabled := true
+var audio
+var power_short := false
 var fog
 const ArmyRules = preload("res://scripts/economy/army_rules.gd")
 const SkirmishMaps = preload("res://scripts/economy/skirmish_maps.gd")
@@ -153,6 +155,9 @@ func _ai_decide() -> void:
 
 func _ready() -> void:
  army_choices = [ArmyRules.valid_choice(str(army_choices[0])), ArmyRules.valid_choice(str(army_choices[1]))]
+ audio = preload("res://scripts/audio/match_audio.gd").new()
+ audio.name = "MatchAudio"
+ add_child(audio)
  add_child(commander)
  commander.reset(self)
  super._ready()
@@ -208,6 +213,8 @@ func reset_battle() -> void:
  current_tab=0
  orders_sheet_open=false
  hud_status="Select the MCV, press H or tap DEPLOY, and build POWER."
+ power_short=false
+ if audio != null and is_instance_valid(audio): audio.reset_cues()
  if static_obstacles.is_empty(): static_obstacles=obstacles.duplicate()
  _rebuild_navigation()
  var resolved: Array = SkirmishMaps.resolve_slots(start_slots)
@@ -295,6 +302,7 @@ func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-
   _set_active_producer(side,"infantry" if id=="barracks" else "vehicle",b)
  _rebuild_navigation()
  if side>=0: _calculate_power(side)
+ if side==0 and id!="relay": play_cue("construction")
  if id=="refinery":
   var nearest=point+Vector2(0,135 if side==0 else -135)
   var spawn_site=_find_open_position(nearest,22.0)
@@ -411,6 +419,10 @@ func _calculate_power(side: int) -> void:
   demand+=int(STRUCTURE_DATA[b.kind]["demand"])
  states[side]["power"]=capacity
  states[side]["demand"]=demand+commander.extra_demand(side)
+ if side==0:
+  var short_now: bool=int(states[side]["demand"])>int(states[side]["power"])
+  if short_now and not power_short: play_cue("low_power")
+  power_short=short_now
 
 func has_structure(side: int, id: String) -> bool:
  for b in structures:
@@ -813,6 +825,7 @@ func _produce_unit(side: int, id: String) -> bool:
   elif unit.has_method("order_move"):
    var military=not ArmyRules.engineer(id)
    unit.order_move(waypoint,producer.rally_attack_move and military)
+ if side==0: play_cue("unit_ready")
  return true
 
 func _infantry_exit_offset(side: int, producer) -> Vector2:
@@ -1113,15 +1126,25 @@ func issue_order(point: Vector2, attack_move: bool=false, queued: bool=false) ->
    if is_instance_valid(u) and ArmyRules.engineer(u.unit_id):
     u.order_capture(capture_target)
     assigned=true
-  if assigned: return
+  if assigned:
+   play_cue("ack")
+   return
  var enemy_building
  for b in structures:
   if is_instance_valid(b) and b.team==1 and entity_visible_to(0, b) and b.ground_bounds().grow(8).has_point(point): enemy_building=b; break
  if enemy_building!=null:
+  var attacked:=false
   for u in selected:
-   if is_instance_valid(u) and u.can_hit(enemy_building): u.order_attack(enemy_building)
+   if is_instance_valid(u) and u.can_hit(enemy_building):
+    u.order_attack(enemy_building)
+    attacked=true
+  if attacked: play_cue("ack")
   return
+ if not selected.is_empty(): play_cue("ack")
  super.issue_order(point,attack_move,queued)
+
+func play_cue(id: String) -> void:
+ if audio != null and is_instance_valid(audio): audio.cue(id)
 
 # Godot 4 canvas-items stretch uses visible viewport coordinates on desktop
 # and Android. Keep a single geometry contract for landscape and portrait.
