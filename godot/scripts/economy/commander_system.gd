@@ -9,7 +9,13 @@ const RESEARCH := {
  "veteran_crews":{"name":"Veteran Crews","army":"republic_armor","site":"vanguard_foundry","cost":1200.0,"time":30.0,"demand":0},
  "guidance_van":{"name":"Guidance Van Targeting","army":"gia_missile","site":"depot","cost":1100.0,"time":30.0,"demand":10},
  "rapid_reload":{"name":"Rapid Reload","army":"gia_missile","site":"depot","cost":1500.0,"time":40.0,"demand":10},
- "saturation_payload":{"name":"Silo Saturation Payload","army":"gia_missile","site":"silo","cost":2000.0,"time":50.0,"demand":10}
+ "saturation_payload":{"name":"Silo Saturation Payload","army":"gia_missile","site":"silo","cost":2000.0,"time":50.0,"demand":10},
+ "reinforced_hangars":{"name":"Reinforced Hangars","army":"alliance_air","site":"factory","cost":1300.0,"time":32.0,"demand":20},
+ "countermeasures":{"name":"Advanced Countermeasures","army":"alliance_air","site":"factory","cost":1100.0,"time":28.0,"demand":10},
+ "forward_observers":{"name":"Forward Observers","army":"republic_artillery","site":"factory","cost":1200.0,"time":30.0,"demand":10},
+ "rapid_fire_mission":{"name":"Rapid Fire Mission","army":"republic_artillery","site":"factory","cost":1500.0,"time":36.0,"demand":15},
+ "recovery_crews":{"name":"Recovery Crews","army":"gia_salvage","site":"depot","cost":850.0,"time":30.0,"demand":0},
+ "field_improvisation":{"name":"Field Improvisation","army":"gia_salvage","site":"depot","cost":1000.0,"time":34.0,"demand":0}
 }
 const POWERS := {
  "grid_surge":{"name":"Grid Surge","army":"alliance_energy","rank":1,"cooldown":75.0,"radius":200.0,"delay":0.0},
@@ -20,7 +26,16 @@ const POWERS := {
  "breakthrough_order":{"name":"Breakthrough Order","army":"republic_armor","rank":5,"cooldown":150.0,"radius":200.0,"delay":0.0},
  "rocket_recon":{"name":"Rocket Recon Beacon","army":"gia_missile","rank":1,"cooldown":70.0,"radius":200.0,"delay":1.5},
  "harassing_salvo":{"name":"Harassing Salvo","army":"gia_missile","rank":3,"cooldown":100.0,"radius":125.0,"delay":3.0},
- "saturation_strike":{"name":"Saturation Strike","army":"gia_missile","rank":5,"cooldown":150.0,"radius":210.0,"delay":5.0}
+ "saturation_strike":{"name":"Saturation Strike","army":"gia_missile","rank":5,"cooldown":150.0,"radius":210.0,"delay":5.0},
+ "recon_overflight":{"name":"Recon Overflight","army":"alliance_air","rank":1,"cooldown":80.0,"radius":240.0,"delay":0.0},
+ "interdiction_flight":{"name":"Interdiction Flight","army":"alliance_air","rank":3,"cooldown":110.0,"radius":120.0,"delay":3.0},
+ "sky_supremacy":{"name":"Sky Supremacy","army":"alliance_air","rank":5,"cooldown":150.0,"radius":170.0,"delay":5.0},
+ "spotter_recon":{"name":"Spotter Recon","army":"republic_artillery","rank":1,"cooldown":80.0,"radius":230.0,"delay":0.0},
+ "rolling_barrage":{"name":"Rolling Barrage","army":"republic_artillery","rank":3,"cooldown":120.0,"radius":80.0,"delay":3.0},
+ "fire_mission":{"name":"Fire Mission Omega","army":"republic_artillery","rank":5,"cooldown":150.0,"radius":160.0,"delay":4.0},
+ "rapid_salvage":{"name":"Rapid Salvage","army":"gia_salvage","rank":1,"cooldown":90.0,"radius":180.0,"delay":0.0},
+ "roadside_reinforcements":{"name":"Roadside Reinforcements","army":"gia_salvage","rank":3,"cooldown":140.0,"radius":110.0,"delay":3.0},
+ "scavenger_convoy":{"name":"Scavenger Convoy","army":"gia_salvage","rank":5,"cooldown":150.0,"radius":200.0,"delay":0.0}
 }
 const THRESHOLDS := [0.0,400.0,1000.0,2000.0,3500.0]
 var world
@@ -109,9 +124,10 @@ func cast(side: int, id: String, point: Vector2) -> bool:
  var level:=int(s.powers.get(id,0))
  if level==0 or float(s.cooldowns.get(id,0.0))>0.0 or not world.BOARD.has_point(point): return false
  # Recon can scout unknown terrain; damaging/support powers require shared sight.
- if id not in ["rocket_recon","target_lattice"] and not sees(side,point): return false
+ if id not in ["rocket_recon","target_lattice","recon_overflight","spotter_recon"] and not sees(side,point): return false
  if id=="grid_surge" and not world.power_ok(side): return false
  if id=="armor_reserve" and (not legal_site(side,point) or living_count(side)+2+level>80): return false
+ if id=="roadside_reinforcements" and (not legal_site(side,point) or living_count(side)+level>80): return false
  s.cooldowns[id]=float(POWERS[id].cooldown)
  var event={"id":id,"side":side,"point":point,"radius":float(POWERS[id].radius),"remaining":float(POWERS[id].delay),"level":level}
  if event.remaining>0.0: events.append(event)
@@ -134,43 +150,58 @@ func launch_silo(side: int, point: Vector2) -> bool:
  queue_redraw()
  return true
 
+func blast(event: Dictionary, point: Vector2, kind: String, damage: float, radius: float) -> void:
+ var side: int=event.side
+ if kind=="ROCKET" and intercept_area(side,point): damage*=0.65
+ for victim in world.projectile_targets().duplicate():
+  if not is_instance_valid(victim) or victim.team==side or victim.team<0 or victim.hp<=0 or victim.air or victim.position.distance_to(point)>radius: continue
+  var amount: float=damage*world.armor_multiplier(kind,victim.armor)
+  victim.receive_damage(amount,null)
+  world.register_hit(null,victim,amount)
+  if victim.hp<=0: award_xp(side,100.0)
+ world.show_combat_feedback(point,"death",kind,radius*0.35)
+
 func resolve(event: Dictionary) -> void:
  var id: String=event.id
  var side: int=event.side
  var point: Vector2=event.point
  var scale:=1.0+0.25*(int(event.level)-1)
- if id in ["target_lattice","rocket_recon"]:
+ if id in ["target_lattice","rocket_recon","recon_overflight","spotter_recon"]:
   reveals.append({"side":side,"point":point,"radius":event.radius,"remaining":18.0*scale,"mark":id=="target_lattice"})
   world._refresh_fog()
- elif id in ["grid_surge","breakthrough_order"]:
+ elif id in ["grid_surge","breakthrough_order","scavenger_convoy"]:
   buffs.append({"id":id,"side":side,"point":point,"radius":event.radius,"remaining":12.0*scale})
+ elif id=="rapid_salvage":
+  for unit in world.units:
+   if is_instance_valid(unit) and unit.team==side and unit.hp>0 and not unit.air and unit.armor!="PERSONNEL" and unit.position.distance_to(point)<=event.radius:
+    unit.hp=minf(unit.max_hp,unit.hp+unit.max_hp*0.12*scale)
+    if unit.unit_id=="g_junker": grant_salvage_tier(unit)
+    unit.queue_redraw()
  elif id=="field_repairs":
   for unit in world.units:
    if is_instance_valid(unit) and unit.team==side and unit.hp>0 and not unit.air and unit.armor!="PERSONNEL" and unit.position.distance_to(point)<=event.radius:
     unit.hp=minf(unit.max_hp,unit.hp+unit.max_hp*0.25*scale)
     unit.queue_redraw()
- elif id=="armor_reserve":
+ elif id in ["armor_reserve","roadside_reinforcements"]:
   # Recheck occupancy and vision at arrival. A blocked/lost landing zone cancels delivery.
   if not legal_site(side,point): return
-  for i in range(2+int(event.level)):
+  var reserve_id: String="g_junker" if id=="roadside_reinforcements" else "r_jugger"
+  var reserve_count: int=int(event.level) if id=="roadside_reinforcements" else 2+int(event.level)
+  for i in range(reserve_count):
    if living_count(side)>=80: break
    var site: Vector2=world._find_open_position(point,18.0)
    if site!=Vector2.ZERO and site.distance_to(point)<=event.radius and sees(side,site):
-    var unit=world._spawn("r_jugger",side,site)
+    var unit=world._spawn(reserve_id,side,site)
     world.show_combat_feedback(site,"impact","AP",18.0)
     unit.order_move(site+Vector2(0,72 if side==0 else -72))
+ elif id=="rolling_barrage":
+  for step in range(3):
+   blast(event, point+Vector2((step-1)*90.0,0.0), "AP", 120.0*scale, 70.0)
  else:
-  var kind: String="ENERGY" if id=="orbital_pulse" else "ROCKET"
-  var damage: float={"orbital_pulse":260.0,"harassing_salvo":100.0,"saturation_strike":190.0,"silo":380.0 if bool(event.get("wide",false)) else 900.0}.get(id,0.0)*scale
+  var kind: String="ENERGY" if id=="orbital_pulse" else ("AP" if id=="fire_mission" else "ROCKET")
+  var damage: float={"orbital_pulse":260.0,"harassing_salvo":100.0,"saturation_strike":190.0,"interdiction_flight":140.0,"sky_supremacy":210.0,"fire_mission":170.0,"silo":380.0 if bool(event.get("wide",false)) else 900.0}.get(id,0.0)*scale
   # Missile support is finite and interceptable. One ready lattice reduces one local blast.
-  if kind=="ROCKET" and intercept_area(side,point): damage*=0.65
-  for victim in world.projectile_targets().duplicate():
-   if not is_instance_valid(victim) or victim.team==side or victim.team<0 or victim.hp<=0 or victim.air or victim.position.distance_to(point)>event.radius: continue
-   var amount: float=damage*world.armor_multiplier(kind,victim.armor)
-   victim.receive_damage(amount,null)
-   world.register_hit(null,victim,amount)
-   if victim.hp<=0: award_xp(side,100.0)
-  world.show_combat_feedback(point,"death",kind,event.radius*0.35)
+  blast(event, point, kind, damage, event.radius)
 
 func buff_at(side: int, id: String, point: Vector2) -> bool:
  for effect in buffs:
@@ -193,6 +224,7 @@ func modify_shot(source, enemy, shot: Dictionary, interval: float) -> float:
  if source.get("unit_id") in Rules.SIGNATURE_MISSILES:
   # Starting .9 bonus and researched reload are clamped to .75 of base.
   if has_research(side,"rapid_reload"): interval*=0.75/0.9
+ if source.get("unit_id")=="r_stormrail" and has_research(side,"rapid_fire_mission"): interval*=0.85
  if marked(enemy.team,enemy.position): shot.damage*=1.1
  if source.get("unit_xp")!=null and source.unit_xp>=100.0: shot.damage*=1.1
  return interval
@@ -201,10 +233,35 @@ func weapon_range(unit, enemy) -> float:
  var result:=float(unit.weapon.get("range",0.0))
  if not enemy.air: result=float(unit.weapon.get("ground_range",result))
  if unit.unit_id in Rules.SIGNATURE_MISSILES and has_research(unit.team,"guidance_van"): result+=30.0
+ if unit.unit_id=="r_stormrail":
+  result*=1.15
+  if has_research(unit.team,"forward_observers"): result+=40.0
  return result
 
 func prepare_unit(unit) -> void:
  if unit.unit_id in Rules.STEEL_TANKS and has_research(unit.team,"veteran_crews"): unit.unit_xp=100.0
+ if unit.unit_id=="a_tempest" and has_research(unit.team,"reinforced_hangars"):
+  unit.max_hp*=1.15
+  unit.hp=unit.max_hp
+
+func grant_salvage_tier(unit) -> void:
+ if unit==null or not is_instance_valid(unit) or unit.unit_id!="g_junker": return
+ var tier: int=int(unit.get("salvage_tier"))
+ if tier>=2: return
+ unit.salvage_tier=tier+1
+ var bonus: float=0.12 if has_research(unit.team,"field_improvisation") else 0.10
+ if unit.salvage_tier==1:
+  unit.max_hp*=1.0+bonus
+  unit.hp=minf(unit.max_hp,unit.hp+unit.max_hp*bonus)
+ else:
+  unit.weapon.damage*=1.0+bonus
+ unit.queue_redraw()
+
+func salvage_kill(unit, victim) -> void:
+ grant_salvage_tier(unit)
+ if not has_research(unit.team,"recovery_crews") or victim.get("unit_id")==null: return
+ var payout: float=minf(200.0,float(world.roster.get(victim.unit_id,{}).get("credits",0.0))*0.15)
+ world.states[unit.team].credits+=payout
 
 func interception_ready(unit) -> bool:
  return unit.unit_id=="a_lattice" and world.power_ok(unit.team) and float(interception.get(unit.get_instance_id(),0.0))<=0.0
@@ -272,13 +329,13 @@ func ai_tick(side: int = 1) -> void:
    if int(teams[side].powers.get(id,0))<3: buy_power(side,id)
  for id in power_ids(side):
   var point:=Vector2(-1,-1)
-  if id in ["target_lattice","rocket_recon"]:
+  if id in ["target_lattice","rocket_recon","recon_overflight","spotter_recon"]:
    for unit in world.units:
     if is_instance_valid(unit) and unit.team==side and unit.moving: point=unit.destination; break
-  elif id in ["grid_surge","field_repairs","armor_reserve","breakthrough_order"]:
+  elif id in ["grid_surge","field_repairs","armor_reserve","breakthrough_order","rapid_salvage","roadside_reinforcements","scavenger_convoy"]:
    for unit in world.units:
     if is_instance_valid(unit) and unit.team==side and not Rules.economic(unit.unit_id):
-     point=world._find_open_position(unit.position+Vector2(0,80),20.0) if id=="armor_reserve" else unit.position
+     point=world._find_open_position(unit.position+Vector2(0,80),20.0) if id in ["armor_reserve","roadside_reinforcements"] else unit.position
      break
   else:
    for enemy in world.projectile_targets():

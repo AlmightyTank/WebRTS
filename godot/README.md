@@ -96,7 +96,7 @@ Sight refreshes every 0.15 seconds and currently uses radial grid-based vision,
 not terrain-occluded line of sight or remembered enemy-building silhouettes.
 Restart clears exploration. Test with `res://tests/fog_of_war_smoke.gd`.
 
-- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. Vale, Korda and Sayegh have research and commander trees; naval, aircraft factories, saving, networking and refined audio remain future work.
+- This is an end-to-end **economy/combat vertical slice**, not the full RA2/ZH game. Vale, Voss, Korda, Orlov, Sayegh and Varek have research and commander trees; naval, aircraft factories, saving, networking and refined audio remain future work.
 - Building production time/health and some structure silhouettes are provisional. Full battle balancing requires interactive device testing. The core v0.4 combat stats remain loaded from `res://data/unit_balance_v0.4.json`.
 - AI is a budget-constrained scripted opponent, not a full tactical strategic planner; its building sites are selected from predefined viable locations.
 - RTS mobile layout needs additional touch QA for differing aspect ratios and scaling.
@@ -141,26 +141,32 @@ Supported choices (initial tuning, not balance-certified):
 | --- | --- |
 | Alliance | Ranger, Javelin, Engineer, Sentinel, mobile AA, Striker; flexible combined arms |
 | Vale / Lattice | Arc Lance, Lattice Interceptor, Beam Bastion replace Sentinel, mobile AA, Sentry Turret. Powered energy damage +10%; shortage doubles firing interval |
+| Voss / Sky Command | Tempest replaces the Striker. Sentinel is unavailable. Aircraft cost +10% |
 | Republic | Line Infantry, Tank Hunter, Engineer, Bastion, Flak, Mammoth, Siege Helicopter; heavier, slower armor |
 | Korda / Steel Vanguard | Juggernaut, Imperator, Armored Scout Carrier, Vanguard Foundry replace Bastion, Mammoth, Recon APC, Heavy Foundry. Signature tanks +10% HP; aircraft +20% price |
+| Orlov / Longbow | Stormrail replaces the Mammoth; Escort tank replaces the Bastion. Stormrail range +15%, two-second setup, minimum range |
 | GIA | Militia, Rocket Cell, Technician, Scavenger, AA Truck, Rocket Buggy, improvised helicopter; cheaper, mobile, fragile forces |
 | Sayegh / Saturation | Siege Rocket Squad, Volley, Missile Defense Nest replace Rocket Cell, Buggy, Salvaged AA. Signature missiles reload/move ×0.9; Nest is AA-only |
+| Varek / Wreckrunner | Junker replaces the Scavenger and starts at 90% hull health. Rocket Truck, Rocket Buggy and the improvised helicopter move +10%. Kills add up to two salvage tiers |
 
 Each army has its own MCV and collector. Aircraft temporarily use the vehicle queue and require a factory and power plant; there is no airfield/rearm simulation yet. New weapon translations are explicit provisional profiles in `scripts/economy/army_rules.gd`, not automatic parsing of proposal text. GIA standard units reuse existing art; replacement units and infrastructure have cached original silhouettes.
 
-The supported roster resolves before displaying production tiles. Removed and foreign units/structures are rejected by queue and completion APIs; the AI uses the same rules and prices. Vale has no Precision Howitzer, Korda no Thunderbolt, Sayegh no Shadow Operative/camouflage research. Match choices are fixed until returning to setup. This is **six choices**, not completion of the 12-army proposal: the other six generals, stealth, tunnels and salvage remain unimplemented.
+The supported roster resolves before displaying production tiles. Removed and foreign units/structures are rejected by queue and completion APIs; the AI uses the same rules and prices. Vale has no Precision Howitzer, Voss no Sentinel, Korda no Thunderbolt, Sayegh no Shadow Operative/camouflage research. Match choices are fixed until returning to setup. This is **nine choices**, not completion of the 12-army proposal: Rook, Volkov and Nadir, plus stealth, tunnels and the full wreck-yard system, remain unimplemented.
 
-## First three commander kits
+## Commander kits
 
-Open **COMMAND / RESEARCH** above the production tabs. Research pays gradually from credits, pauses if its site is lost, and can be canceled for an actual-investment refund. Completed research is permanent for the match; power-dependent benefits still require power. The AI uses these same systems.
+Open the **UPG** tab beside the build tabs. Research pays gradually from credits, pauses if its site is lost, and can be canceled for an actual-investment refund. Completed research is permanent for the match; power-dependent benefits still require power. The AI uses these same systems.
 
 | General | Research | Rank 1 / 3 / 5 support |
 | --- | --- | --- |
 | Vale | Depot: Beam Capacitors ($1400, +15% energy damage, +25 power demand); Grid Stabilizers ($1200, shortage interval 2× → 1.5×, +15 demand) | Grid Surge / Target Lattice / Orbital Pulse |
+| Voss | Factory: Reinforced Hangars ($1300, new Tempests +15% hull, +20 demand); Advanced Countermeasures ($1100, Tempests take 15% less damage from AA, +10 demand) | Recon Overflight / Interdiction Flight / Sky Supremacy |
 | Korda | Vanguard Foundry: Autoloaders ($1600, signature tank interval ×0.85); Veteran Crews ($1200, new signature tanks start with 100 unit XP) | Field Repairs / Armor Reserve / Breakthrough Order |
+| Orlov | Factory: Forward Observers ($1200, Stormrail range +40, +10 demand); Rapid Fire Mission ($1500, Stormrail interval ×0.85, +15 demand) | Spotter Recon / Rolling Barrage / Fire Mission Omega |
 | Sayegh | Depot: Guidance Van targeting ($1100, signature missile range +30); Rapid Reload ($1500, total interval floor 0.75× original). Silo: Saturation Payload ($2000) trades 900 focused damage/radius 100 for 380 damage/radius 230 | Rocket Recon Beacon / Harassing Salvo / Saturation Strike |
+| Varek | Depot: Recovery Crews ($850, a Junker kill pays up to $200 or 15% of the victim's price); Field Improvisation ($1000, salvage tiers grant 12% instead of 10%) | Rapid Salvage / Roadside Reinforcements / Scavenger Convoy |
 
-Command XP comes from enemy kills, not research. Five ranks at 0/400/1000/2000/3500 XP grant seven GP total. Each power level costs one GP, up to three levels; buy only after its rank gate. GP purchases never unlock replacement production. Unit XP is separate: kills grant 50; 100 XP grants +10% shot damage. Research and all progression reset on restart.
+Command XP comes from enemy kills, not research. Five ranks at 0/400/1000/2000/3500 XP grant seven GP total. Each power level costs one GP, up to three levels; buy only after its rank gate. GP purchases never unlock replacement production. Unit XP is separate: kills grant 50; 100 XP grants +10% shot damage. Research and all progression reset on restart. Voss cooldowns are 80/110/150s; Orlov 80/120/150s; Varek 90/140/150s. Recon Overflight and Spotter Recon can scout shroud. Interdiction Flight and Sky Supremacy are rocket strikes a Lattice can intercept; Rolling Barrage (three AP blasts) and Fire Mission Omega are shells. Rapid Salvage heals owned ground vehicles and can raise a Junker's salvage tier. Roadside Reinforcements delivers one Junker per power level to a visible clear site. Scavenger Convoy gives light vehicles +10% speed in its area. A Junker kill raises one salvage tier, up to two: the first adds hull health, the second adds cannon damage. Tier meshes are `g_junker_salvage_1` and `g_junker_salvage_2`. There is no mobile salvage yard in this batch.
 
 Choose a power then click/tap the world; Esc/right-click cancels. Damage powers require shared current sight. Target Lattice and Rocket Recon can scout shroud for 18 seconds (longer at higher levels); Lattice marks for +10% damage. Cooldowns: Vale 75/100/150s; Korda 90/150/150s; Sayegh 70/100/150s. Orbital Pulse warns for 3s; recon beacon 1.5s; Harassing Salvo 3s; Saturation Strike 5s. Warnings are public through shroud, with countdowns. Delayed strikes hit their fixed location, not a tracked target. They spare friendly/neutral entities and aircraft.
 
@@ -172,4 +178,4 @@ These are playable named kits, not balance certification. Values not specified b
 
 Regression: `godot --headless --path godot --script res://tests/commander_kits_smoke.gd` covers research payment/refunds/facility loss, GP/rank separation, all nine powers, cooldowns/delays/target legality, limited interception, reload caps, veteran crews, silo payload, pause/reset and HUD targeting. Run without `--headless` for `user://commander_*.png` captures.
 
-Regression: `godot --headless --path godot --script res://tests/army_rules_smoke.gd` covers all six choices on both ownership sides, mirror-match deployment, collector grants, queue/spawn legality, signature stats, power penalties and setup transfer. Running without `--headless` also saves `user://army_selection.png` and `user://army_battlefield.png` for visual review. Human counterplay/balance testing remains necessary.
+Regression: `godot --headless --path godot --script res://tests/army_rules_smoke.gd` covers all nine choices on both ownership sides, mirror-match deployment, collector grants, queue/spawn legality, signature stats, power penalties and setup transfer. Running without `--headless` also saves `user://army_selection.png` and `user://army_battlefield.png` for visual review. Human counterplay/balance testing remains necessary.
