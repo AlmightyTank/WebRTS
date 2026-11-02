@@ -14,6 +14,9 @@ var source_air := false
 var is_homing := false
 var destination := Vector2.ZERO
 var velocity := Vector2.ZERO
+var _drawn_velocity := Vector2.INF
+var _scan_hit
+var _scan_t := INF
 
 func configure(world: Node2D, origin: Vector2, source, enemy, profile: Dictionary) -> void:
  arena = world
@@ -46,11 +49,28 @@ func _physics_process(delta: float) -> void:
  if not arena.clear_shot(position,next_position,source_air,target_air,target):
   queue_free()
   return
- var nearest
- var nearest_t := INF
  var path := next_position-position
  var travel_squared := maxf(0.0001,path.length_squared())
- for unit in arena.projectile_targets() if arena.has_method("projectile_targets") else arena.units:
+ _scan_hit = null
+ _scan_t = INF
+ _scan_hits(arena.units, path, travel_squared)
+ var buildings: Variant = arena.get("structures")
+ if buildings is Array:
+  _scan_hits(buildings, path, travel_squared)
+ if _scan_hit != null:
+  var amount = damage*arena.armor_multiplier(weapon_kind,_scan_hit.armor)
+  if amount > 0.0:
+   _scan_hit.receive_damage(amount,shooter if is_instance_valid(shooter) else null)
+   arena.register_hit(shooter,_scan_hit,amount)
+  queue_free()
+  return
+ position = next_position
+ if not velocity.is_equal_approx(_drawn_velocity):
+  _drawn_velocity = velocity
+  queue_redraw()
+
+func _scan_hits(list: Array, path: Vector2, travel_squared: float) -> void:
+ for unit in list:
   if not is_instance_valid(unit) or unit.hp<=0.0 or unit.team==owner_team:
    continue
   # A dual-purpose weapon's shot uses the layer it was actually fired at.
@@ -58,18 +78,9 @@ func _physics_process(delta: float) -> void:
    continue
   var t := clampf((unit.position-position).dot(path)/travel_squared,0.0,1.0)
   var closest := position+path*t
-  if closest.distance_to(unit.position) <= unit.radius+5.0 and t<nearest_t:
-   nearest_t=t
-   nearest=unit
- if nearest != null:
-  var amount = damage*arena.armor_multiplier(weapon_kind,nearest.armor)
-  if amount > 0.0:
-   nearest.receive_damage(amount,shooter if is_instance_valid(shooter) else null)
-   arena.register_hit(shooter,nearest,amount)
-  queue_free()
-  return
- position = next_position
- queue_redraw()
+  if closest.distance_to(unit.position) <= unit.radius+5.0 and t<_scan_t:
+   _scan_t=t
+   _scan_hit=unit
 
 func _draw() -> void:
  var missile := is_homing or weapon_kind in ["MISSILE", "ROCKET"]

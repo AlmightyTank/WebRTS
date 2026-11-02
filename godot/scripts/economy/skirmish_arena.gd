@@ -368,20 +368,30 @@ func register_hit(source, victim, amount: float) -> void:
 func find_target(seeker, search_radius: float):
  var winner
  var best=INF
- for entity in projectile_targets():
-  if not is_instance_valid(entity) or entity.hp<=0 or entity.team==seeker.team: continue
-  if seeker.position.distance_squared_to(entity.position)>search_radius*search_radius: continue
-  if not entity_visible_to(seeker.team,entity) or not seeker.can_hit(entity): continue
-  var distance=seeker.position.distance_to(entity.position)
-  if distance>search_radius: continue
-  var score=distance
-  if entity is Node2D and entity in structures: score*=1.25
-  if seeker.weapon.get("type","")=="AA" and entity.air: score*=0.5
-  if seeker.weapon.get("type","")=="ROCKET" and entity.armor=="HEAVY": score*=0.7
+ var radius_sq=search_radius*search_radius
+ for entity in units:
+  var score=_rank_target(seeker,entity,search_radius,radius_sq,false)
+  if score<best:
+   best=score
+   winner=entity
+ for entity in structures:
+  var score=_rank_target(seeker,entity,search_radius,radius_sq,true)
   if score<best:
    best=score
    winner=entity
  return winner
+
+func _rank_target(seeker, entity, search_radius: float, radius_sq: float, building: bool) -> float:
+ if not is_instance_valid(entity) or entity.hp<=0 or entity.team==seeker.team: return INF
+ if seeker.position.distance_squared_to(entity.position)>radius_sq: return INF
+ if not entity_visible_to(seeker.team,entity) or not seeker.can_hit(entity): return INF
+ var distance: float=seeker.position.distance_to(entity.position)
+ if distance>search_radius: return INF
+ var score:=distance
+ if building: score*=1.25
+ if seeker.weapon.get("type","")=="AA" and entity.air: score*=0.5
+ if seeker.weapon.get("type","")=="ROCKET" and entity.armor=="HEAVY": score*=0.7
+ return score
 
 func power_ok(side: int) -> bool:
  return int(states[side]["power"])>=int(states[side]["demand"])

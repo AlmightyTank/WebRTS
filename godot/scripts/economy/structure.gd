@@ -25,6 +25,9 @@ var art_time: float = 0.0
 var door_open: float = 0.0
 var exit_activity: float = 0.0
 var art_working: bool = false
+var _drawn_art_frame := -999
+var _drawn_door_frame := -999
+var _drawn_working := false
 var weapon := {"type":"SMALL_ARMS", "damage":16.0, "interval":0.7, "range":165.0, "projectile_speed":620.0}
 
 func configure(world, building_kind: String, side: int, pos: Vector2, size: Vector2) -> void:
@@ -67,6 +70,15 @@ func _process(delta: float) -> void:
   # Service-only ambient cycle. Never produces or spawns a unit.
   target=0.7 if fmod(art_time,18.0)>13.0 else 0.0
  door_open=move_toward(door_open,target,delta*2.5)
+ # Building meshes are cached per 20 Hz frame and 16 door steps. Health, selection
+ # and repair call queue_redraw themselves when those overlays change.
+ var frame := int(art_time*20.0)
+ var door_frame := int(round(door_open*16.0))
+ if frame==_drawn_art_frame and door_frame==_drawn_door_frame and art_working==_drawn_working:
+  return
+ _drawn_art_frame=frame
+ _drawn_door_frame=door_frame
+ _drawn_working=art_working
  queue_redraw()
 
 func _physics_process(delta: float) -> void:
