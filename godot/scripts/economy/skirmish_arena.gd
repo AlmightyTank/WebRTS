@@ -60,6 +60,7 @@ var staging_areas: Array = []
 var hud_top_panel: PanelContainer
 var hud_dock: PanelContainer
 var hud_toolbar: PanelContainer
+var hud_powers: PanelContainer
 var hud_scroll: ScrollContainer
 var hud_build_column: VBoxContainer
 var hud_toolbar_scroll: ScrollContainer
@@ -221,6 +222,7 @@ func reset_battle() -> void:
   ally.selected=true
   selected=[ally]
  if is_instance_valid(result_text): result_text.text=""
+ if is_instance_valid(commander.rank_label): commander.refresh_ui()
  if fog_enabled:
   if fog != null: fog.reset(self)
   else: _refresh_fog()
@@ -1162,6 +1164,18 @@ func _apply_hud_layout(view_size: Vector2) -> void:
  _set_control_rect(hud_top_panel,layout["top"])
  _set_control_rect(hud_toolbar,layout["toolbar"])
  _set_control_rect(hud_dock,layout["dock"])
+ if is_instance_valid(hud_powers) and hud_powers.visible and not compact_hud:
+  var rail:=82.0
+  var top: Rect2=layout["top"]
+  var bar: Rect2=layout["toolbar"]
+  _set_control_rect(hud_top_panel,Rect2(top.position.x+rail,top.position.y,maxf(140.0,top.size.x-rail),top.size.y))
+  _set_control_rect(hud_toolbar,Rect2(bar.position.x+rail,bar.position.y,maxf(140.0,bar.size.x-rail),bar.size.y))
+  _set_control_rect(hud_powers,Rect2(top.position.x,top.position.y,76.0,maxf(72.0,bar.position.y-top.position.y-6.0)))
+ elif is_instance_valid(hud_powers):
+  var top_bottom: float=hud_top_panel.position.y+hud_top_panel.size.y
+  var lower: float=layout["dock"].position.y if compact_hud else layout["toolbar"].position.y
+  var origin_y: float=top_bottom+6.0
+  _set_control_rect(hud_powers,Rect2(layout["top"].position.x,origin_y,76.0,maxf(72.0,lower-origin_y-6.0)))
  if is_instance_valid(sidebar_toggle):
   sidebar_toggle.text=("PRODUCTION  ▲  COLLAPSE" if sidebar_open else "PRODUCTION  ▼  OPEN") if compact_hud else "PRODUCTION"
   sidebar_toggle.disabled=not compact_hud
@@ -1447,6 +1461,22 @@ func _create_hud() -> void:
  upgrades_panel=VBoxContainer.new()
  upgrades_panel.visible=false
  column.add_child(upgrades_panel)
+ hud_powers=PanelContainer.new()
+ hud_powers.name="PowerColumn"
+ hud_powers.visible=false
+ hud_powers.mouse_filter=Control.MOUSE_FILTER_STOP
+ root.add_child(hud_powers)
+ RetroSkin.panel(hud_powers,"screen")
+ var power_scroll:=ScrollContainer.new()
+ power_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+ power_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+ power_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ power_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ hud_powers.add_child(power_scroll)
+ commander.power_column=VBoxContainer.new()
+ commander.power_column.add_theme_constant_override("separation",6)
+ commander.power_column.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ power_scroll.add_child(commander.power_column)
  commander.build_ui(upgrades_panel)
  queue_panel=VBoxContainer.new()
  column.add_child(queue_panel)
