@@ -1,5 +1,7 @@
 # WebRTS — Desktop & Mobile RTS 1.0 Master Roadmap
 
+> **Archived.** This document planned a browser game with two factions and online crossplay. Meridian Warfront ships from `godot/` as an offline Windows game. The living 1.0 board is [ROADMAP.md](../ROADMAP.md). Keep this file as the old slice spec only.
+
 **Status (2026-10-29):** v0.2 Slices A–H implemented and merged into `main`; `test-and-build` and `browser-playtest` CI passed on the current main branch. **Next: v0.3 Slice A (shared unit intents and commands).** All v0.3–1.0 slices remain planned until individually implemented and accepted.
 **Original planning baseline:** building-placement 2.0 slices A–E at `6fdeec67830bae136b64c02e9130fdeac4980afe`.
 **Reference feel:** the strategic depth and immediacy of classic Red Alert 2, rebuilt as an original intellectual property with original names, graphics, voices, maps, music, technology and story.

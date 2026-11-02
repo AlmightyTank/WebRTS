@@ -1,105 +1,62 @@
-# WebRTS — Roadmap to 1.0
+# Meridian Warfront — Roadmap to 1.0
 
-> **Status (October 29, 2026):** v0.2 **COMPLETE** (Slices A–H merged to `main`; unit/build and Chromium desktop/mobile/tablet CI passed). **Up next: v0.3 Slice A — shared RTS player commands.** Future versions below are planned, not completed.
->
-> **Detailed implementation plan:** [Desktop & Mobile 1.0 Master Roadmap](docs/ROADMAP-1.0-DESKTOP-MOBILE.md) · [v0.2 Foundation Release](docs/V0.2-ENGINE-FOUNDATION-RELEASE.md) · [High-DPI Rendering](docs/HIDPI-RENDERING.md) · [Changelog](CHANGELOG.md)
+> **Status (November 1, 2026):** The playable game is the Godot skirmish in `godot/`. A match already has a construction yard, iron ore, power, three factions, six generals, fog, and a win/loss state. **1.0 is the offline Windows game that feels like Red Alert 2’s base-building and Zero Hour’s generals had a child.** The old browser plan in [docs/ROADMAP-1.0-DESKTOP-MOBILE.md](docs/ROADMAP-1.0-DESKTOP-MOBILE.md) is archived.
 
-WebRTS is an original, browser-based real-time strategy game built for **desktop and mobile as equal platforms**. The design target is the immediacy, base-building depth, large-scale battles and two-sided storytelling of classic *Red Alert 2*, while using **original** factions, fiction, art, music, units, maps and code. The current prototype is built with Phaser 4, Vite and a fixed-step JavaScript simulation.
+Design authority: [Master GDD](docs/MERIDIAN-WARFRONT-MASTER-GDD-v0.1.md) · [Factions and generals](docs/FACTIONS-AND-GENERALS-DESIGN-v0.5.md) · [Building roles](docs/FACTION-BUILDING-ROSTER-1.0.md)
 
-## What shipping 1.0 means
+## The feel test
 
-Players can start from the main menu and complete a full match or campaign on a desktop or phone without developer assistance:
+Every slice is done when a player can feel it in a match, with original names, art, audio, and fiction.
 
-- **Two distinct factions:** Iron Collective (heavier, durable army and fortifications) and Vanguard League (fast, precise units, scouting and technology).
-- **Two story campaigns:** 10 authored missions per faction (20 total), with briefings, objectives, scripted events, checkpoints and endings.
-- **Skirmish:** 12 polished maps, three AI difficulty levels, configurable teams and victory rules, and offline single-player.
-- **Core RTS:** deployable HQ, ore harvesting and refineries, credits, power, production queues, tech trees, infantry, armor, air, navy, engineers, garrisons, veterancy, stealth and superweapons.
-- **Online:** server-authoritative casual 1v1 and 2v2 with mixed desktop/mobile players, reconnection and replays.
-- **Presentation and access:** original artwork, readable effects, audio, robust save/load, performance presets and accessibility settings.
-- **Content budget:** approximately 50–70 distinct units, structures and specialist entities, finalized only after balance and asset testing.
+**From Red Alert 2:** deploy an MCV, build from the sidebar, run harvesters, care about power, capture and sell, queue production, rally an army, and fight a readable combined-arms battle. Late game has a warned superweapon. Skirmish means several maps. A campaign teaches one idea per mission.
 
-Mobile uses touch-oriented input and compact HUDs, **not** easier economy, different damage values or reduced units/technology. Do not reuse copyrighted Red Alert code, maps, art, dialogue, music or characters.
+**From Zero Hour:** three armies that are different games. You pick a general and the roster, building, and powers change before the match starts. Fighting earns rank and points. Powers are buttons on the battlefield, aimed with a click, and telegraphed. Each faction has a hole: expensive precision, slow armor, or fragile raids.
 
-## Milestone tracker (18 versions, 147 development slices)
+**Working 1.0 decisions** (the GDD left these open; this board closes them so work can proceed):
 
-Completion means a version's **all** slices, acceptance scenario and CI gate have passed on `main`, not simply that an initial prototype exists.
+- 1.0 ships on Windows, offline. Skirmish and a 12-mission campaign, four missions from each faction’s point of view.
+- The captured neutral relay pays a small capped credit trickle. That is the late-game income so a match can continue after the ore is gone.
+- There is no army supply cap. The existing unit limit stays a performance guard.
+- All nine generals are in 1.0. Rook, Volkov, and Nadir are the missing doctrines (ghost, fortress, guerrilla), so the general select screen is the Zero Hour half of the game.
+- Navy, online play, Android store release, replays, and the full 57-building art set wait until after 1.0. Touch layout stays in the project so it does not have to be invented later.
 
-| Version | Slices | Deliverable / definition of done | Status |
-| --- | ---: | --- | --- |
-| **0.2** Engine foundation | A–H (8) | Modular simulation, validated data, deterministic saves, diagnostics, desktop/mobile/tablet CI | **Complete** |
-| **0.3** RTS input and HUD | A–H (8) | Accurate selection, orders, touch gestures, camera and usable UI on all screens | **Next** |
-| **0.4** Terrain and fog | A–H (8) | Map terrain, robust group pathfinding, vision and fog-of-war | Planned |
-| **0.5** Base and economy | A–H (8) | Deploy HQ, harvest ore, build a base, manage power/tech and train units | Planned |
-| **0.6** Ground combat | A–H (8) | Infantry, vehicles, weapon/armor counters, garrisons, capture and veterancy | Planned |
-| **0.7** Factions | A–H (8) | Iron Collective and Vanguard League have distinct, viable rosters and tech | Planned |
-| **0.8** Air and naval | A–H (8) | Aircraft, ships, submarines, amphibious transfers and counters | Planned |
-| **0.9** Advanced warfare | A–H (8) | Stealth, infiltration, abilities, siege modes and original superweapons | Planned |
-| **0.10** Offline skirmish | A–H (8) | Setup, smarter AI, 3 difficulties, win/lose states and match results | Planned |
-| **0.11** Art and sound | A–H (8) | Original final assets, FX, soundtrack, unit voices and coherent UI | Planned |
-| **0.12** Mission framework | A–H (8) | Objectives, trigger scripting, editor, progress, checkpoints and test missions | Planned |
-| **0.13** Iron campaign | A–J (10) | Ten finished Iron Collective missions and ending | Planned |
-| **0.14** Vanguard campaign | A–J (10) | Ten finished Vanguard League missions and ending | Planned |
-| **0.15** Online core | A–H (8) | Authoritative headless server, lobby, sync, fair 1v1 and reconnect | Planned |
-| **0.16** Crossplay and replay | A–H (8) | Casual 2v2, room flow, team controls, observer and replays | Planned |
-| **0.17** Platform polish | A–H (8) | Mobile/desktop optimization, accessibility, persistence and PWA | Planned |
-| **0.18** Release candidate | A–H (8) | 12 polished maps, tutorial, balance, full QA and release freeze | Planned |
-| **1.0** Public release | A–G (7) | VPS deploy, verified full playthroughs, rollback, monitoring and support | Planned |
+## Where the skirmish is
 
-**Completion:** 8 / 147 slices implemented in v0.2; the remaining **139 slices** are tracked by the master specification. The count describes deliverable slices, not comparable estimates of effort.
-
-## Execution sequence and playable checkpoints
-
-| Stage | Versions | Playable milestone |
+| Fantasy | In a match today | Still missing for the feel |
 | --- | --- | --- |
-| Foundation and controls | 0.2–0.4 | Reliable desktop/touch battlefield, navigation, terrain and fog |
-| Complete basic RTS | 0.5–0.7 | Harvest, build, produce, attack and win as either faction |
-| Complete warfare and skirmish | 0.8–0.10 | Combined ground/air/sea battles against configurable AI |
-| Identity and authoring | 0.11–0.12 | Production-quality audiovisual direction and scripted test missions |
-| Story completion | 0.13–0.14 | Two distinct, finishable 10-mission campaigns |
-| Connected play | 0.15–0.16 | Reliable cross-platform 1v1/2v2 and match replays |
-| Ship | 0.17–1.0 | Optimized, tested, deployed and supported 1.0 |
+| Construction yard | Deploy, sidebar tabs, queues, refund, repair, sell, rally, staging, multiple factories | Walls, gates, radar building |
+| Ore and power | Finite iron, delivery once, brownout slows production, turrets go dark | Relay does not pay; low power has no sound |
+| Orders | Select, groups, attack-move, hold, formations, scout, fog | Fog is a radius, not terrain line of sight |
+| Three armies | Alliance, Republic, GIA, with different rosters and some structures | Shared build rules; many designed units stay in the balance file |
+| Generals | Vale, Voss, Korda, Orlov, Sayegh, Varek: replacements, research, rank, aimed powers | Powers sit in the Upgrades tab. Rook, Volkov, Nadir are unbuilt |
+| Superweapons | GIA silo, with a public warning | Alliance beam and Republic artillery array |
+| Air | Tempest, Striker, helicopters, from the vehicle queue | No airfield, no rearm |
+| Skirmish | Lobby: army, start, credits, fog, AI vs AI. One map, Meridian Basin | More maps, difficulty that changes behavior, resume |
+| Product | Main menu, pause, settings file | Campaign and multiplayer buttons are disabled. No match save. Volume slider has nothing to play |
 
-**Dependencies:** Input and deterministic simulation underpin pathfinding; pathfinding and combat underpin factions and AI; stable mechanics underpin campaign missions; authoritative server and reproducible commands underpin online play. Build reusable systems first and avoid one-off code for individual missions.
+About 38 unit ids and 15 structure ids can appear in a match. The balance file holds a larger proposed roster. Godot smoke tests cover combat, economy, fog, armies, and commander kits. CI installs Godot 4.4.1; `project.godot` declares a 4.7 feature tag, which should be reconciled before a release export.
 
-## Current sprint — v0.3: desktop and mobile RTS controls
+## Path
 
-No v0.3 slice is marked complete yet. Implement in sequence and update this section only after merge and verification.
+Work in this order. A later row can start only when the rows above it are playable.
 
-- [ ] **A — Shared player intents.** Centralize select, move, attack, attack-move, defend, patrol, stop, command queue, build and ability orders behind platform-neutral inputs. Preserve existing construction and save contracts.
-- [ ] **B — Desktop controls.** Click/box/shift selection, double-click same-type selection, right-click contextual orders, control groups 0–9, hotkeys and edge scrolling.
-- [ ] **C — Mobile selection.** Tap, multi-select/lasso, double-tap similar units, large command targets, long-press inspection and non-conflicting gesture behavior.
-- [ ] **D — Advanced unit orders.** Attack-move, force-fire, patrol, guard, stance, rally points, chained waypoints and visible queued-order feedback.
-- [ ] **E — Camera and minimap.** One-finger drag pan, two-finger pinch, desktop camera controls, minimap jumps/orders and safe placement near HUD overlays.
-- [ ] **F — Adaptive HUD.** Distinct desktop, tablet and phone compositions; landscape-first phone layout with functional portrait fallback.
-- [ ] **G — Production and selection UI.** Context cards, unit groups, production queues, tooltips and information that remains accessible without obscuring the battlefield.
-- [ ] **H — Acceptance and regression.** Automated mouse/keyboard/touch tests; desktop, phone portrait/landscape and tablet screenshots; wrong-target and overlay tap checks.
+1. **Command bar.** Show rank, points, and the three powers on the battlefield. Click to arm, click the map to cast, keep the warnings that already exist. The Upgrades tab keeps research.
+2. **Match sounds.** Original cues for construction complete, unit ready, low power, base under attack, and incoming superweapon. One acknowledgement style per faction is enough here.
+3. **Save and resume.** A versioned skirmish snapshot: credits, ore, queues, units, structures, fog, commander rank, research, and AI plans. Leaving the match can offer save. Campaign checkpoints reuse this.
+4. **Relay income.** Capturing the north relay starts a capped credit trickle. Document the rate next to the ore numbers and test that it cannot outrun a living economy.
+5. **Airfield.** Aircraft build from an airfield, return to rearm, and stop firing when they are dry. Voss’s bonuses apply to that loop.
+6. **The other two superweapons.** Alliance particle beam and Republic ironstorm, with the same warning, power, and one-structure rules as the silo.
+7. **Walls and gates.** They block ground paths, have faction health differences, and open for friendlies. This is also Volkov’s foundation.
+8. **Maps.** Add land maps on the Meridian Basin schema (spawns, ore, cliffs, one capturable). Target eight skirmish maps before the campaign needs its own layouts.
+9. **Rook, Volkov, Nadir.** Ghost, fortress, and guerrilla: replacement units, one special structure or stance, research, and three powers each. Stealth reveals on fire and to detectors.
+10. **AI and the opening clock.** Recruit, Regular, and Veteran change scouting, build choice, and attack timing. Measure time to first ore delivery, first tank, and first attack. Regular uses no hidden resources.
+11. **Missions.** A data-driven objective and trigger layer, briefings, and 12 missions. The first Alliance mission is the tutorial.
+12. **Ship.** Remappable keys, colorblind team marks, reduced motion, subtitles for the cues in row 2, a Windows export, and three fresh-player skirmishes plus one campaign path played without a developer in the room.
 
-**v0.3 acceptance scenario:** A fresh player on a desktop and on a phone can select a mixed army, move and attack, use queued orders, pan and zoom, inspect the minimap, place a new building with a valid preview, and produce units. No accidental duplicate orders, unwanted camera jumps or blocked touch targets.
+## Done when
 
-**Regression priorities:** Keep the Building Placement 2.0 preview (a completed building is not freely draggable), the high-DPI pointer mapping, one-finger map panning, two-finger zoom, correct purchase/refund handling, and v0.2 save/load functioning throughout the controls rewrite.
+A new player can pick any of the nine generals, build a base, hear the match, fight an AI on more than one map, fire a faction superweapon they were warned about, save, and finish a mission from each faction. The same build runs from the Godot project and from the Windows export.
 
-## End-to-end slice delivery contract
+## After 1.0
 
-Every slice should be reviewable and playable, not just code-complete.
-
-1. **Implement on a focused branch.** Reference the target version and letter: `feature/v0.3-slice-a-commands`, etc. Keep unrelated features out.
-2. **Prove behavior.** Add/extend simulation tests and browser acceptance for any changed player input or UI. Include save compatibility checks when commands/state change.
-3. **Use one ruleset.** Desktop and mobile send equivalent game commands. UI adaptations must not silently change combat, economy or fog rules.
-4. **Pass CI.** Run `npm ci`, `npm test`, `npm run build` and `node --test tests/browser-placement.mjs`. Both `test-and-build` and `browser-playtest` must pass before merging.
-5. **Test real devices.** Chromium touch emulation is a regression tool, not proof of actual Android/iOS smoothness, thermal behavior or visual sharpness.
-6. **Document the result.** Update this tracker, the appropriate detailed milestone notes and `CHANGELOG.md` (when cutting a release), including screenshots and a manual playtest scenario.
-7. **Deploy separately.** A green GitHub build does not mean the VPS-hosted game updated. Verify Nginx assets, server health where applicable, backup and rollback after deployment.
-
-### Release gates
-
-A milestone can be checked off only if its slices are merged to `main`, tests and production build pass, required device/playtest flows succeed, and there is no known blocker for the milestone's stated exit criteria. Maintain backward compatibility of local saves and future multiplayer protocols through explicit migrations.
-
-**1.0 is blocked until:** both 10-mission campaigns are completable; all 12 skirmish maps are shippable; both factions are balanced; online 1v1/2v2 and reconnect work on desktop/mobile; fog-of-war information cannot leak from the server; every purchase is charged once with correct refunds; accessibility/performance targets and asset-license audit pass; VPS rollback, persistence, monitoring and backups are verified.
-
-## Post-1.0 candidates — not launch blockers
-
-A third faction and expansion campaign, ranked ladder, mods/map sharing, cooperative missions, tournaments, optional native desktop distribution and additional languages are **future projects**, not part of 1.0.
-
----
-
-**Start here:** [v0.3 Slice A in the master roadmap](docs/ROADMAP-1.0-DESKTOP-MOBILE.md#v03--classic-rts-orders-and-desktopmobile-interaction). The complete A–H/A–J slice specifications, exit gates and 20 campaign mission outlines live in that document; this root file is the living status board.
+Naval maps and docks. Online matches, once commands are already the same ones the AI and the campaign send. An Android release after a real device pass. Replays. The remaining building-role art (radar as a deeper intel structure, tunnels, drones) wherever a general or mission still needs it.

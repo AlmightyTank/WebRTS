@@ -1,6 +1,6 @@
 # Meridian Warfront
 
-A native **Godot 4**, top-down 2D real-time strategy game, inspired by classic Command & Conquer base-building and modern military warfare.
+A native **Godot 4**, top-down 2D real-time strategy game. The target feel is Red Alert 2’s construction yard and ore economy, with Generals Zero Hour’s three armies and battlefield powers. All names, art, audio, and fiction are original.
 
 ## Run the game
 
@@ -8,9 +8,9 @@ A native **Godot 4**, top-down 2D real-time strategy game, inspired by classic C
 2. Open Godot Project Manager and import `godot/project.godot`.
 3. Run the project with **F5**.
 
-The Godot project is the primary implementation. Source code and artwork live in [`godot/`](godot/). The active status board is [`ROADMAP.md`](ROADMAP.md); retained ideas from the former isometric plan are in [`docs/IDEAS.md`](docs/IDEAS.md).
+The Godot project is the primary implementation. Source code and artwork live in [`godot/`](godot/). The active status board is [`ROADMAP.md`](ROADMAP.md): 1.0 is an offline Windows game with Red Alert 2 base-building and Zero Hour generals. Retained ideas from the former isometric plan are in [`docs/IDEAS.md`](docs/IDEAS.md).
 
-The proposed [three-faction, nine-general content design](docs/FACTIONS-AND-GENERALS-DESIGN-v0.5.md) defines named commanders, signature replacements, bonuses, weaknesses and an art direction matching the current procedural renderer. It is a design specification, not completed gameplay content.
+The [three-faction, nine-general content design](docs/FACTIONS-AND-GENERALS-DESIGN-v0.5.md) is the target roster. Six generals are playable in skirmish. Rook, Volkov, and Nadir are still design-only.
 
 ## Status
 
