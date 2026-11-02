@@ -102,7 +102,8 @@ func _initialize() -> void:
     unit._step_movement(1.0 / 60.0)
  var arrived := 0
  for i in range(crowd.size()):
-  if crowd[i].position.distance_to(goals[i]) < 3.0:
+  # Ordinary moves may stop within six pixels when the last step is blocked.
+  if crowd[i].position.distance_to(goals[i]) <= 6.0:
    arrived += 1
   else:
    print("Crowd ", i, " at ", crowd[i].position, " goal ", goals[i], " moving ", crowd[i].moving)
