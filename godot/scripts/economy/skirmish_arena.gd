@@ -1103,8 +1103,7 @@ func _ai_place_ready(lane: String, id: String, side: int = 1) -> void:
  # Offsets face the center. West bases mirror them; east bases use them as written.
  var inward: float=-1.0 if anchor.x<BOARD.get_center().x else 1.0
  for offset in sites:
-  var place=(Vector2(1600,610)+offset) if side==1 else (Vector2(310,620)+Vector2(-offset.x,offset.y))
-  place=_snap_build_point(id, place)
+  var place:=_snap_build_point(id, anchor+Vector2(offset.x*inward, offset.y))
   if can_place(place,id,side):
    _place_structure(id,side,place)
    states[side]["lanes"][lane]={}
