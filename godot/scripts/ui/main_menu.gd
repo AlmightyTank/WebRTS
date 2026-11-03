@@ -19,6 +19,7 @@ var ai_vs_ai := false
 var map_id := "meridian_basin"
 var starting_credits := 10000
 var fog_enabled := true
+var ai_difficulty := "regular"
 var start_slots: Array = ["west", "east"]
 var lobby_compact_override := -1
 var lobby_lock := false
@@ -29,6 +30,8 @@ var lobby_start: Array = []
 var lobby_credits: OptionButton
 var lobby_fog: CheckButton
 var lobby_watch: CheckButton
+var lobby_difficulty: OptionButton
+var lobby_difficulty_note: Label
 var lobby_map_summary: Label
 var _lobby_compact_applied := false
 var _lobby_compact_known := false
@@ -234,6 +237,15 @@ func _add_skirmish_lobby() -> Button:
  lobby_watch = _lobby_check(map_col, "Watch only (both sides are AI)", ai_vs_ai)
  lobby_watch.toggled.connect(func(enabled):
   if not lobby_lock: ai_vs_ai = enabled)
+ var difficulty := OptionButton.new()
+ difficulty.name = "DifficultySelect"
+ for id in ["recruit", "regular", "veteran"]:
+  difficulty.add_item(str(id).capitalize())
+  difficulty.set_item_metadata(difficulty.item_count - 1, id)
+ _lobby_option(map_col, "Difficulty", difficulty)
+ difficulty.item_selected.connect(func(index): _on_difficulty_picked(difficulty, index))
+ lobby_difficulty = difficulty
+ lobby_difficulty_note = _lobby_note(map_col, _difficulty_summary(ai_difficulty))
  var players := _lobby_column(columns)
  for side in range(2):
   _add_player_card(players, side)
@@ -372,6 +384,20 @@ func set_fog(enabled: bool) -> void:
  fog_enabled = enabled
  _sync_lobby()
 
+func _on_difficulty_picked(picker: OptionButton, index: int) -> void:
+ if lobby_lock: return
+ set_difficulty(str(picker.get_item_metadata(index)))
+
+func set_difficulty(id: String) -> void:
+ ai_difficulty = id if id in ["recruit", "regular", "veteran"] else "regular"
+ _sync_lobby()
+
+func _difficulty_summary(id: String) -> String:
+ match id:
+  "recruit": return "Recruit thinks slowly, sends one late scout, and attacks later with a larger force."
+  "veteran": return "Veteran keeps the queues full, scouts your start early, and attacks with a smaller force."
+  _: return "Regular uses the standard build and idle scouts. It earns no extra credits."
+
 func _sync_lobby() -> void:
  if lobby_lock or not is_instance_valid(lobby_preview): return
  lobby_lock = true
@@ -394,6 +420,12 @@ func _sync_lobby() -> void:
   lobby_credits.select(credit_index if credit_index >= 0 else 1)
  if is_instance_valid(lobby_fog): lobby_fog.button_pressed = fog_enabled
  if is_instance_valid(lobby_watch): lobby_watch.button_pressed = ai_vs_ai
+ if is_instance_valid(lobby_difficulty):
+  var difficulty_ids := ["recruit", "regular", "veteran"]
+  var difficulty_index := difficulty_ids.find(ai_difficulty)
+  lobby_difficulty.select(difficulty_index if difficulty_index >= 0 else 1)
+ if is_instance_valid(lobby_difficulty_note):
+  lobby_difficulty_note.text = _difficulty_summary(ai_difficulty)
  lobby_lock = false
 
 func _start_game() -> void:
@@ -407,6 +439,7 @@ func _start_game() -> void:
  game.map_id = map_id
  game.starting_credits = starting_credits
  game.fog_enabled = fog_enabled
+ game.ai_difficulty = ai_difficulty
  game.start_slots = start_slots.duplicate()
  # The front-end runs while paused; the battlefield must not inherit that mode.
  game.process_mode = Node.PROCESS_MODE_PAUSABLE
