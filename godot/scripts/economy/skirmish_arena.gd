@@ -73,6 +73,12 @@ var ai_clock: Array = [{"ore":-1.0,"tank":-1.0,"attack":-1.0},{"ore":-1.0,"tank"
 var ai_pushed: Array = [false, false]
 var ai_next_build: Array = [0.0, 0.0]
 var ai_scout: Array = [null, null]
+var showcase := false
+var showcase_pan := 0.0
+var cameo_fill: Dictionary = {}
+var command_cameo: Control
+var alert_banner: Label
+var alert_left := 0.0
 var retro_ai_label: Label
 var selected_building = null
 var pending_sale = null
@@ -225,6 +231,7 @@ func _ready() -> void:
  _frame_player()
  get_viewport().size_changed.connect(_on_hud_viewport_resized)
  _on_hud_viewport_resized()
+ if showcase: _begin_showcase()
 
 func _new_state() -> Dictionary:
  return {"credits":float(starting_credits),"total_mined":0.0,"total_spent":0.0,"total_refunded":0.0,"total_sales":0.0,"total_repairs":0.0,"total_relay":0.0,"power":0,"demand":0,"lanes":{"build":{},"defense":{},"infantry":{},"vehicle":{},"air":{}},"queued":{"infantry":[],"vehicle":[],"air":[]},"harvesters":0}
@@ -1442,6 +1449,12 @@ func _physics_process(delta: float) -> void:
   if not paused and not battle_over: scouting.tick(self)
  super._physics_process(delta)
  if paused or battle_over: return
+ if showcase and camera!=null and is_instance_valid(camera):
+  showcase_pan+=delta
+  camera.destination=BOARD.get_center()+Vector2(cos(showcase_pan*0.15)*240.0, sin(showcase_pan*0.11)*90.0)
+ if alert_left>0.0:
+  alert_left-=delta
+  if alert_left<=0.0 and is_instance_valid(alert_banner): alert_banner.visible=false
  skirmish_time+=delta
  commander.tick(delta)
  _tick_production(0,delta)
@@ -1456,6 +1469,7 @@ func _physics_process(delta: float) -> void:
   ai_build_tick+=1
 
 func _unhandled_input(event: InputEvent) -> void:
+ if showcase: return
  if commander.pending_power!="":
   if (event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE) or (event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_RIGHT):
    commander.pending_power=""
@@ -1606,9 +1620,52 @@ func issue_order(point: Vector2, attack_move: bool=false, queued: bool=false) ->
  if not selected.is_empty(): play_cue("ack")
  super.issue_order(point,attack_move,queued)
 
+func _on_cameo_pointer(event: InputEvent, id: String) -> void:
+ if showcase or not (event is InputEventMouseButton) or not event.pressed or event.button_index!=MOUSE_BUTTON_RIGHT: return
+ var lane: String=_lane_for(id)
+ _ensure_production_lane(0, lane)
+ var waiting: Array=states[0]["queued"].get(lane,[])
+ for index in range(waiting.size()-1,-1,-1):
+  if str(waiting[index])!=id: continue
+  cancel_production(0,lane,index)
+  hud_status="Removed one from the queue."
+  _update_hud()
+  return
+ var job: Dictionary=states[0]["lanes"][lane]
+ if not job.is_empty() and str(job.get("id",""))==id:
+  cancel_production(0,lane)
+  if placement_lane==lane: placement_lane=""
+  hud_status="Canceled production; invested credits refunded."
+  _update_hud()
+
+func _begin_showcase() -> void:
+ ai_pushed=[true,true]
+ if is_instance_valid(hud): hud.visible=false
+ if camera!=null and is_instance_valid(camera):
+  camera.set_process_unhandled_input(false)
+  camera.zoom_goal=0.62
+  camera.zoom=Vector2.ONE*camera.zoom_goal
+  camera.destination=BOARD.get_center()
+  camera.position=BOARD.get_center()
+ var center: Vector2=BOARD.get_center()
+ for n in range(4):
+  var ally=_spawn("a_ranger",0,center+Vector2(-78,-36+n*24))
+  var foe=_spawn("r_line",1,center+Vector2(78,-36+n*24))
+  if ally!=null: ally.order_move(center+Vector2(70,0),true)
+  if foe!=null: foe.order_move(center+Vector2(-70,0),true)
+ var tank=_spawn("a_sentinel",0,center+Vector2(-130,10))
+ var heavy=_spawn("r_bastion",1,center+Vector2(130,10))
+ if tank!=null: tank.order_move(center+Vector2(40,10),true)
+ if heavy!=null: heavy.order_move(center+Vector2(-40,10),true)
+
 func play_cue(id: String) -> void:
- if restoring: return
+ if restoring or showcase: return
  if audio != null and is_instance_valid(audio): audio.cue(id)
+ var banner := {"construction":"CONSTRUCTION COMPLETE","unit_ready":"UNIT READY","low_power":"LOW POWER","under_attack":"BASE UNDER ATTACK","superweapon":"INCOMING STRIKE"}
+ if banner.has(id) and is_instance_valid(alert_banner):
+  alert_banner.text=banner[id]
+  alert_banner.visible=true
+  alert_left=4.5
 
 func save_match(path: String = "") -> bool:
  return MatchSave.write(self, MatchSave.PATH if path == "" else path)
@@ -1850,8 +1907,24 @@ func _create_hud() -> void:
  dock.mouse_filter=Control.MOUSE_FILTER_STOP
  root.add_child(dock)
  hud_dock=dock
+ var dock_row=HBoxContainer.new()
+ dock_row.add_theme_constant_override("separation",4)
+ dock.add_child(dock_row)
+ retro_powerbar=ProgressBar.new()
+ retro_powerbar.name="PowerMeter"
+ retro_powerbar.fill_mode=ProgressBar.FILL_BOTTOM_TO_TOP
+ retro_powerbar.custom_minimum_size=Vector2(14,0)
+ retro_powerbar.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ retro_powerbar.show_percentage=false
+ retro_powerbar.max_value=100.0
+ retro_powerbar.value=100.0
+ retro_powerbar.tooltip_text="Power. A full green bar means the base is supplied. Red means a brownout."
+ retro_powerbar.add_theme_stylebox_override("background",RetroSkin.tile("disabled"))
+ retro_powerbar.add_theme_stylebox_override("fill",RetroSkin.tile("active"))
+ dock_row.add_child(retro_powerbar)
  var dock_stack=VBoxContainer.new()
- dock.add_child(dock_stack)
+ dock_stack.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ dock_row.add_child(dock_stack)
  sidebar_toggle=Button.new()
  sidebar_toggle.text="PRODUCTION"
  sidebar_toggle.custom_minimum_size=Vector2(0,28)
@@ -1873,6 +1946,13 @@ func _create_hud() -> void:
  column.custom_minimum_size=Vector2(0,0)
  scroll.add_child(column)
  hud_build_column=column
+ retro_economy_label=Label.new()
+ retro_economy_label.text="IRON  010000\nPOWER +0"
+ retro_economy_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ column.add_child(retro_economy_label)
+ RetroSkin.label(retro_economy_label,false,true)
+ retro_economy_label.add_theme_font_size_override("font_size",16)
+ retro_economy_label.add_theme_color_override("font_color",RetroSkin.GOLD)
  var badge=HBoxContainer.new()
  column.add_child(badge)
  var crest=Control.new()
@@ -1894,18 +1974,6 @@ func _create_hud() -> void:
  radar_view.custom_minimum_size=Vector2(0,108)
  column.add_child(radar_view)
  radar_view.configure(self)
- retro_economy_label=Label.new()
- retro_economy_label.text="CREDITS 010000  ·  POWER 0 / 0"
- column.add_child(retro_economy_label)
- RetroSkin.label(retro_economy_label,false,true)
- retro_powerbar=ProgressBar.new()
- retro_powerbar.custom_minimum_size=Vector2(0,7)
- retro_powerbar.show_percentage=false
- retro_powerbar.max_value=100.0
- retro_powerbar.value=100.0
- retro_powerbar.add_theme_stylebox_override("background",RetroSkin.tile("disabled"))
- retro_powerbar.add_theme_stylebox_override("fill",RetroSkin.tile("active"))
- column.add_child(retro_powerbar)
  var mode_row=HBoxContainer.new()
  mode_row.add_theme_constant_override("separation",6)
  column.add_child(mode_row)
@@ -1969,8 +2037,16 @@ func _create_hud() -> void:
   button.custom_minimum_size=Vector2(0,76)
   button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   button.pressed.connect(_on_build_button.bind(id))
+  button.gui_input.connect(_on_cameo_pointer.bind(id))
   RetroSkin.button(button)
   build_container.add_child(button)
+  var fill=ColorRect.new()
+  fill.mouse_filter=Control.MOUSE_FILTER_IGNORE
+  fill.color=Color(0.89,0.72,0.28,0.38)
+  fill.visible=false
+  fill.z_index=-1
+  button.add_child(fill)
+  cameo_fill[id]=fill
   var icon=Control.new()
   icon.set_script(RetroIcon)
   icon.anchor_left=0.5
@@ -2114,6 +2190,12 @@ func _create_hud() -> void:
  hud_toolbar_scroll=toolbar_scroll
  var row=HBoxContainer.new()
  toolbar_scroll.add_child(row)
+ command_cameo=Control.new()
+ command_cameo.name="CommandCameo"
+ command_cameo.set_script(RetroIcon)
+ command_cameo.custom_minimum_size=Vector2(46,46)
+ row.add_child(command_cameo)
+ command_cameo.configure("EMBLEM")
  for pair in [["SELECT_ALL","Select All"],["MOVE","Move"],["ATTACK_MOVE","Attack-Move"],["STOP","Stop"],["SCOUT","Scout (G)"],["FORMATION","Formation"],["DEPLOY","Deploy"],["RALLY","Rally"],["STAGING","Staging"],["PAUSE","Pause"],["RESET","Restart"]]:
   var button=Button.new()
   button.text=pair[1]
@@ -2138,6 +2220,19 @@ func _create_hud() -> void:
  result_text.add_theme_font_size_override("font_size",14)
  result_text.mouse_filter=Control.MOUSE_FILTER_IGNORE
  root.add_child(result_text)
+ alert_banner=Label.new()
+ alert_banner.name="AlertBanner"
+ alert_banner.visible=false
+ alert_banner.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ alert_banner.anchor_left=0.5
+ alert_banner.anchor_right=0.5
+ alert_banner.offset_left=-160
+ alert_banner.offset_right=160
+ alert_banner.offset_top=78
+ alert_banner.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ alert_banner.add_theme_font_size_override("font_size",18)
+ alert_banner.add_theme_color_override("font_color",Color("#f2e2a8"))
+ root.add_child(alert_banner)
  _skin_hud()
  _on_hud_viewport_resized()
 
@@ -2307,9 +2402,19 @@ func _update_hud() -> void:
  for i in range(tab_buttons.size()):
   tab_buttons[i].button_pressed=(i==current_tab)
  if is_instance_valid(retro_economy_label):
-  retro_economy_label.text="IRON  %06d%s   POWER %+d" % [int(state["credits"]),relay_text,int(state["power"])-int(state["demand"])]
+  retro_economy_label.text="IRON  %06d%s\nPOWER %+d" % [int(state["credits"]),relay_text,int(state["power"])-int(state["demand"])]
  if is_instance_valid(retro_powerbar):
-  retro_powerbar.value=100.0 if int(state["demand"])<=0 else clampf(100.0*float(state["power"])/float(state["demand"]),0.0,100.0)
+  var supply: float=float(state["power"])
+  var drain: float=float(state["demand"])
+  retro_powerbar.value=100.0 if drain<=0.0 else clampf(100.0*supply/drain,0.0,100.0)
+  var tone: StyleBoxFlat=RetroSkin.tile("active")
+  tone.bg_color=Color("#67b36a") if supply+0.1>=drain else (Color("#d2b15a") if supply>=drain*0.5 else Color("#c45b4a"))
+  retro_powerbar.add_theme_stylebox_override("fill",tone)
+ if is_instance_valid(command_cameo):
+  var portrait: String="EMBLEM"
+  if not selected.is_empty() and is_instance_valid(selected[0]): portrait=str(selected[0].unit_id)
+  elif selected_building!=null and is_instance_valid(selected_building): portrait=str(selected_building.kind)
+  command_cameo.configure(portrait,0,faction_style(0))
  var on_upgrades=current_tab>=TABS.size()-1 or current_tab>3
  if is_instance_valid(build_container): build_container.visible=not on_upgrades
  if is_instance_valid(upgrades_panel):
@@ -2366,7 +2471,27 @@ func _update_hud() -> void:
   if ready: label_tail="READY"
   elif not job.is_empty() and str(job["id"])==id:
    label_tail="%d%%" % int(100.0*float(job["paid"])/maxf(1.0,float(recipe.get("cost",1))))
-  button.text="\n\n\n"+str(short_label)+"\n"+label_tail
+  var queued_count:=0
+  for item in state["queued"].get(lane,[]):
+   if str(item)==id: queued_count+=1
+  var active_cameo: bool=not job.is_empty() and str(job.get("id",""))==id
+  var shown_count: int=queued_count+(1 if active_cameo else 0)
+  var count_note: String=("  x%d" % shown_count) if shown_count>1 else ""
+  button.text="\n\n\n"+str(short_label)+count_note+"\n"+label_tail
+  var fill: ColorRect=cameo_fill.get(id)
+  if fill!=null:
+   var ratio:=0.0
+   if active_cameo and bool(job.get("ready",false)): ratio=1.0
+   elif active_cameo: ratio=clampf(float(job.get("paid",0.0))/maxf(1.0,float(recipe.get("cost",1.0))),0.0,1.0)
+   fill.visible=ratio>0.02
+   fill.anchor_right=1.0
+   fill.anchor_top=1.0
+   fill.anchor_bottom=1.0
+   fill.offset_left=0.0
+   fill.offset_right=0.0
+   fill.offset_bottom=0.0
+   fill.offset_top=-76.0*ratio
+  button.modulate=Color(1,1,0.72+0.28*absf(sin(skirmish_time*5.0))) if ready else Color.WHITE
   button.tooltip_text="%s | %d credits | %d seconds" % [label,cost,int(recipe.get("time",0))]
   button.disabled=not ready and (not _tech_ready(0,id) or not _has_producer(0,lane) or (not job.is_empty() and lane in ["build","defense"]))
  if is_instance_valid(refund_button):

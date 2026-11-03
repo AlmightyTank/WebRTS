@@ -108,5 +108,8 @@ jobs:
       - name: Test AI opening clock
         run: godot --headless --path godot --script res://tests/ai_opening_smoke.gd
         timeout-minutes: 3
+      - name: Test command screen
+        run: godot --headless --path godot --script res://tests/command_screen_smoke.gd
+        timeout-minutes: 2
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180

@@ -36,6 +36,8 @@ var lobby_map_summary: Label
 var _lobby_compact_applied := false
 var _lobby_compact_known := false
 var save_notice := ""
+var showcase: Node
+var menu_panel: PanelContainer
 
 func _ready() -> void:
  process_mode = Node.PROCESS_MODE_ALWAYS
@@ -46,16 +48,31 @@ func _ready() -> void:
  add_child(layer)
  overlay = Control.new()
  overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ overlay.mouse_filter = Control.MOUSE_FILTER_STOP
  layer.add_child(overlay)
- var background := ColorRect.new()
- background.color = Color("#101e24")
- background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
- overlay.add_child(background)
+ var wash := ColorRect.new()
+ wash.color = Color(0.03, 0.05, 0.06, 0.28)
+ wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ overlay.add_child(wash)
+ menu_panel = PanelContainer.new()
+ menu_panel.name = "MenuPanel"
+ menu_panel.anchor_bottom = 1.0
+ menu_panel.offset_right = 440.0
+ menu_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+ overlay.add_child(menu_panel)
+ var plate := StyleBoxFlat.new()
+ plate.bg_color = Color(0.07, 0.09, 0.1, 0.9)
+ plate.border_color = RetroSkin.RIM
+ plate.border_width_right = 2
+ plate.content_margin_left = 22.0
+ plate.content_margin_right = 22.0
+ plate.content_margin_top = 22.0
+ plate.content_margin_bottom = 22.0
+ menu_panel.add_theme_stylebox_override("panel", plate)
  var margin := MarginContainer.new()
  margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
- for edge in ["left", "right", "top", "bottom"]:
-  margin.add_theme_constant_override("margin_" + edge, 24)
- overlay.add_child(margin)
+ menu_panel.add_child(margin)
  var scroll := ScrollContainer.new()
  margin.add_child(scroll)
  content = VBoxContainer.new()
@@ -67,6 +84,7 @@ func _ready() -> void:
  theme.set_color("font_color", "Label", RetroSkin.TEXT)
  overlay.theme = theme
  _show_page("home")
+ _start_showcase()
  get_viewport().size_changed.connect(_on_menu_resized)
 
 func _input(event: InputEvent) -> void:
@@ -119,6 +137,7 @@ func _show_page(next_page: String) -> void:
  match page:
   "home":
    _text("Establish your base. Secure the ore fields. Control the front.")
+   _text("A battle is already on the field.")
    if MatchSave.read() != null:
     first = _button("RESUME MATCH", _resume_saved_match)
     _button("SKIRMISH", _show_page.bind("skirmish"))
@@ -162,7 +181,7 @@ func _show_page(next_page: String) -> void:
    _focus_if_active.call_deferred(volume)
   "controls":
    _text("FIELD MANUAL", true)
-   _text("Select: click / drag; Shift-click toggles; double-click same type\nOrders: right click; Shift queues movement; J holds position\nControl groups: Ctrl+0–9 assign, Alt+0–9 recall\nProduction tabs: 1–4\nCamera: WASD / arrows; right or middle drag\nZoom: mouse wheel\nDeploy selected MCV: H\nTactical pause: Space\nOpen / close pause menu: F10\nCancel current command: Escape or right click\nTouch camera: drag / pinch (device validation pending)")
+   _text("Select: click / drag; Shift-click toggles; double-click same type. A selected unit shows its health.\nOrders: right click; Shift queues movement; J holds position\nProduction cameo: left click queues one, right click removes one\nControl groups: Ctrl+0–9 assign, Alt+0–9 recall\nProduction tabs: 1–4\nCamera: WASD / arrows; right or middle drag\nZoom: mouse wheel\nDeploy selected MCV: H\nTactical pause: Space\nOpen / close pause menu: F10\nCancel current command: Escape or right click\nTouch camera: drag / pinch (device validation pending)")
   "credits":
    _text("Meridian Warfront\nAn original real-time strategy project.\nBuilt with Godot Engine — godotengine.org (MIT license).\nUnits, structures and command UI use the project's procedural artwork.\nDevelopment build: gameplay, artwork and content are still evolving.")
   "leave":
@@ -176,6 +195,7 @@ func _show_page(next_page: String) -> void:
    _text("Exit Meridian Warfront?", true)
    first = _button("CANCEL", _show_page.bind("home"))
    _button("EXIT GAME", get_tree().quit)
+ _frame_menu()
  if page not in ["home", "pause", "leave", "quit"]:
   var back := _button("BACK", _show_page.bind("pause" if is_instance_valid(game) else "home"))
   if first == null and page != "settings": first = back
@@ -428,7 +448,31 @@ func _sync_lobby() -> void:
   lobby_difficulty_note.text = _difficulty_summary(ai_difficulty)
  lobby_lock = false
 
+func _frame_menu() -> void:
+ if not is_instance_valid(menu_panel): return
+ var wide := page in ["skirmish", "settings", "controls", "credits"]
+ menu_panel.offset_right = 900.0 if wide else 440.0
+
+func _start_showcase() -> void:
+ if is_instance_valid(game) or is_instance_valid(showcase): return
+ var scene := load("res://scenes/skirmish.tscn") as PackedScene
+ if scene == null: return
+ showcase = scene.instantiate()
+ showcase.showcase = true
+ showcase.ai_vs_ai = true
+ showcase.fog_enabled = false
+ showcase.ai_difficulty = "veteran"
+ showcase.process_mode = Node.PROCESS_MODE_PAUSABLE
+ add_child(showcase)
+ move_child(showcase, 0)
+
+func _stop_showcase() -> void:
+ if is_instance_valid(showcase):
+  showcase.queue_free()
+ showcase = null
+
 func _start_game() -> void:
+ _stop_showcase()
  var scene := load("res://scenes/skirmish.tscn") as PackedScene
  if scene == null:
   _text("Unable to load the battlefield.")
@@ -470,6 +514,7 @@ func _save_and_leave() -> void:
   _show_page("leave")
 
 func _resume_saved_match() -> void:
+ _stop_showcase()
  var scene := load("res://scenes/skirmish.tscn") as PackedScene
  if scene == null or MatchSave.read() == null:
   _show_page("home")
@@ -491,6 +536,7 @@ func _leave_game() -> void:
   game.queue_free()
  game = null
  _show_page("home")
+ _start_showcase()
 
 func _set_volume(value: float) -> void:
  config.set_value("audio", "volume", value)
