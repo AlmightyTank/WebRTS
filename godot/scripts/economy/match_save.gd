@@ -54,6 +54,8 @@ static func capture(arena) -> Dictionary:
 		}
 		if building.kind in ["wall", "gate"]:
 			row["style"] = int(building.art_style)
+		if building.get("life_left") != null and float(building.life_left) >= 0.0:
+			row["life_left"] = float(building.life_left)
 		structures.append(row)
 	var units: Array = []
 	for unit in arena.units:
@@ -105,6 +107,10 @@ static func capture(arena) -> Dictionary:
 		"map": str(arena.map_id),
 		"credits_start": int(arena.starting_credits),
 		"fog": bool(arena.fog_enabled),
+		"ai_difficulty": str(arena.ai_difficulty) if arena.get("ai_difficulty") != null else "regular",
+		"ai_clock": _capture_clock(arena),
+		"ai_pushed": [bool(arena.ai_pushed[0]), bool(arena.ai_pushed[1])] if arena.get("ai_pushed") != null else [false, false],
+		"ai_next_build": [float(arena.ai_next_build[0]), float(arena.ai_next_build[1])] if arena.get("ai_next_build") != null else [0.0, 0.0],
 		"starts": [str(arena.start_slots[0]), str(arena.start_slots[1])],
 		"time": float(arena.skirmish_time),
 		"ai_tick": int(arena.ai_build_tick),
@@ -131,6 +137,35 @@ static func capture(arena) -> Dictionary:
 		"commander": _capture_commander(arena.commander)
 	}
 
+static func _capture_clock(arena) -> Array:
+	var clocks: Array = []
+	if arena.get("ai_clock") == null:
+		return clocks
+	for side in range(mini(2, arena.ai_clock.size())):
+		var row: Dictionary = arena.ai_clock[side]
+		clocks.append({"ore": float(row.get("ore", -1.0)), "tank": float(row.get("tank", -1.0)), "attack": float(row.get("attack", -1.0))})
+	return clocks
+
+static func _restore_clock(arena, data: Dictionary) -> void:
+	if arena.get("ai_clock") == null:
+		return
+	var clocks = data.get("ai_clock", [])
+	if typeof(clocks) == TYPE_ARRAY:
+		for side in range(mini(2, clocks.size())):
+			var row = clocks[side]
+			if typeof(row) != TYPE_DICTIONARY:
+				continue
+			for key in ["ore", "tank", "attack"]:
+				arena.ai_clock[side][key] = float(row.get(key, -1.0))
+	var pushed = data.get("ai_pushed", [])
+	if arena.get("ai_pushed") != null and typeof(pushed) == TYPE_ARRAY:
+		for side in range(mini(2, pushed.size())):
+			arena.ai_pushed[side] = bool(pushed[side])
+	var nxt = data.get("ai_next_build", [])
+	if arena.get("ai_next_build") != null and typeof(nxt) == TYPE_ARRAY:
+		for side in range(mini(2, nxt.size())):
+			arena.ai_next_build[side] = float(nxt[side])
+
 static func apply(arena, data: Dictionary) -> bool:
 	if _problem(arena, data) != "":
 		return false
@@ -142,6 +177,8 @@ static func apply(arena, data: Dictionary) -> bool:
 		arena.adopt_map()
 	arena.starting_credits = int(data.get("credits_start", arena.starting_credits))
 	arena.fog_enabled = bool(data.get("fog", true))
+	if arena.has_method("_valid_difficulty"):
+		arena.ai_difficulty = arena._valid_difficulty(str(data.get("ai_difficulty", "regular")))
 	arena.start_slots = [str(data.starts[0]), str(data.starts[1])]
 	arena.clear_for_restore()
 	var battlefield: Dictionary = SkirmishMaps.MAPS[arena.map_id]
@@ -169,6 +206,8 @@ static func apply(arena, data: Dictionary) -> bool:
 		building.timer = float(row.get("timer", 0.0))
 		if row.has("style"):
 			building.art_style = int(row.style)
+		if row.has("life_left") and building.get("life_left") != null:
+			building.life_left = float(row.life_left)
 		building.queue_redraw()
 	var unit_rows: Array = data.units
 	for row in unit_rows:
@@ -216,6 +255,7 @@ static func apply(arena, data: Dictionary) -> bool:
 		if not members.is_empty():
 			arena.control_groups[int(key)] = members
 	arena.skirmish_time = float(data.get("time", 0.0))
+	_restore_clock(arena, data)
 	arena.ai_build_tick = int(data.get("ai_tick", 0))
 	arena.economy_ai_timer = float(data.get("ai_timer", 2.0))
 	arena.current_tab = int(data.get("tab", 0))
@@ -344,6 +384,15 @@ static func _capture_unit(arena, unit) -> Dictionary:
 		row["capture_progress"] = _num(unit, "capture_progress")
 		row["capture_pause"] = _num(unit, "capture_pause")
 		row["capture_at"] = _pair(unit.capture_approach_point) if unit.get("capture_approach_point") != null else [0, 0]
+		if unit.get("life_left") != null and float(unit.life_left) >= 0.0:
+			row["life_left"] = float(unit.life_left)
+		if unit.get("deployed") == true or float(unit.get("deploy_left") if unit.get("deploy_left") != null else 0.0) > 0.0:
+			row["deployed"] = bool(unit.deployed)
+			row["packing"] = bool(unit.packing)
+			row["deploy_left"] = float(unit.deploy_left)
+		if unit.get("cloak_hold") != null and (bool(unit.cloaked) or float(unit.cloak_hold) > 0.0):
+			row["cloaked"] = bool(unit.cloaked)
+			row["cloak_hold"] = float(unit.cloak_hold)
 		if unit.get("ammo") != null:
 			row["ammo"] = int(unit.ammo)
 			row["ammo_max"] = int(unit.ammo_max)
@@ -396,6 +445,15 @@ static func _spawn_saved_unit(arena, row: Dictionary):
 	if unit.get("has_attack_move_goal") != null:
 		unit.has_attack_move_goal = bool(row.get("has_attack_goal", false))
 		unit.attack_move_goal = _vec(row.get("attack_goal", [0, 0]))
+	if row.has("life_left") and unit.get("life_left") != null:
+		unit.life_left = float(row.life_left)
+	if row.has("deployed") and unit.get("deployed") != null:
+		unit.deployed = bool(row.deployed)
+		unit.packing = bool(row.get("packing", false))
+		unit.deploy_left = float(row.get("deploy_left", 0.0))
+	if row.has("cloak_hold") and unit.get("cloak_hold") != null:
+		unit.cloaked = bool(row.get("cloaked", false))
+		unit.cloak_hold = float(row.cloak_hold)
 	if row.has("ammo") and unit.get("ammo") != null:
 		unit.ammo = int(row.ammo)
 		unit.ammo_max = int(row.get("ammo_max", unit.ammo_max))

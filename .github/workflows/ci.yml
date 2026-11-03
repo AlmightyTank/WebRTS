@@ -102,5 +102,14 @@ jobs:
       - name: Test skirmish maps
         run: godot --headless --path godot --script res://tests/maps_smoke.gd
         timeout-minutes: 2
+      - name: Test Rook, Volkov, and Nadir
+        run: godot --headless --path godot --script res://tests/generals_smoke.gd
+        timeout-minutes: 2
+      - name: Test AI opening clock
+        run: godot --headless --path godot --script res://tests/ai_opening_smoke.gd
+        timeout-minutes: 3
+      - name: Test command screen
+        run: godot --headless --path godot --script res://tests/command_screen_smoke.gd
+        timeout-minutes: 2
       - name: Launch skirmish startup regression
         run: godot --headless --path godot --quit-after 180

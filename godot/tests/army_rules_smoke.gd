@@ -27,7 +27,8 @@ func _run() -> void:
    world._place_structure("barracks",side,Vector2(x,460))
    world._place_structure("factory",side,Vector2(x,700))
    world._place_structure("airfield",side,Vector2(x+200,700))
-   world._place_structure("depot",side,Vector2(x+180,300))
+   var service: String = str(Rules.REPLACEMENTS.get(choice, {}).get("depot", "depot"))
+   world._place_structure(service,side,Vector2(x+180,300))
    var collector := false
    for u in world.units:
     if u.team==side and u.unit_id==Rules.economic_id(choice,true): collector=true
@@ -82,6 +83,24 @@ func _run() -> void:
    expect(is_equal_approx(world.commander.weapon_range(gun,spotter),400.0*1.15), "Stormrail doctrine range is +15%")
    expect(is_equal_approx(float(gun.weapon.brace),2.0), "Stormrail braces for two seconds")
    expect(world.commander.power_ids(0).size()==3, "Longbow has three powers")
+  if choice=="republic":
+   expect(is_equal_approx(float(world._recipe("wall",0).hp),1200.0) and is_equal_approx(float(world._recipe("wall",0).time),8.0), "Standard Republic walls keep their base health and build time")
+  if choice=="alliance_ghost":
+   expect("a_pathfinder" in Rules.roster_ids(choice) and "a_ghost_carrier" in Rules.roster_ids(choice) and "a_ranger" not in Rules.roster_ids(choice), "Ghost Command fields pathfinders and a carrier")
+   expect("ghost_node" in Rules.structure_ids(choice) and "depot" not in Rules.structure_ids(choice), "Ghost Operations Node replaces the depot")
+   expect(is_equal_approx(float(world._recipe("a_pathfinder").cost),260.0*1.15), "Pathfinders cost 15 percent more")
+   expect(world.commander.power_ids(0).size()==3 and world.commander.research_ids(0).size()==2, "Ghost Command has two researches and three powers")
+  if choice=="republic_fortress":
+   expect("r_garrison" in Rules.roster_ids(choice) and "r_siege_carrier" in Rules.roster_ids(choice) and "r_recon" not in Rules.roster_ids(choice) and "pillbox" in Rules.structure_ids(choice), "Bastion Command replaces the line, the recon, and the turret")
+   expect(is_equal_approx(float(world._recipe("wall",0).hp),1200.0*1.15) and is_equal_approx(float(world._recipe("wall",0).time),8.0*1.15), "Bastion defenses gain 15 percent health and build time once")
+   expect(is_equal_approx(float(world._recipe("pillbox",0).hp),1600.0*1.15) and is_equal_approx(float(world._recipe("pillbox",0).time),15.0*1.15), "The pillbox bonus is not applied twice")
+   expect(world.commander.power_ids(0).size()==3, "Bastion Command has three powers")
+  if choice=="gia_guerrilla":
+   expect("g_shade" in Rules.roster_ids(choice) and "g_ghost_technical" in Rules.roster_ids(choice) and "g_scavenger" not in Rules.roster_ids(choice) and "g_rocket_cell" in Rules.roster_ids(choice), "Shadow Front drops the tank and keeps rocket infantry")
+   var technical=world._spawn("g_ghost_technical",0,Vector2(700,760))
+   expect(is_equal_approx(technical.max_hp,260.0*0.9), "Ghost Technical starts at 90 percent hull")
+   expect("concealed_nest" in Rules.structure_ids(choice), "Concealed Gun Nest replaces the turret")
+   expect(world.commander.power_ids(0).size()==3, "Shadow Front has three powers")
   if choice=="gia_salvage":
    var junker = world._spawn("g_junker",0,Vector2(700,720))
    expect(is_equal_approx(junker.max_hp,float(world.roster.g_junker.hp)*0.9), "Junker starts at 90% hull health")

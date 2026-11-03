@@ -40,10 +40,10 @@ func refresh() -> void:
  _paint_shroud()
  for entity in world.units:
   if is_instance_valid(entity):
-   entity.visible = entity.team == 0 or sees(0, entity.position)
+   entity.visible = world.entity_visible_to(0, entity)
  for entity in world.structures:
   if is_instance_valid(entity):
-   entity.visible = entity.team == 0 or sees(0, entity.position)
+   entity.visible = world.entity_visible_to(0, entity)
  for projectile in world.projectiles:
   if is_instance_valid(projectile):
    projectile.visible = sees(0, projectile.position)
@@ -55,6 +55,10 @@ func _reveal_source(source, structure_lookup: Dictionary) -> void:
  var sight := 360.0 if structure_lookup.has(source) else 336.0
  if source.get("unit_id") in ["r_recon", "r_armored_scout"]:
   sight = 420.0
+ elif source.get("unit_id") in ["a_pathfinder", "a_ghost_carrier"]:
+  sight = 403.0
+ elif str(source.get("kind")) == "ghost_node":
+  sight = 432.0
  _stamp_sight(source.team, source.position, sight, ceili(sight / CELL))
 
 func _reveal_area(side: int, point: Vector2, radius: float) -> void:

@@ -1,10 +1,10 @@
 extends RefCounted
 ## Compact field-console skin based on the responsive SVG command HUD reference.
-const INK = Color("#1f2929")
-const STEEL = Color("#354148")
-const RIM = Color("#84969d")
-const BLUE = Color("#648ca2")
-const GOLD = Color("#a8d8ad")
+const INK = Color("#14191c")
+const STEEL = Color("#2c3538")
+const RIM = Color("#8d7340")
+const BLUE = Color("#5f7c8a")
+const GOLD = Color("#e3c56a")
 const TEXT = Color("#dce9e9")
 const MUTED = Color("#9fbaa8")
 const MAP = Color("#455a44")

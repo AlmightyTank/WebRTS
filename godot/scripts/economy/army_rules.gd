@@ -4,10 +4,13 @@ const CHOICES := {
  "alliance": {"name":"Alliance — Standard", "faction":"alliance", "summary":"Flexible combined arms. Precise tanks, missile infantry and mobile AA."},
  "alliance_energy": {"name":"Vale — Lattice Command", "faction":"alliance", "summary":"Arc Lance, Lattice Interceptor and Beam Bastion. Powered energy +10%; shortage halves fire rate. Grid research and orbital support."},
  "alliance_air": {"name":"Voss — Sky Command", "faction":"alliance", "summary":"Tempest replaces the Striker. No Sentinel tank. Aircraft cost +10%. Hangar research and warned air strikes."},
+ "alliance_ghost": {"name":"Rook — Ghost Command", "faction":"alliance", "summary":"Pathfinders replace Rangers. A Ghost Carrier and the Ghost Operations Node detect hidden units. Stealth breaks on fire, damage, and detectors."},
  "republic": {"name":"Republic — Standard", "faction":"republic", "summary":"Durable, slower armor. Heavy tanks cost more and take longer to field."},
  "republic_armor": {"name":"Korda — Steel Vanguard", "faction":"republic", "summary":"Juggernaut, Imperator, Armored Scout and Vanguard Foundry. Tanks +10% HP; aircraft +20% cost. Veteran crews and armor support."},
  "republic_artillery": {"name":"Orlov — Longbow Command", "faction":"republic", "summary":"Stormrail replaces the Mammoth. Escort tank replaces the Bastion. Longer range, two-second setup, and warned barrages."},
+ "republic_fortress": {"name":"Volkov — Bastion Command", "faction":"republic", "summary":"Garrison Guards, a Siege Carrier that deploys, and a Steel Pillbox. Defenses have more health and take longer to build."},
  "gia": {"name":"GIA — Standard", "faction":"gia", "summary":"Cheap mobile pressure; fragile vehicles need flanks and missile support."},
+ "gia_guerrilla": {"name":"Nadir — Shadow Front", "faction":"gia", "summary":"Shade Cells and a Ghost Technical. No Scavenger tank. The Concealed Gun Nest stays hidden until it fires."},
  "gia_missile": {"name":"Sayegh — Saturation Command", "faction":"gia", "summary":"Siege Rocket Squad, Volley and AA-only Missile Nest. Signature missiles reload 10% faster, move 10% slower. Recon and warned saturation strikes."},
  "gia_salvage": {"name":"Varek — Wreckrunner Command", "faction":"gia", "summary":"Junker replaces the Scavenger and starts weaker. Light raiders are faster. Kills add up to two salvage tiers."}
 }
@@ -22,9 +25,23 @@ const REPLACEMENTS := {
  "republic_armor":{"r_bastion":"r_jugger","r_mammoth":"r_imperator","r_recon":"r_armored_scout","foundry":"vanguard_foundry"},
  "republic_artillery":{"r_bastion":"r_escort","r_mammoth":"r_stormrail"},
  "gia_missile":{"g_rocket_cell":"g_siege_rocket","g_rocket_buggy":"g_volley","salvaged_aa":"missile_nest"},
- "gia_salvage":{"g_scavenger":"g_junker"}
+ "gia_salvage":{"g_scavenger":"g_junker"},
+ "alliance_ghost":{"a_ranger":"a_pathfinder","depot":"ghost_node"},
+ "republic_fortress":{"r_line":"r_garrison","r_recon":"r_siege_carrier","turret":"pillbox"},
+ "gia_guerrilla":{"g_militia":"g_shade","g_scavenger":"g_ghost_technical","turret":"concealed_nest"}
 }
-const DISABLED := {"alliance_energy":["a_howitzer"],"alliance_air":["a_sentinel"],"republic_armor":["r_thunder"],"gia_missile":["g_shadow","camo_netting"]}
+const EXTRAS := {"alliance_ghost":["a_ghost_carrier"]}
+const DISABLED := {"alliance_energy":["a_howitzer"],"alliance_air":["a_sentinel"],"republic_armor":["r_thunder"],"gia_missile":["g_shadow","camo_netting"],"alliance_ghost":["a_howitzer"]}
+# Stationary cloak delay in seconds. Firing, damage, and a detector break it.
+const CLOAK := {
+ "a_pathfinder":{"delay":3.0,"detect":200.0},
+ "a_ghost_carrier":{"delay":3.0,"detect":0.0},
+ "g_shade":{"delay":3.0,"detect":0.0},
+ "g_ghost_technical":{"delay":3.0,"detect":0.0}
+}
+const GHOST_NODE_DETECT := 240.0
+const FORTRESS_DEFENSES := ["pillbox","wall","gate","sam","turret"]
+const FORTRESS_BONUS := 1.15
 const SIGNATURE_MISSILES := ["g_siege_rocket","g_volley"]
 const STEEL_TANKS := ["r_jugger","r_imperator"]
 const LIGHT_RAIDERS := ["g_rocket_truck","g_rocket_buggy","g_heli"]
@@ -74,7 +91,21 @@ const PROFILES := {
  "a_tempest":{"type":"ROCKET","damage":110.0,"interval":1.65,"range":230.0,"projectile_speed":350.0,"homing":true},
  "r_escort":{"type":"AP","damage":95.0,"interval":2.1,"range":190.0,"projectile_speed":460.0},
  "r_stormrail":{"type":"AP","damage":160.0,"interval":6.0,"range":400.0,"min_range":140.0,"projectile_speed":280.0,"brace":2.0},
- "g_junker":{"type":"AP","damage":92.0,"interval":2.65,"range":185.0,"projectile_speed":420.0}
+ "g_junker":{"type":"AP","damage":92.0,"interval":2.65,"range":185.0,"projectile_speed":420.0},
+ "a_pathfinder":{"type":"SMALL_ARMS","damage":35.0,"interval":1.7,"range":205.0,"projectile_speed":700.0},
+ "a_ghost_carrier":{"type":"SMALL_ARMS","damage":14.0,"interval":0.6,"range":150.0,"projectile_speed":660.0},
+ "r_garrison":{"type":"SMALL_ARMS","damage":14.0,"interval":0.55,"range":145.0,"projectile_speed":660.0},
+ "r_siege_carrier":{"type":"SMALL_ARMS","damage":27.0,"interval":0.55,"range":190.0,"projectile_speed":660.0},
+ "g_shade":{"type":"SMALL_ARMS","damage":13.0,"interval":0.75,"range":135.0,"projectile_speed":660.0},
+ "g_ghost_technical":{"type":"SMALL_ARMS","damage":14.0,"interval":0.5,"range":140.0,"projectile_speed":660.0}
+}
+const EXTRA_UNITS := {
+ "a_pathfinder":{"id":"a_pathfinder","name":"Pathfinder Team","armor":"PERSONNEL","hp":90.0,"credits":260.0,"build_seconds":8.0,"speed":83.0},
+ "a_ghost_carrier":{"id":"a_ghost_carrier","name":"Ghost Recon Carrier","armor":"LIGHT","hp":295.0,"credits":950.0,"build_seconds":18.0,"speed":130.0},
+ "r_garrison":{"id":"r_garrison","name":"Garrison Guard","armor":"PERSONNEL","hp":140.0,"credits":200.0,"build_seconds":6.0,"speed":66.0},
+ "r_siege_carrier":{"id":"r_siege_carrier","name":"Siege Carrier","armor":"HEAVY","hp":780.0,"credits":1300.0,"build_seconds":25.0,"speed":77.0},
+ "g_shade":{"id":"g_shade","name":"Shade Cell","armor":"PERSONNEL","hp":80.0,"credits":175.0,"build_seconds":6.0,"speed":95.0},
+ "g_ghost_technical":{"id":"g_ghost_technical","name":"Ghost Technical","armor":"LIGHT","hp":260.0,"credits":700.0,"build_seconds":14.0,"speed":155.0}
 }
 
 static func valid_choice(id: String) -> String:
@@ -89,6 +120,8 @@ static func roster_ids(choice: String) -> Array:
  for id in ROSTERS[faction(choice)]:
   var resolved: String=replacements.get(id,id)
   if resolved not in DISABLED.get(choice,[]): result.append(resolved)
+ for id in EXTRAS.get(choice, []):
+  if id not in result and id not in DISABLED.get(choice, []): result.append(id)
  return result
 
 static func base_id(id: String) -> String:
@@ -120,9 +153,13 @@ static func rearm_seconds(choice: String) -> float:
 static func perimeter(choice: String, id: String) -> Dictionary:
  return PERIMETER[faction(choice)][id]
 
+static func fortress_defense(choice: String, id: String) -> bool:
+ return choice=="republic_fortress" and id in FORTRESS_DEFENSES
+
 static func cost_factor(choice: String, data: Dictionary) -> float:
  if choice == "republic_armor" and data.get("armor", "") == "AIR": return 1.2
  if choice == "alliance_air" and data.get("armor", "") == "AIR": return 1.1
+ if choice == "alliance_ghost" and str(data.get("id",""))=="a_pathfinder": return 1.15
  return 1.0
 
 static func apply_unit(choice: String, unit) -> void:
@@ -137,3 +174,6 @@ static func apply_unit(choice: String, unit) -> void:
   unit.hp = unit.max_hp
  if choice == "gia_salvage" and unit.unit_id in LIGHT_RAIDERS:
   unit.move_speed *= 1.1
+ if choice == "gia_guerrilla" and unit.unit_id == "g_ghost_technical":
+  unit.max_hp *= 0.9
+  unit.hp = unit.max_hp

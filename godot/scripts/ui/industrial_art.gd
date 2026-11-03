@@ -24,7 +24,8 @@ const UNIT_MESH_KINDS = [
  "a_arc_lance","a_tempest","r_stormrail","r_escort","g_volley",
  "a_ghost_carrier","r_siege_carrier","g_ghost_technical",
   "r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2",
-  "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket"
+  "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket",
+  "a_pathfinder","r_garrison","g_shade"
 ]
 
 static func _polygon(c: CanvasItem, points: PackedVector2Array, color: Color) -> void:
@@ -138,7 +139,7 @@ static func asset_kind(id: String) -> String:
  return {"a_mcv":"mcv","r_mcv":"mcv","a_harvester":"harvester","r_hauler":"harvester","a_ranger":"rifleman","r_line":"rifleman","a_javelin":"missile_team","r_hunter":"missile_team","a_engineer":"engineer","r_engineer":"engineer","a_sentinel":"tank","r_bastion":"heavy_tank","a_sentinel_aa":"aa","r_flak":"flak","a_striker":"gunship","r_siege_heli":"helicopter"}.get(id,id)
 
 static func has_asset(id: String) -> bool:
- if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","airfield","wall","gate"]: return true
+ if id in UNIT_MESH_KINDS or id in ["beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","airfield","wall","gate","ghost_node","pillbox","concealed_nest","sandbag","passage"]: return true
  if id in ["sam","salvaged_aa"]: return true
  id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return true
@@ -149,6 +150,9 @@ static func has_asset(id: String) -> bool:
 static func asset_bounds(id: String) -> Rect2:
  id = asset_kind(id)
  if id in ["a_ghost_carrier","r_siege_carrier","g_ghost_technical"]: return Rect2(-82,-100,164,170)
+ if id in ["a_pathfinder","r_garrison","g_shade"]: return Rect2(-23,-43,54,57)
+ if id in ["ghost_node","pillbox","concealed_nest"]: return Rect2(-70,-90,140,140)
+ if id in ["sandbag","passage"]: return Rect2(-22,-36,44,52)
  if id in ["a_tempest","r_stormrail","g_volley"]: return Rect2(-90,-110,180,180)
  if id=="r_escort": return Rect2(-53,-61,106,98)
  if id in ["a_arc_lance","r_imperator","g_junker","g_junker_salvage_1","g_junker_salvage_2"]: return Rect2(-82,-100,164,170)
@@ -189,15 +193,15 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
   if kind == "harvester": cargo = cargo_frame / 16.0
   _batch_building = true
  var building_key := ""
- if kind in ["yard","power","barracks","refinery","factory","airfield","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","wall","gate"]:
+ if kind in ["yard","power","barracks","refinery","factory","airfield","depot","relay","turret","sam","salvaged_aa","beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm","wall","gate","ghost_node","pillbox","concealed_nest","sandbag","passage"]:
   # Share identical animation frames across instances; bound retained GPU memory.
   var frame = int(float(animation.get("time",0.0))*20.0)
   var door_frame = int(round(float(animation.get("door",0.0))*16.0))
-  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest","silo","beam_array","ironstorm","wall"]:
+  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest","silo","beam_array","ironstorm","wall","pillbox","concealed_nest","sandbag","ghost_node"]:
    frame=0
    door_frame=0
   building_key="%s:%d:%d:%d:%s:%d" % [kind,team,frame,door_frame,animation.get("working",false),style]
-  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest"]:
+  if kind in ["turret","sam","salvaged_aa","beam_bastion","missile_nest","pillbox","concealed_nest"]:
    var aim_frame := posmod(int(round(aim / TAU * 64.0)),64)
    aim = aim_frame * TAU / 64.0
    building_key += ":%d" % aim_frame
@@ -215,7 +219,9 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
  match kind:
   "mcv": _mcv(c,faction,heading)
   "a_lattice","r_jugger","r_recon","r_armored_scout","g_siege_rocket": _commander_unit(c,kind,faction,heading,aim)
+  "a_pathfinder","r_garrison","g_shade": _doctrine_infantry(c,kind,faction,heading,aim)
   "beam_bastion","missile_nest","foundry","vanguard_foundry","silo","beam_array","ironstorm": _commander_structure(c,kind,faction,aim,animation)
+  "ghost_node","pillbox","concealed_nest","sandbag","passage": _doctrine_structure(c,kind,faction,aim,animation)
   "wall","gate": _perimeter(c,kind,faction,style,animation)
   "a_arc_lance": _arc_lance(c,faction,heading,aim)
   "a_tempest": _tempest(c,faction,heading)
@@ -246,6 +252,68 @@ static func draw_asset(c: CanvasItem, kind: String, team: int = 0, heading: floa
  if depth_sorted: _flush_depth(c)
  if not vehicle_key.is_empty(): _finish_building_batch(c,vehicle_key,true)
  if not building_key.is_empty(): _finish_building_batch(c,building_key)
+
+static func _doctrine_infantry(c: CanvasItem, kind: String, color: Color, heading: float, aim: float) -> void:
+ var style := 0 if kind=="a_pathfinder" else (1 if kind=="r_garrison" else 2)
+ _infantry(c, color, heading, aim, "rifleman", style)
+ _collect_depth=true
+ if kind=="a_pathfinder":
+  # Long sensor rifle and a short folded cloak.
+  _gun_barrel(c, Vector3(16,-6,19), 22, 1.2, aim)
+  box(c, Vector3(-8,-7,16), Vector3(4,14,12), Color("#24343c"), aim)
+  box(c, Vector3(-2,-3,30), Vector3(3,6,2), Color("#8adce5"), aim)
+ elif kind=="r_garrison":
+  box(c, Vector3(-2,-8,14), Vector3(8,16,8), color.darkened(0.1), aim)
+  box(c, Vector3(-8,-9,18), Vector3(16,4,4), STEEL, aim)
+ else:
+  box(c, Vector3(-7,-7,28), Vector3(14,14,4), Color("#c2ad7c"), aim)
+  box(c, Vector3(4,-2,18), Vector3(10,3,2), Color("#6d5c3e"), aim)
+ _flush_depth(c)
+
+static func _doctrine_structure(c: CanvasItem, kind: String, color: Color, aim: float, animation: Dictionary = {}) -> void:
+ _collect_depth=false
+ if kind=="sandbag":
+  _slab(c, Vector2(16, 12))
+  for y in [-6.0, -1.0, 4.0]:
+   box(c, Vector3(-14, y, 2+y*0.2), Vector3(28, 5, 4), Color("#b7a56a"))
+  return
+ if kind=="passage":
+  var open: float=float(animation.get("door", 0.0))
+  _slab(c, Vector2(16, 12))
+  box(c, Vector3(-15, -5, 1), Vector3(5, 10, 14), STEEL)
+  box(c, Vector3(10, -5, 1), Vector3(5, 10, 14), STEEL)
+  var span: float=18.0-open*14.0
+  beam(c, Vector3(-10, 0, 10), Vector3(-10+span, 0, 10), Color("#d7c27a"), 3)
+  return
+ if kind=="ghost_node":
+  _slab(c, Vector2(48, 36))
+  box(c, Vector3(-40, -28, 4), Vector3(80, 56, 16), CONCRETE.darkened(0.08))
+  box(c, Vector3(-28, -18, 20), Vector3(40, 36, 10), color)
+  for x in [-34.0, 22.0]:
+   box(c, Vector3(x, -4, 18), Vector3(8, 8, 28), STEEL)
+   box(c, Vector3(x-6, -10, 46), Vector3(20, 4, 3), color)
+  box(c, Vector3(-8, -6, 30), Vector3(16, 12, 6), Color("#244b60"))
+  box(c, Vector3(-3, -2, 36), Vector3(6, 4, 3), Color("#8adce5"))
+  return
+ _slab(c, Vector2(30, 26))
+ if kind=="pillbox":
+  box(c, Vector3(-28, -22, 2), Vector3(56, 44, 10), CONCRETE.darkened(0.12))
+  box(c, Vector3(-24, -18, 12), Vector3(48, 36, 12), CONCRETE)
+  box(c, Vector3(-18, -12, 24), Vector3(36, 24, 6), STEEL)
+  _collect_depth=true
+  box(c, Vector3(-8, -6, 28), Vector3(16, 12, 6), color, aim)
+  _gun_barrel(c, Vector3(6, 0, 30), 16, 2.2, aim)
+  _flush_depth(c)
+ else:
+  # Uneven scrap roof with a narrow slit. The nest reads as closed until it fires.
+  box(c, Vector3(-26, -20, 1), Vector3(22, 14, 8), Color("#8a6242"))
+  box(c, Vector3(-8, -16, 1), Vector3(30, 18, 11), Color("#6e5138"))
+  box(c, Vector3(6, 2, 1), Vector3(18, 16, 7), STEEL.darkened(0.25))
+  box(c, Vector3(-18, -14, 12), Vector3(34, 26, 4), Color("#a99b76"))
+  _collect_depth=true
+  box(c, Vector3(-4, -3, 16), Vector3(14, 6, 4), INK, aim)
+  _gun_barrel(c, Vector3(8, 0, 17), 12, 1.4, aim)
+  _flush_depth(c)
 
 static func _commander_unit(c: CanvasItem, kind: String, color: Color, heading: float, aim: float) -> void:
  _collect_depth=true

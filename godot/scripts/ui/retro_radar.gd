@@ -56,6 +56,14 @@ func _draw() -> void:
    draw_circle(map_point(u.position),2.0,ALLIED if u.team==0 else FOE)
  if world.fog_enabled and world.fog != null and world.fog.texture != null:
   draw_texture_rect(world.fog.texture, Rect2(Vector2.ZERO, size), false)
+ if world.get("commander")!=null:
+  for decoy in world.commander.decoys:
+   var mine: bool=int(decoy.side)==0
+   var blip: Vector2=map_point(decoy.point)
+   if mine:
+    draw_arc(blip, 4.0, 0, TAU, 12, Color("#d7e28a"), 1.4)
+   else:
+    draw_circle(blip, 2.2, FOE)
  if is_instance_valid(world.camera):
   var visible=get_viewport_rect().size/maxf(0.25,world.camera.zoom.x)
   var top=world.camera.position-visible*0.5
