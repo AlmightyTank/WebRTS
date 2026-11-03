@@ -548,6 +548,11 @@ func _draw() -> void:
     GroundOrders.draw_route(self)
     if selected:
         draw_arc(Vector2.ZERO,radius+8.0,0.0,TAU,36,Color("#e1f39e"),2.2)
+        var health_ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
+        var bar_width := maxf(28.0, radius * 2.0)
+        var bar_origin := Vector2(-bar_width * 0.5, -radius - 16.0)
+        draw_rect(Rect2(bar_origin, Vector2(bar_width, 4.0)), Color(0, 0, 0, 0.7))
+        draw_rect(Rect2(bar_origin, Vector2(bar_width * health_ratio, 4.0)), Color(1.0 - health_ratio, health_ratio * 0.85, 0.12))
         if hold_position:
             draw_string(ThemeDB.fallback_font,Vector2(-15,28),"HOLD",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#e1f39e"))
     if cloaked:

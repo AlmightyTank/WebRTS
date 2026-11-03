@@ -72,13 +72,14 @@ godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd` v
 
 The Godot GUI now uses an **original code-drawn industrial RTS aesthetic** inspired by early C&C interfaces. All chrome framing, insignia and production icons are new Godot primitives; no external RA2 artwork or proprietary sidebar assets are included.
 
-- **Right sidebar:** original Alliance command crest, interactive real-time minimap, credits/power readout, power capacity meter and two-column production tile rack with building/unit silhouettes. The four classic Build/Defense/Infantry/Vehicles tabs stay wired to the existing shared queues; tile captions show credits, readiness and active payment percent.
+- **Right sidebar:** gold IRON readout, a vertical power bar that fills from the bottom (green when supplied, red in a brownout), the minimap, then the two-column cameo rack. A cameo shows its cost, fills as it is paid for, and flashes when it is ready to place. Left click queues one. Right click removes one, refunding a build that had already started. The command strip leads with the selected unit or building. A selected unit draws a health bar. Construction, unit ready, low power, base under attack, and an incoming strike each post a banner.
 - **Queue display:** four readout slots show the current production progress and up to three waiting unit jobs.
 - **Factory staging:** the existing active Barracks/War Factory cards and Personal/Alpha/Bravo/Charlie selection remain accessible below the production rack with their rally/attack-move controls.
 - **Bottom tactical bar:** original steel-framed icon buttons for Select All, Move, Attack-Move, Stop, Formation, Deploy, Rally, Staging, Pause and Restart. Rally and Staging work with the same producer UI and command logic as before.
 - **Radar:** renders terrain obstacles, ore fields, structures, units and the camera viewing rectangle. Click/tap to reposition the camera. The radar is a functional Control, not a static texture.
 - **Mobile:** the same responsive collapsible bottom production drawer and horizontally scrollable command bar are preserved. The radar is reduced in height for compact layouts; production tile buttons are large enough for touch.
-- **Verification:** `godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd` checks component creation, queue display, production tabs, minimap projection and phone/desktop layout geometry. Visual QA on an actual Android phone is still recommended.
+- **Main menu:** the buttons sit on a plate at the left. Behind them a live match is already fighting, and the camera drifts across it. Opening a real skirmish replaces that battle. Returning to the menu starts another.
+- **Verification:** `godot --headless --path godot --script res://tests/retro_command_hud_smoke.gd` checks component creation, queue display, production tabs, minimap projection and phone/desktop layout geometry. `godot --headless --path godot --script res://tests/command_screen_smoke.gd` checks the menu battle, the vertical power bar, the banner, and right-click removal from a cameo. Visual QA on an actual Android phone is still recommended.
 
 ## Current limits / intentionally not implemented
 
