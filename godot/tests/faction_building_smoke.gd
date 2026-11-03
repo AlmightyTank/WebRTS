@@ -9,8 +9,8 @@ func _run() -> void:
  root.content_scale_size=Vector2i(1280,720)
  var gallery = load("res://scenes/faction_building_preview.tscn").instantiate()
  root.add_child(gallery)
- for step in range(48):
-  gallery.batch=0 if step<24 else 1
+ for step in range(96):
+  gallery.batch=step/24
   gallery.elapsed=step*0.5
   gallery.queue_redraw()
   await process_frame
@@ -39,5 +39,5 @@ func _run() -> void:
    push_error("Cached building must contain one nonempty mesh surface")
    quit(1)
    return
- print("Faction building smoke: eighteen buildings, both animated batches rendered; bounded mesh cache verified")
+ print("Faction building smoke: thirty-two designs, four animated batches rendered; bounded mesh cache verified")
  quit(0)
