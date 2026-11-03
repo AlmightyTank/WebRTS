@@ -25,6 +25,9 @@ var art_time: float = 0.0
 var door_open: float = 0.0
 var exit_activity: float = 0.0
 var art_working: bool = false
+var life_left := -1.0
+var cloaked := false
+var reveal_left := 0.0
 var _drawn_art_frame := -999
 var _drawn_door_frame := -999
 var _drawn_working := false
@@ -43,6 +46,10 @@ func configure(world, building_kind: String, side: int, pos: Vector2, size: Vect
  name=("Alliance" if team==0 else "Republic")+"_"+kind
  if kind=="beam_bastion": weapon={"type":"ENERGY","damage":75.0,"interval":1.5,"range":225.0,"projectile_speed":850.0,"grid_energy":true}
  if kind in ["sam","salvaged_aa","missile_nest"]: weapon={"type":"ROCKET","damage":90.0 if kind=="missile_nest" else 70.0,"interval":2.4,"range":300.0,"projectile_speed":400.0,"homing":true,"anti_air":true,"anti_ground":false}
+ if kind=="pillbox": weapon={"type":"SMALL_ARMS","damage":22.0,"interval":0.85,"range":170.0,"projectile_speed":680.0}
+ if kind=="concealed_nest":
+  cloaked=true
+  weapon={"type":"SMALL_ARMS","damage":11.0,"interval":1.05,"range":145.0,"projectile_speed":660.0}
  queue_redraw()
 
 func ground_bounds() -> Rect2:
@@ -52,7 +59,7 @@ func notify_unit_exit() -> void:
  exit_activity=2.0
 
 func _process(delta: float) -> void:
- if kind=="gate" and arena!=null and not arena.paused and not arena.battle_over:
+ if kind in ["gate","passage"] and arena!=null and not arena.paused and not arena.battle_over:
   var open:=false
   for unit in arena.units:
    if is_instance_valid(unit) and unit.hp>0.0 and not unit.air and unit.team==team and unit.position.distance_to(position)<=40.0:
@@ -108,6 +115,16 @@ func _shot_origin(aim: Vector2) -> Vector2:
 
 func _physics_process(delta: float) -> void:
  if arena.paused or arena.battle_over or hp<=0: return
+ if life_left>=0.0:
+  life_left=maxf(0.0,life_left-delta)
+  if life_left<=0.0:
+   hp=0.0
+   destroyed.emit(self)
+   queue_free()
+   return
+ if kind=="concealed_nest":
+  reveal_left=maxf(0.0,reveal_left-delta)
+  cloaked=reveal_left<=0.0
  if kind in ["wall","gate"]:
   if team>=0: return
   if float(weapon.get("damage",0.0))!=18.0: weapon={"type":"SMALL_ARMS","damage":18.0,"interval":0.9,"range":150.0,"projectile_speed":700.0,"anti_ground":true,"anti_air":false}
@@ -121,25 +138,31 @@ func _physics_process(delta: float) -> void:
   timer=float(weapon.interval)
   arena.spawn_projectile(self,abandoned,abandoned_shot,origin)
   return
- if kind not in ["turret","beam_bastion","sam","salvaged_aa","missile_nest"]: return
+ if kind not in ["turret","beam_bastion","sam","salvaged_aa","missile_nest","pillbox","concealed_nest"]: return
+ if arena.get("commander")!=null and arena.commander.blacked_out(self): return
  if not arena.power_ok(team) and kind!="beam_bastion": return
  timer-=delta
  if timer>0.0: return
  var victim=arena.find_target(self,float(weapon["range"]))
- if victim!=null and arena.clear_shot(position,victim.position,false,victim.air):
+ var origin: Vector2=position if victim==null else _shot_origin(victim.position)
+ if victim!=null and arena.clear_shot(origin,victim.position,false,victim.air,victim):
   var shot: Dictionary=weapon.duplicate(true)
   timer=float(weapon.interval)
   if kind=="beam_bastion":
    if arena.power_ok(team): shot.damage*=1.1
    else: timer*=2.0
   if arena.get("commander")!=null: timer=arena.commander.modify_shot(self,victim,shot,timer)
-  arena.spawn_projectile(self,victim,shot)
+  if kind=="concealed_nest":
+   cloaked=false
+   reveal_left=3.0
+  arena.spawn_projectile(self,victim,shot,origin)
 
 func can_hit(other) -> bool:
  return other!=null and is_instance_valid(other) and other.team!=team and other.hp>0.0 and (bool(weapon.get("anti_air",false)) if other.air else bool(weapon.get("anti_ground",true)))
 
 func receive_damage(amount: float, _attacker) -> void:
  if hp<=0.0: return
+ if arena!=null and arena.get("commander")!=null: amount=arena.commander.mitigate(self,amount)
  hp=maxf(0.0,hp-amount)
  if team==0 and amount>0.0 and arena!=null and arena.has_method("play_cue"): arena.play_cue("under_attack")
  queue_redraw()

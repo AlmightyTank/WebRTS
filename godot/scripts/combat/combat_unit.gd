@@ -2,6 +2,7 @@ extends Node2D
 ## Code-drawn combat actor. Physics state, weapons and orders are independent of rendering.
 const IndustrialArt = preload("res://scripts/ui/industrial_art.gd")
 const GroundOrders = preload("res://scripts/combat/ground_orders.gd")
+const ArmyRules = preload("res://scripts/economy/army_rules.gd")
 var pending_orders: Array = []
 
 func queue_move(point: Vector2, attack_move: bool = false, column_spine = null, column_slot: Vector2 = Vector2.ZERO) -> void:
@@ -56,6 +57,12 @@ var unit_xp := 0.0
 var salvage_tier := 0
 var stationary_time := 0.0
 var last_combat_position := Vector2.ZERO
+var cloaked := false
+var cloak_hold := 0.0
+var deployed := false
+var packing := false
+var deploy_left := 0.0
+var life_left := -1.0
 var _visual_pose := -1
 
 func configure(world: Node2D, unit_data: Dictionary, side: int, pos: Vector2, gun: Dictionary, flying: bool = false) -> void:
@@ -80,6 +87,8 @@ func can_hit(other) -> bool:
     if other == null or not is_instance_valid(other) or other.team == team or other.hp <= 0.0:
         return false
     if not arena.entity_visible_to(team, other):
+        return false
+    if arena.get("commander") != null and arena.commander.blacked_out(self):
         return false
     var factor = arena.armor_multiplier(str(weapon.get("type", "SMALL_ARMS")), other.armor)
     return factor > 0.0 and (bool(weapon.get("anti_air", false)) if other.air else bool(weapon.get("anti_ground", true)))
@@ -149,7 +158,7 @@ func order_capture(building) -> void:
     if unit_id not in ["a_engineer", "r_engineer", "g_tech"] or not is_instance_valid(building) or building.team == team:
         return
     # Walls and gates stay with the faction that built them.
-    if str(building.get("kind")) in ["wall", "gate"]:
+    if str(building.get("kind")) in ["wall", "gate", "sandbag", "passage"]:
         return
     if not arena.entity_visible_to(team, building):
         return
@@ -191,7 +200,94 @@ func _tick_capture(delta: float) -> bool:
         arena.capture_structure(self,claimed)
     return true
 
+func order_deploy() -> void:
+    if unit_id != "r_siege_carrier" or hp <= 0.0:
+        return
+    order_revision += 1
+    if deployed:
+        deployed = false
+        packing = true
+        deploy_left = _stance_seconds()
+        return
+    if deploy_left > 0.0:
+        return
+    packing = false
+    deploy_left = _stance_seconds()
+    moving = false
+    route.clear()
+    target = null
+    explicit_attack = false
+
+func _stance_seconds() -> float:
+    if arena.get("commander") != null and arena.commander.has_research(team, "mobile_field_works"):
+        return 2.0
+    return 3.0
+
+func _cloak_delay() -> float:
+    var delay := float(ArmyRules.CLOAK.get(unit_id, {}).get("delay", 0.0))
+    if delay <= 0.0 or arena.get("commander") == null:
+        return delay
+    if unit_id in ["a_pathfinder", "a_ghost_carrier"] and arena.commander.has_research(team, "silent_running"):
+        return 1.6
+    if unit_id in ["g_shade", "g_ghost_technical"] and arena.commander.has_research(team, "camo_netting"):
+        return maxf(0.4, delay - 0.8)
+    return delay
+
+func _cloak_while_moving() -> bool:
+    return unit_id in ["a_pathfinder", "a_ghost_carrier"] and arena.get("commander") != null and arena.commander.has_research(team, "silent_running")
+
+func _tick_cloak() -> void:
+    if not ArmyRules.CLOAK.has(unit_id):
+        cloaked = false
+        return
+    if cloak_hold > 0.0:
+        cloaked = false
+        return
+    cloaked = _cloak_while_moving() or (not moving and stationary_time >= _cloak_delay())
+
+func break_cloak() -> void:
+    if not ArmyRules.CLOAK.has(unit_id):
+        return
+    cloaked = false
+    cloak_hold = _cloak_delay()
+    stationary_time = 0.0
+
+func _tick_life(delta: float) -> bool:
+    if life_left < 0.0:
+        return false
+    life_left = maxf(0.0, life_left - delta)
+    if life_left > 0.0:
+        return false
+    hp = 0.0
+    destroyed.emit(self)
+    queue_free()
+    return true
+
+func _tick_stance(delta: float) -> void:
+    if unit_id != "r_siege_carrier":
+        return
+    if deploy_left > 0.0:
+        deploy_left = maxf(0.0, deploy_left - delta)
+        moving = false
+        if deploy_left <= 0.0 and not packing:
+            deployed = true
+        elif deploy_left <= 0.0 and packing:
+            packing = false
+            if position.distance_to(destination) > 12.0:
+                _begin_route(destination)
+    if deployed or deploy_left > 0.0:
+        moving = false
+        route.clear()
+
 func _begin_route(point: Vector2) -> void:
+    if unit_id == "r_siege_carrier" and deployed:
+        destination = arena.clamp_point(point)
+        deployed = false
+        packing = true
+        deploy_left = _stance_seconds()
+        moving = false
+        route.clear()
+        return
     blocked_time = 0.0
     traffic_wait = 0.0
     column_move = false
@@ -209,6 +305,10 @@ func _begin_route(point: Vector2) -> void:
 func _physics_process(delta: float) -> void:
     if arena.paused or arena.battle_over or hp <= 0.0:
         return
+    if _tick_life(delta):
+        return
+    cloak_hold = maxf(0.0, cloak_hold - delta)
+    _tick_stance(delta)
     fire_feedback = maxf(0.0, fire_feedback - delta)
     hit_feedback = maxf(0.0, hit_feedback - delta)
     if _tick_capture(delta):
@@ -266,6 +366,7 @@ func _physics_process(delta: float) -> void:
     if target != null and is_instance_valid(target) and target.hp > 0.0:
         desired_turret_angle = (target.position - position).angle()
     turret_angle = lerp_angle(turret_angle, desired_turret_angle, minf(1.0, (9.0 if target != null else 4.0) * delta))
+    _tick_cloak()
     _publish_visual()
 
 func _publish_visual() -> void:
@@ -288,11 +389,18 @@ func _publish_visual() -> void:
         pose |= 1 << 20
     if not pending_orders.is_empty():
         pose |= 1 << 21
+    if cloaked:
+        pose |= 1 << 22
+    if deployed:
+        pose |= 1 << 23
     if pose != _visual_pose:
         _visual_pose = pose
         queue_redraw()
 
 func _step_movement(delta: float) -> void:
+    if deployed or deploy_left > 0.0:
+        moving = false
+        return
     if arena.begin_column_spread(self) and not moving:
         return
     if route_index >= route.size():
@@ -402,10 +510,13 @@ func fire(enemy) -> void:
     fire_feedback = 0.12
     cooldown = float(weapon.get("interval", 1.0))
     var shot := weapon.duplicate(true)
+    if cloaked and unit_id == "g_shade" and str(enemy.get("armor")) == "PERSONNEL":
+        shot.damage *= 1.5
     if bool(weapon.get("grid_energy", false)):
         if arena.power_ok(team): shot.damage *= 1.1
         else: cooldown *= 2.0
     if arena.get("commander")!=null: cooldown=arena.commander.modify_shot(self,enemy,shot,cooldown)
+    break_cloak()
     arena.spawn_projectile(self, enemy, shot)
     if ammo > 0:
         ammo -= 1
@@ -417,6 +528,8 @@ func receive_damage(value: float, attacker) -> void:
         capture_progress = 0.0
         capture_pause = 1.0
     if arena.get("commander")!=null and armor=="HEAVY" and arena.commander.buff_at(team,"breakthrough_order",position): value*=0.8
+    if arena.get("commander")!=null: value=arena.commander.mitigate(self, value)
+    break_cloak()
     if unit_id=="r_jugger" and is_instance_valid(attacker) and absf(angle_difference(facing,(attacker.position-position).angle()))<PI/3.0: value*=0.8
     if unit_id=="a_tempest" and arena.get("commander")!=null and arena.commander.has_research(team,"countermeasures") and is_instance_valid(attacker):
         var attacker_weapon: Variant = attacker.get("weapon")
@@ -437,6 +550,10 @@ func _draw() -> void:
         draw_arc(Vector2.ZERO,radius+8.0,0.0,TAU,36,Color("#e1f39e"),2.2)
         if hold_position:
             draw_string(ThemeDB.fallback_font,Vector2(-15,28),"HOLD",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#e1f39e"))
+    if cloaked:
+        draw_arc(Vector2.ZERO, radius + 4.0, 0.0, TAU, 24, Color(0.75, 0.9, 0.95, 0.55), 1.2)
+    if deployed:
+        draw_string(ThemeDB.fallback_font, Vector2(-28, 28), "DEPLOYED", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#e1f39e"))
     var artwork := unit_id
     if unit_id == "g_junker" and salvage_tier > 0:
         artwork = "g_junker_salvage_%d" % salvage_tier

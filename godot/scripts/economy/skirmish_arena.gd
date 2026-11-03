@@ -24,7 +24,12 @@ const STRUCTURE_DATA := {
  "beam_array":{"name":"Particle Beam Array","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(120,108),"hp":1800},
  "ironstorm":{"name":"Ironstorm Artillery Array","cost":5000.0,"time":90.0,"power":0,"demand":100,"size":Vector2(124,108),"hp":1800},
  "wall":{"name":"Energy-Reinforced Barrier","cost":100.0,"time":6.0,"power":0,"demand":0,"size":Vector2(32,32),"hp":600},
- "gate":{"name":"Security Gate","cost":180.0,"time":8.0,"power":0,"demand":0,"size":Vector2(32,32),"hp":600}
+ "gate":{"name":"Security Gate","cost":180.0,"time":8.0,"power":0,"demand":0,"size":Vector2(32,32),"hp":600},
+ "ghost_node":{"name":"Ghost Operations Node","cost":900.0,"time":16.0,"power":0,"demand":20,"size":Vector2(118,100),"hp":1100},
+ "pillbox":{"name":"Steel Pillbox","cost":800.0,"time":15.0,"power":0,"demand":10,"size":Vector2(66,66),"hp":1600},
+ "concealed_nest":{"name":"Concealed Gun Nest","cost":650.0,"time":11.0,"power":0,"demand":10,"size":Vector2(66,66),"hp":900},
+ "sandbag":{"name":"Sandbag Line","cost":0.0,"time":0.0,"power":0,"demand":0,"size":Vector2(32,32),"hp":450},
+ "passage":{"name":"Hidden Passage","cost":0.0,"time":0.0,"power":0,"demand":0,"size":Vector2(32,32),"hp":400}
 }
 const TABS := ["BUILDINGS","DEFENSE","INFANTRY","VEHICLES","UPGRADES"]
 const PRODUCER_KINDS := ["barracks","factory","airfield"]
@@ -106,6 +111,7 @@ var fog_enabled := true
 var audio
 var power_short := false
 var restoring := false
+var fieldwork := false
 var fog
 const ArmyRules = preload("res://scripts/economy/army_rules.gd")
 const SkirmishMaps = preload("res://scripts/economy/skirmish_maps.gd")
@@ -126,6 +132,8 @@ func _load_balance() -> void:
  super._load_balance()
  for data in registry.get("specialist_units", []):
   if data.id in ["a_lance","a_lattice","r_jugger","r_imperator","r_armored_scout","g_siege_rocket","g_volley","a_tempest","r_stormrail","r_escort","g_junker"]: roster[data.id] = data
+ for extra_id in ArmyRules.EXTRA_UNITS:
+  roster[extra_id]=ArmyRules.EXTRA_UNITS[extra_id]
 
 func _spawn(id: String, side: int, point: Vector2):
  var unit
@@ -152,7 +160,26 @@ var scouting = preload("res://scripts/combat/scouting.gd").new()
 
 func entity_visible_to(side: int, entity) -> bool:
  if not is_instance_valid(entity): return false
- return not fog_enabled or fog == null or entity.team == side or fog.sees(side, entity.position)
+ if entity.get("team")!=null and int(entity.team)==side: return true
+ if entity.get("cloaked")==true and not detected_by(side, entity): return false
+ return not fog_enabled or fog == null or fog.sees(side, entity.position)
+
+func detected_by(side: int, entity) -> bool:
+ if side<0 or side>1 or not is_instance_valid(entity): return false
+ var origin: Vector2=entity.position
+ for unit in units:
+  if is_instance_valid(unit) and unit.hp>0.0 and unit.team==side and unit.unit_id=="a_pathfinder" and unit.position.distance_to(origin)<=float(ArmyRules.CLOAK["a_pathfinder"].detect): return true
+ for building in structures:
+  if is_instance_valid(building) and building.hp>0.0 and building.team==side and building.kind=="ghost_node" and building.position.distance_to(origin)<=ArmyRules.GHOST_NODE_DETECT: return true
+ return false
+
+func near_structure(side: int, point: Vector2, kind: String, reach: float) -> bool:
+ for building in structures:
+  if not is_instance_valid(building) or building.hp<=0.0 or building.team!=side: continue
+  if kind!="" and building.kind!=kind: continue
+  if building.kind in ["sandbag","passage"]: continue
+  if building.position.distance_to(point)<=reach: return true
+ return false
 
 func feedback_visible(point: Vector2) -> bool:
  return not fog_enabled or fog == null or fog.sees(0, point)
@@ -323,14 +350,15 @@ func obstacle_clearance(box: Rect2) -> float:
  return 24.0
 
 func passage_open(actor, box: Rect2) -> bool:
- return _perimeter_kind(box)=="gate" and _gate_owner(box)==_actor_team(actor)
+ var kind: String=_perimeter_kind(box)
+ return kind in ["gate","passage"] and _gate_owner(box)==_actor_team(actor)
 
 func open_passage(actor) -> Array[Vector2i]:
  var opened: Array[Vector2i]=[]
  var team: int=_actor_team(actor)
  if team<0 or actor==null or bool(actor.get("air")): return opened
  for building in structures:
-  if not is_instance_valid(building) or building.hp<=0.0 or building.kind!="gate" or building.team!=team: continue
+  if not is_instance_valid(building) or building.hp<=0.0 or building.kind not in ["gate","passage"] or building.team!=team: continue
   var reach: Rect2=building.ground_bounds().grow(8.0)
   var min_cell: Vector2i=world_cell(reach.position)
   var max_cell: Vector2i=world_cell(reach.end-Vector2(0.1,0.1))
@@ -350,13 +378,13 @@ func _actor_team(actor) -> int:
 
 func _gate_owner(box: Rect2) -> int:
  for building in structures:
-  if is_instance_valid(building) and building.hp>0.0 and building.kind=="gate" and building.ground_bounds().is_equal_approx(box):
+  if is_instance_valid(building) and building.hp>0.0 and building.kind in ["gate","passage"] and building.ground_bounds().is_equal_approx(box):
    return int(building.team)
  return -2
 
 func _perimeter_kind(box: Rect2) -> String:
  for building in structures:
-  if is_instance_valid(building) and building.hp>0.0 and building.kind in ["wall","gate"] and building.ground_bounds().is_equal_approx(box):
+  if is_instance_valid(building) and building.hp>0.0 and building.kind in ["wall","gate","passage"] and building.ground_bounds().is_equal_approx(box):
    return building.kind
  return ""
 
@@ -411,7 +439,7 @@ func _deploy_mcv(side: int) -> bool:
 
 func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-1.0) -> bool:
  # A resume can include a captured building the owner's roster would not build.
- if not restoring and side>=0 and id not in ["yard","relay"] and not id in ArmyRules.structure_ids(army_choices[side]): return false
+ if not restoring and not fieldwork and side>=0 and id not in ["yard","relay"] and not id in ArmyRules.structure_ids(army_choices[side]): return false
  var size: Vector2=Vector2(155,135) if id=="yard" else STRUCTURE_DATA[id]["size"]
  var b=Node2D.new()
  b.set_script(StructureScript)
@@ -428,6 +456,9 @@ func _place_structure(id: String, side: int, point: Vector2, paid_value: float=-
   b.max_hp=float(profile.hp)
   b.hp=b.max_hp
   if paid_value<0.0: b.paid_value=float(profile.cost)
+ if side>=0 and ArmyRules.fortress_defense(army_choices[side], id):
+  b.max_hp*=ArmyRules.FORTRESS_BONUS
+  b.hp=b.max_hp
  b.destroyed.connect(_building_destroyed)
  structures.append(b)
  if side>=0 and id in PRODUCER_KINDS:
@@ -479,7 +510,7 @@ func _on_destroyed(unit) -> void:
 func _side_alive(side: int) -> bool:
  for building in structures:
   if not is_instance_valid(building) or building.team!=side or building.hp<=0.0: continue
-  if building.kind not in ["turret","wall","gate"]: return true
+  if building.kind not in ["turret","pillbox","concealed_nest","wall","gate","sandbag","passage"]: return true
  for actor in units:
   if is_instance_valid(actor) and actor.team==side and actor.hp>0.0 and str(actor.unit_id) in ["a_mcv","r_mcv","g_mcv"]: return true
  return false
@@ -807,7 +838,7 @@ func _tech_ready(side: int, id: String) -> bool:
    return has_structure(side,"barracks") and (has_structure(side,"refinery") if base in ["a_javelin","r_hunter","g_rocket_cell"] else true)
   if roster[id].armor=="AIR": return has_structure(side,"airfield") and has_structure(side,"power")
   if not has_structure(side,"factory"): return false
-  if base in ["a_mcv","r_mcv","g_mcv","r_mammoth"]: return has_structure(side,"depot")
+  if base in ["a_mcv","r_mcv","g_mcv","r_mammoth"]: return has_structure(side,"depot") or has_structure(side,"ghost_node")
   if base in ["a_sentinel_aa","r_flak","g_rocket_truck"]: return has_structure(side,"power")
   return true
  match id:
@@ -815,8 +846,8 @@ func _tech_ready(side: int, id: String) -> bool:
   "refinery","barracks": return has_structure(side,"power")
   "factory": return has_structure(side,"refinery") and has_structure(side,"barracks")
   "airfield": return has_structure(side,"factory")
-  "depot": return has_structure(side,"factory")
-  "turret","beam_bastion","sam","salvaged_aa","missile_nest": return has_structure(side,"barracks")
+  "depot","ghost_node": return has_structure(side,"factory")
+  "turret","beam_bastion","sam","salvaged_aa","missile_nest","pillbox","concealed_nest": return has_structure(side,"barracks")
   "foundry","vanguard_foundry": return has_structure(side,"factory") and has_structure(side,"depot")
   "silo","beam_array","ironstorm": return has_structure(side,"factory") and has_structure(side,"depot")
   "wall","gate": return true
@@ -831,11 +862,31 @@ func _recipe(id: String, side: int = 0) -> Dictionary:
  if id in ["wall","gate"] and side>=0 and side<army_choices.size():
   var profile: Dictionary = ArmyRules.perimeter(army_choices[side], id)
   var base: Dictionary = STRUCTURE_DATA[id]
-  return {"name":profile.name,"cost":float(profile.cost),"time":float(profile.time),"power":0,"demand":0,"size":base.size,"hp":float(profile.hp)}
- if STRUCTURE_DATA.has(id): return STRUCTURE_DATA[id]
+  var recipe: Dictionary={"name":profile.name,"cost":float(profile.cost),"time":float(profile.time),"power":0,"demand":0,"size":base.size,"hp":float(profile.hp)}
+  return _fortify_recipe(side, id, recipe)
+ if STRUCTURE_DATA.has(id): return _fortify_recipe(side, id, STRUCTURE_DATA[id])
  if roster.has(id):
   return {"name":roster[id]["name"],"cost":float(roster[id]["credits"])*ArmyRules.cost_factor(army_choices[side],roster[id]),"time":float(roster[id]["build_seconds"])}
  return {}
+
+func _fortify_recipe(side: int, id: String, recipe: Dictionary) -> Dictionary:
+ if side<0 or side>=army_choices.size() or not ArmyRules.fortress_defense(army_choices[side], id): return recipe
+ var fortified: Dictionary=recipe.duplicate()
+ fortified["time"]=float(recipe.get("time",0.0))*ArmyRules.FORTRESS_BONUS
+ fortified["hp"]=float(recipe.get("hp",0.0))*ArmyRules.FORTRESS_BONUS
+ return fortified
+
+func place_fieldwork(id: String, side: int, point: Vector2, hp: float, seconds: float) -> bool:
+ fieldwork=true
+ var placed: bool=_place_structure(id, side, point, 0.0)
+ fieldwork=false
+ if not placed: return false
+ var building=structures[structures.size()-1]
+ building.max_hp=hp
+ building.hp=hp
+ building.paid_value=0.0
+ building.life_left=seconds
+ return true
 
 func queue_production(side: int, lane: String, id: String) -> bool:
  if side<0 or side>=states.size() or not lane in ["build","defense","infantry","vehicle","air"]: return false
@@ -914,7 +965,7 @@ func capture_structure(engineer, b) -> bool:
  if engineer==null or b==null or not is_instance_valid(engineer) or not is_instance_valid(b): return false
  if not units.has(engineer) or not structures.has(b) or b.hp<=0.0: return false
  if not ArmyRules.engineer(engineer.unit_id) or engineer.team==b.team: return false
- if str(b.kind) in ["wall","gate"]: return false
+ if str(b.kind) in ["wall","gate","sandbag","passage"]: return false
  var old_owner: int=b.team
  b.team=engineer.team
  if b.kind in PRODUCER_KINDS:
@@ -1219,8 +1270,9 @@ func _ai_economy(side: int = 1) -> void:
    if not has_structure(side,id) and _tech_ready(side,id):
     queue_production(side,"build",id)
     break
-  if has_structure(side,"factory") and not has_structure(side,"depot") and float(state["credits"])>1700.0:
-   queue_production(side,"build","depot")
+  var depot_id: String=str(ArmyRules.REPLACEMENTS.get(army_choices[side],{}).get("depot","depot"))
+  if has_structure(side,"factory") and not has_structure(side,depot_id) and float(state["credits"])>1700.0 and _tech_ready(side,depot_id):
+   queue_production(side,"build",depot_id)
   elif has_structure(side,"factory") and float(state["credits"])>4000.0 and ai_build_tick%6==0:
    queue_production(side,"build","factory" if _building_count(side,"factory")<2 else "power")
   elif has_structure(side,"power") and has_structure(side,"refinery") and has_structure(side,"barracks") and has_structure(side,"factory") and not has_structure(side,"airfield") and float(state["credits"])>3500.0 and ai_build_tick%7==0:
@@ -1744,7 +1796,7 @@ func _create_hud() -> void:
  column.add_child(field_orders)
  var deploy=Button.new()
  deploy.text="DEPLOY"
- deploy.tooltip_text="Deploy the selected MCV (H)."
+ deploy.tooltip_text="Deploy the selected MCV, or deploy and pack a Siege Carrier (H)."
  deploy.custom_minimum_size=Vector2(0,28)
  deploy.size_flags_horizontal=Control.SIZE_EXPAND_FILL
  deploy.pressed.connect(_on_deploy)
@@ -1986,7 +2038,10 @@ func _on_toolbar(action: String) -> void:
   _: super._on_toolbar(action)
 
 func _on_deploy() -> void:
- if _deploy_mcv(0): _update_hud()
+ for unit in selected:
+  if is_instance_valid(unit) and unit.team==0 and unit.unit_id=="r_siege_carrier" and unit.has_method("order_deploy"):
+   unit.order_deploy()
+ if _deploy_mcv(0) or _selection_has_unit(["r_siege_carrier"]): _update_hud()
 
 func _cancel_current_tab() -> void:
  if current_tab<0 or current_tab>3:
@@ -2073,7 +2128,7 @@ func _on_build_button(id: String) -> void:
  queue_redraw()
 
 func _lane_for(id: String) -> String:
- if id in ["turret","beam_bastion","sam","salvaged_aa","missile_nest","wall","gate"]: return "defense"
+ if id in ["turret","beam_bastion","sam","salvaged_aa","missile_nest","pillbox","concealed_nest","wall","gate","sandbag"]: return "defense"
  if STRUCTURE_DATA.has(id): return "build"
  if roster.has(id): return ArmyRules.lane(id,roster[id])
  return "vehicle"
@@ -2126,7 +2181,7 @@ func _update_hud() -> void:
  if is_instance_valid(queue_panel): queue_panel.visible=not on_upgrades
  if is_instance_valid(orders_sheet): orders_sheet.visible=_orders_sheet_wanted()
  if is_instance_valid(field_orders) and field_orders.get_child_count()>1:
-  var show_deploy=_selection_has_unit(["a_mcv","r_mcv","g_mcv"])
+  var show_deploy=_selection_has_unit(["a_mcv","r_mcv","g_mcv","r_siege_carrier"])
   var show_harvest=_selection_has_unit(["a_harvester","r_hauler","g_collector"])
   var deploy_button: Button=field_orders.get_child(0)
   var harvest_button: Button=field_orders.get_child(1)
@@ -2162,6 +2217,9 @@ func _update_hud() -> void:
    "a_sentinel":"SENTINEL","a_sentinel_aa":"MOBILE AA",
    "a_harvester":"HARVESTER","a_mcv":"MCV",
    "a_lance":"ARC LANCE","a_striker":"STRIKER","a_tempest":"TEMPEST",
+   "a_pathfinder":"PATHFINDER","a_ghost_carrier":"GHOST CARRIER","ghost_node":"GHOST NODE",
+   "r_garrison":"GARRISON","r_siege_carrier":"SIEGE CARRIER","pillbox":"PILLBOX",
+   "g_shade":"SHADE","g_ghost_technical":"GHOST TECH","concealed_nest":"GUN NEST",
    "r_imperator":"IMPERATOR","r_mammoth":"MAMMOTH","r_siege_heli":"SIEGE HELI",
    "r_stormrail":"STORMRAIL","r_escort":"ESCORT",
    "g_rocket_truck":"MOBILE AA","g_volley":"VOLLEY","g_heli":"HELICOPTER","g_collector":"COLLECTOR",
